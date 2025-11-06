@@ -81,6 +81,7 @@ export default function Page() {
             onChange={event => setNickname(event.target.value)}
             style={{
               width: '100%',
+              boxSizing: 'border-box',
               padding: '0.85rem 1rem',
               borderRadius: 12,
               border: '1px solid rgba(148, 163, 184, 0.4)',
@@ -97,6 +98,7 @@ export default function Page() {
               onClick={handleEnterLobby}
               style={{
                 flex: 1,
+                boxSizing: 'border-box',
                 minWidth: 160,
                 padding: '0.9rem 1rem',
                 borderRadius: 999,
@@ -119,6 +121,7 @@ export default function Page() {
               onClick={handleGenerateNickname}
               style={{
                 flex: 1,
+                boxSizing: 'border-box',
                 minWidth: 160,
                 padding: '0.9rem 1rem',
                 borderRadius: 999,
