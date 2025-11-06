@@ -19,3 +19,11 @@ export const ServerState = z.object({
   pot: z.number().int(),
 });
 export type ServerState = z.infer<typeof ServerState>;
+
+export const Heartbeat = z.object({
+  status: z.literal('ok'),
+  timestamp: z.number().int(),
+  uptimeMs: z.number().int().min(0),
+  connections: z.number().int().min(0)
+});
+export type Heartbeat = z.infer<typeof Heartbeat>;
