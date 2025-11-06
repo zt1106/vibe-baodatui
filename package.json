@@ -1,0 +1,16 @@
+{
+  "name": "poker-monorepo",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -C apps/server dev & pnpm -C apps/web dev & wait",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "e2e": "pnpm -C apps/web test:e2e"
+  }
+}

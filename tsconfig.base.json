@@ -1,0 +1,19 @@
+
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@game-core/*": ["packages/game-core/src/*"],
+      "@shared/*": ["packages/shared/src/*"],
+      "@test-utils/*": ["packages/test-utils/src/*"]
+    },
+    "types": ["node"]
+  }
+}

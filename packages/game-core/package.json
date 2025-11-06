@@ -1,0 +1,22 @@
+{
+  "name": "@poker/game-core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "vitest --watch",
+    "build": "tsc -b",
+    "test": "vitest run",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "seedrandom": "^3.0.5"
+  },
+  "devDependencies": {
+    "@types/seedrandom": "^3.0.5",
+    "typescript": "^5.6.3",
+    "vitest": "^2.0.5",
+    "@types/node": "^20.12.12"
+  }
+}

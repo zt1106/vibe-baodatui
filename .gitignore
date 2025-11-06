@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+**/node_modules/
+.pnp.cjs
+.pnp.loader.mjs
+.pnp.js
+.pnpm-store/
+
+# Build outputs
+dist/
+**/dist/
+build/
+.next/
+**/.next/
+out/
+.vercel/
+
+# Caches & tooling artefacts
+.turbo/
+.cache/
+.eslintcache
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Tests & coverage
+coverage/
+coverage-final.json
+*.lcov
+apps/web/test-results/
+**/test-results/
+apps/web/playwright-report/
+**/playwright-report/
+
+# Environment files
+.env
+.env.*
+!.env.example
+apps/server/.env
+apps/web/.env
+
+# Local databases
+apps/server/prisma/dev.db
+apps/server/prisma/dev.db-journal
+
+# IDE & OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
