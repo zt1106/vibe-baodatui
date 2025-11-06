@@ -17,15 +17,13 @@ This document captures the current and target-state backend architecture for the
 - **Real-time Hub (Socket.IO)** manages rooms, event fan-out, and backpressure control.
 - **Game Engine (`packages/game-core`)** encapsulates pure poker state transitions (deck, bets, seats).
 - **Shared Contracts (`packages/shared`)** enforce schema parity between client and server via Zod.
-- **Persistence Layer (Prisma → PostgreSQL)** will store durable entities: players, tables, hands, analytics.
-- **Infra Services (Redis, message broker, object storage)** enable horizontal scaling, queueing, and replay.
+- **In-memory Table Registry** tracks active seats, chip stacks, and hands within each server process.
+- **Optional Infra Services (Redis, message broker, object storage)** can be added later for cross-process scaling and replay.
 
 ```
 Clients ──HTTP──▶ Express API ──▶ Controllers ──▶ Game Engine
         ╲        ╱                   │
-         ╲────WebSocket──── Socket.IO Hub ─┬──▶ In-memory Table Cache
-                                           ├──▶ Redis (state replication)
-                                           └──▶ Background Services (matchmaking, audits)
+         ╲────WebSocket──── Socket.IO Hub ───▶ In-memory Table Registry
 ```
 
 ## Runtime Stack
@@ -33,6 +31,7 @@ Clients ──HTTP──▶ Express API ──▶ Controllers ──▶ Game Eng
 - **Language & Runtime**: Node.js 20+, TypeScript-first (strict mode), ES modules across packages.
 - **Frameworks**: Express 4 for HTTP routes, Socket.IO 4 for WebSocket transport with fallback support.
 - **Process Manager**: `tsx` for local dev hot reload; production runs under a supervisor such as `pm2`, Docker, or orchestrated K8s pods.
+- **State Storage**: All gameplay data resides in-memory; restarts reset tables, and there is no external database dependency.
 - **Configuration**: `.env` sourced via `packages/shared/env`, ensuring consistent variable parsing on server and client builds.
 
 ## Module Responsibilities
@@ -54,11 +53,11 @@ Clients ──HTTP──▶ Express API ──▶ Controllers ──▶ Game Eng
 - Zod schemas for events (`JoinTable`, `Bet`, `ServerState`) to validate runtime payloads.
 - Mirror types exported for client consumption to guarantee symmetry and shrink drift risk.
 
-### Persistence & Query Layer
+### In-memory State Store
 
-- Prisma client exposed via a thin repository module (`apps/server/src/data/*`, to be introduced).
-- PostgreSQL as the primary data store; tables envisioned for `players`, `tables`, `hands`, `action_logs`.
-- Optional read replicas or caching layers (Redis) can be layered for leaderboards and session data.
+- Table registry managed by the Socket.IO server thread.
+- Player seating, chip counts, decks, and pots live in process-scoped maps keyed by table id.
+- Optional snapshot hooks can serialize state to disk for debugging, but no persistence is required today.
 
 ### Background Workers
 
@@ -72,43 +71,43 @@ Clients ──HTTP──▶ Express API ──▶ Controllers ──▶ Game Eng
    - Socket.IO connection established; server emits `state` snapshot with current table info.
 2. **Join Table**
    - Client emits `joinTable { nickname }`.
-   - Server validates payload via Zod, mutates table state (`joinTable` + `deal` for demo), persists snapshot when backing store is enabled.
+   - Server validates payload via Zod, mutates table state (`joinTable` + `deal` for demo).
    - Updated `ServerState` broadcast to all subscribers.
 3. **Betting**
    - Client emits `bet { chips }`.
-   - Server validates, delegates to `coreBet`, updates pot, writes action log.
+   - Server validates, delegates to `coreBet`, updates pot, and records action in-memory for the current hand.
    - Broadcast new `ServerState`; failures trigger `errorMessage`.
 4. **Disconnect**
-   - Socket.IO detects disconnect; cleanup worker reclaims seat after timeout, persists changes, notifies table occupants.
+   - Socket.IO detects disconnect; cleanup worker reclaims seat after timeout and notifies table occupants.
 
 Future flows will extend this template for folds, showdowns, and tournament phases.
 
 ## Data & State Management
 
-- **Transient State**: Each table initially lives in-process using the `TableState` map.
-- **Durable State**: Transition to PostgreSQL for seats, hands, chip stacks, and audit trails. Prisma migrations track schema evolution (`pnpm -C apps/server prisma:migrate`).
-- **Caching Layer**: Redis stores hot table snapshots and session metadata; TTLs ensure stale cleanup.
-- **Event Sourcing (optional)**: Append-only `action_logs` table or Kafka topic preserves action history for replay/debugging.
+- **Active State**: Each table lives entirely in-process using the `TableState` map exported by `packages/game-core`.
+- **Ephemeral Nature**: Server restarts wipe state. Acceptable for prototype/testing environments; persistence is a roadmap item.
+- **Optional Replication**: Redis or another pub/sub system can be introduced later to replicate state across nodes if horizontal scaling is required.
+- **Event Sourcing (future)**: Append-only action logs may be adopted to retain hand history once persistence is prioritized.
 
 ## Scaling Strategy
 
-- **Horizontal Scaling**: Run multiple Socket.IO nodes behind a load balancer with sticky sessions. Use Redis adapter (or Postgres pub/sub) so events broadcast across nodes remain consistent.
-- **Room Sharding**: Allocate groups of tables per process; scale outperforming tables by moving them to dedicated pods.
-- **State Offloading**: Large tables or tournaments can move state ownership to dedicated game workers communicating via RPC or message bus.
+- **Horizontal Scaling**: Initially run a single Socket.IO node. When multiple nodes are needed, add the Redis adapter (or another message bus) to synchronize in-memory tables.
+- **Room Sharding**: Allocate groups of tables per process; promote hot tables to dedicated pods if contention appears.
+- **State Offloading**: For larger tournaments, dedicated game workers can own table state and communicate via RPC without storing to disk.
 - **Backpressure & Rate Limiting**: Apply Socket.IO middleware to throttle abusive clients; enforce per-IP and per-user caps at the ingress layer.
-- **Global Distribution**: Multi-region deployments rely on CDN for static assets, regional Socket.IO clusters, and a geo-distributed database (e.g., Neon, CockroachDB, or read replicas) with latency-aware routing.
+- **Global Distribution**: Multi-region deployments rely on CDN for static assets, regional Socket.IO clusters, and geo-aware routing; durability remains a future enhancement.
 
 ## Deployment & Operations
 
-- **Environments**: `dev` (local), `staging` (QA), `prod` (customers). Each environment uses isolated databases and Redis instances.
+- **Environments**: `dev`, `staging`, `prod` share the same in-memory profile—no external database provisioning required.
 - **Containerization**: Dockerfile bundles the server; CI builds and pushes images to registry. Runtime configured via environment variables.
 - **Orchestration**: Kubernetes or ECS schedules pods, mounts config, and manages horizontal pod autoscaling on CPU/WebSocket count.
 - **Observability**:
   - Structured logging (`pino` or `winston`) with correlation IDs per table and hand.
   - Metrics emitted via `prom-client` (active connections, average latency, errors).
   - Tracing (OpenTelemetry) for join/bet flows to spot latency spikes.
-- **Health & Readiness**: `/health` (basic) plus `/ready` (checks DB + Redis) gate traffic in load balancers.
-- **Disaster Recovery**: Automated PostgreSQL backups, Redis snapshotting, IaC-managed infra (Terraform) for reproducible recovery.
+- **Health & Readiness**: `/health` (basic) plus `/ready` (ensures event loop, memory, and Socket.IO health) gate traffic in load balancers.
+- **Disaster Recovery**: With in-memory state, hand history resets on restart; future persistence will introduce backup strategies.
 
 ## Security Considerations
 
@@ -127,7 +126,7 @@ Future flows will extend this template for folds, showdowns, and tournament phas
 
 ## Roadmap & Enhancements
 
-- Persist tables and actions to PostgreSQL; introduce replay and analytics endpoints.
+- Introduce durable storage (e.g., PostgreSQL via Prisma) for hand history, analytics, and persistence.
 - Add matchmaker service supporting table capacity rules and skill-based seeding.
 - Implement side pots, blinds rotation, and showdown logic in `packages/game-core`.
 - Support multi-table tournaments with scheduling via background workers.
@@ -136,7 +135,5 @@ Future flows will extend this template for folds, showdowns, and tournament phas
 ## Appendix: Reference Commands
 
 - `pnpm dev` — start web + server in watch mode.
-- `pnpm -C apps/server prisma:generate` — sync Prisma client after schema updates.
 - `pnpm -C apps/server build` — output production bundle for containerization.
 - `pnpm test && pnpm e2e` — run unit and Playwright suites before deployment.
-
