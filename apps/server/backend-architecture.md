@@ -39,8 +39,14 @@ Clients ──HTTP──▶ Express API ──▶ Controllers ──▶ Game Eng
 ### Express Application (`apps/server/src/index.ts`)
 
 - Boots the HTTP server and attaches Socket.IO.
-- Defines lightweight REST endpoints (`/health`, future `/auth`, `/admin`).
+- Defines lightweight REST endpoints (`/health`, `/ready`, `/auth/register`, `/auth/login`).
 - Bridges incoming WebSocket events to domain services.
+
+### User Registry
+
+- In-memory store that assigns monotonically increasing integer `userId`s to nicknames.
+- Enforces nickname uniqueness (case-insensitive) and powers login/register flows with no password requirement.
+- Provides lookups for Socket.IO handlers to associate connections with persistent users.
 
 ### Game Engine (`packages/game-core`)
 
@@ -68,10 +74,11 @@ Clients ──HTTP──▶ Express API ──▶ Controllers ──▶ Game Eng
 
 1. **Handshake**
    - Client hits `GET /health` for readiness.
+   - Client calls `POST /auth/register` (or `/auth/login`) with a nickname to receive a numeric `userId`.
    - Socket.IO connection established; server emits `state` snapshot with current table info.
 2. **Join Table**
-   - Client emits `joinTable { nickname }`.
-   - Server validates payload via Zod, mutates table state (`joinTable` + `deal` for demo).
+   - Client emits `joinTable { tableId, nickname, userId }`.
+   - Server validates payload via Zod, resolves the user from the registry (registering on first use), ensures a single seat per user, mutates table state (`joinTable` + `deal` for demo), and records the `userId` on the seat.
    - Updated `ServerState` broadcast to all subscribers.
 3. **Betting**
    - Client emits `bet { chips }`.
@@ -85,6 +92,7 @@ Future flows will extend this template for folds, showdowns, and tournament phas
 ## Data & State Management
 
 - **Active State**: Each table lives entirely in-process using the `TableState` map exported by `packages/game-core`.
+- **User Directory**: Nickname-to-`userId` mappings live in the same process; restarting the server clears registrations until persistent storage is added.
 - **Ephemeral Nature**: Server restarts wipe state. Acceptable for prototype/testing environments; persistence is a roadmap item.
 - **Optional Replication**: Redis or another pub/sub system can be introduced later to replicate state across nodes if horizontal scaling is required.
 - **Event Sourcing (future)**: Append-only action logs may be adopted to retain hand history once persistence is prioritized.

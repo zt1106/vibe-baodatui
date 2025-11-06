@@ -24,9 +24,10 @@ describe('deck + shuffle', () => {
 describe('table flow', () => {
   it('join, deal, bet', () => {
     const t = createTable('t1', 'seed123');
-    joinTable(t, 'p1', 'Alice', 100);
-    joinTable(t, 'p2', 'Bob', 100);
+    joinTable(t, 'p1', 'Alice', 1, 100);
+    joinTable(t, 'p2', 'Bob', 2, 100);
     deal(t, 2);
+    expect(t.players['p1'].userId).toBe(1);
     expect(t.players['p1'].hand).toHaveLength(2);
     expect(t.players['p2'].hand).toHaveLength(2);
     bet(t, 'p1', 10);

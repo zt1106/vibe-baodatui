@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useHeartbeat } from '../lib/heartbeat';
+import {
+  ensureUser,
+  loadStoredUser,
+  persistStoredUser,
+  clearStoredUser,
+  type StoredUser
+} from '../lib/auth';
 import { generateRandomChineseName } from '../lib/nickname';
 
 const NICKNAME_STORAGE_KEY = 'nickname';
@@ -12,7 +19,14 @@ const NICKNAME_STORAGE_KEY = 'nickname';
 export default function Page() {
   const router = useRouter();
   const [nickname, setNickname] = useState('');
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const heartbeat = useHeartbeat();
+  const apiBaseUrl = useMemo(() => {
+    const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
+    return base.replace(/\/$/, '');
+  }, []);
 
   const heartbeatTone = useMemo(() => {
     switch (heartbeat.status) {
@@ -32,10 +46,15 @@ export default function Page() {
     heartbeat.timeSinceHeartbeat != null ? Math.floor(heartbeat.timeSinceHeartbeat / 1000) : null;
 
   useEffect(() => {
-    const storedNickname = window.localStorage.getItem(NICKNAME_STORAGE_KEY);
-    if (storedNickname) {
-      setNickname(storedNickname);
+    const storedUser = loadStoredUser();
+    if (storedUser) {
+      setUser(storedUser);
+      setNickname(storedUser.nickname);
+      window.localStorage.setItem(NICKNAME_STORAGE_KEY, storedUser.nickname);
+      return;
     }
+    const storedNickname = window.localStorage.getItem(NICKNAME_STORAGE_KEY);
+    if (storedNickname) setNickname(storedNickname);
   }, []);
 
   const persistNickname = useCallback((value: string) => {
@@ -44,15 +63,38 @@ export default function Page() {
     window.localStorage.setItem(NICKNAME_STORAGE_KEY, safeValue);
   }, []);
 
-  const handleEnterLobby = useCallback(() => {
-    persistNickname(nickname);
-    router.push('/lobby');
-  }, [nickname, persistNickname, router]);
+  const handleEnterLobby = useCallback(async () => {
+    if (isAuthenticating) return;
+    const targetNickname = nickname.trim() || 'Guest';
+    persistNickname(targetNickname);
+    setAuthError(null);
+    setIsAuthenticating(true);
+    try {
+      const authenticated = await ensureUser(apiBaseUrl, targetNickname);
+      persistStoredUser(authenticated);
+      setUser(authenticated);
+      setNickname(authenticated.nickname);
+      router.push('/lobby');
+    } catch (error) {
+      console.error('[web] failed to authenticate before lobby navigation', error);
+      setAuthError('无法登录，请稍后再试。');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }, [apiBaseUrl, isAuthenticating, nickname, persistNickname, router]);
+
+  const handleLogout = useCallback(() => {
+    clearStoredUser();
+    setUser(null);
+    setNickname('');
+    window.localStorage.removeItem(NICKNAME_STORAGE_KEY);
+  }, []);
 
   const handleGenerateNickname = useCallback(() => {
+    if (isAuthenticating) return;
     const generated = generateRandomChineseName();
     persistNickname(generated);
-  }, [persistNickname]);
+  }, [isAuthenticating, persistNickname]);
 
   return (
     <>
@@ -120,18 +162,23 @@ export default function Page() {
               <input
                 data-testid="nickname-input"
                 placeholder="输入昵称加入牌局"
-                value={nickname}
-                onChange={event => setNickname(event.target.value)}
+                value={user ? `Logged in as ${user.nickname}` : nickname}
+                onChange={event => {
+                  if (user) return;
+                  setNickname(event.target.value);
+                }}
+                disabled={!!user}
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
                   padding: '0.9rem 1rem',
                   borderRadius: 12,
                   border: '1px solid rgba(148, 163, 184, 0.45)',
-                  background: 'rgba(15, 23, 42, 0.65)',
-                  color: '#e2e8f0',
+                  background: user ? 'rgba(22, 163, 74, 0.18)' : 'rgba(15, 23, 42, 0.65)',
+                  color: user ? '#34d399' : '#e2e8f0',
                   fontSize: '1rem',
                   boxShadow: '0 10px 24px rgba(15, 23, 42, 0.35)',
+                  transition: 'background 0.2s ease, color 0.2s ease',
                 }}
               />
 
@@ -147,6 +194,7 @@ export default function Page() {
                 <button
                   data-testid="enter-lobby-btn"
                   onClick={handleEnterLobby}
+                  disabled={isAuthenticating}
                   style={{
                     flex: 1,
                     boxSizing: 'border-box',
@@ -158,38 +206,80 @@ export default function Page() {
                     color: '#0f172a',
                     fontWeight: 700,
                     fontSize: '1rem',
-                    cursor: 'pointer',
+                    cursor: isAuthenticating ? 'progress' : 'pointer',
                     boxShadow: '0 18px 40px rgba(249, 115, 22, 0.35)',
                     transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+                    opacity: isAuthenticating ? 0.6 : 1,
                   }}
                 >
-                  进入大厅
+                  {isAuthenticating ? '登录中…' : '进入大厅'}
                 </button>
 
-                {/* data-testid=random-nickname-btn allows tests to opt into curated name generation. */}
-                <button
-                  type="button"
-                  data-testid="random-nickname-btn"
-                  onClick={handleGenerateNickname}
+                {user ? (
+                  <button
+                    type="button"
+                    data-testid="logout-btn"
+                    onClick={handleLogout}
+                    style={{
+                      flex: 1,
+                      boxSizing: 'border-box',
+                      minWidth: 170,
+                      padding: '0.95rem 1.15rem',
+                      borderRadius: 999,
+                      border: '1px solid rgba(148, 163, 184, 0.5)',
+                      background: 'rgba(15, 23, 42, 0.4)',
+                      color: '#e2e8f0',
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 18px 40px rgba(15, 23, 42, 0.35)',
+                      transition: 'transform 0.18s ease, border-color 0.18s ease',
+                    }}
+                  >
+                    登出
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="random-nickname-btn"
+                    onClick={handleGenerateNickname}
+                    disabled={isAuthenticating}
+                    style={{
+                      flex: 1,
+                      boxSizing: 'border-box',
+                      minWidth: 170,
+                      padding: '0.95rem 1.15rem',
+                      borderRadius: 999,
+                      border: '1px solid rgba(148, 163, 184, 0.5)',
+                      background: 'rgba(15, 23, 42, 0.4)',
+                      color: '#e2e8f0',
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      cursor: isAuthenticating ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 18px 40px rgba(15, 23, 42, 0.35)',
+                      transition: 'transform 0.18s ease, border-color 0.18s ease',
+                      opacity: isAuthenticating ? 0.5 : 1,
+                    }}
+                  >
+                    随机昵称
+                  </button>
+                )}
+              </div>
+
+              {authError ? (
+                <div
+                  role="alert"
                   style={{
-                    flex: 1,
-                    boxSizing: 'border-box',
-                    minWidth: 170,
-                    padding: '0.95rem 1.15rem',
-                    borderRadius: 999,
-                    border: '1px solid rgba(148, 163, 184, 0.5)',
-                    background: 'rgba(15, 23, 42, 0.4)',
-                    color: '#e2e8f0',
-                    fontWeight: 600,
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 18px 40px rgba(15, 23, 42, 0.35)',
-                    transition: 'transform 0.18s ease, border-color 0.18s ease',
+                    color: '#f97316',
+                    background: 'rgba(249, 115, 22, 0.12)',
+                    borderRadius: 12,
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.95rem',
                   }}
                 >
-                  随机昵称
-                </button>
-              </div>
+                  {authError}
+                </div>
+              ) : null}
             </div>
           </div>
         </section>

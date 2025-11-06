@@ -4,6 +4,7 @@ import { shuffle } from './shuffle';
 
 export interface PlayerState {
   id: string;
+  userId: number;
   nickname: string;
   chips: number;
   hand: Card[];
@@ -24,9 +25,9 @@ export function createTable(id: string, seed: string): TableState {
   return { id, seed, deck, players: {}, seats: [], pot: 0 };
 }
 
-export function joinTable(state: TableState, playerId: string, nickname: string, buyin = 1000) {
+export function joinTable(state: TableState, playerId: string, nickname: string, userId: number, buyin = 1000) {
   if (state.players[playerId]) return state; // idempotent
-  state.players[playerId] = { id: playerId, nickname, chips: buyin, hand: [], hasFolded: false };
+  state.players[playerId] = { id: playerId, userId, nickname, chips: buyin, hand: [], hasFolded: false };
   state.seats.push(playerId);
   return state;
 }

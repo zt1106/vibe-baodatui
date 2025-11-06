@@ -4,10 +4,10 @@ export function createTable(id, seed) {
     const deck = shuffle(makeDeck(), seed);
     return { id, seed, deck, players: {}, seats: [], pot: 0 };
 }
-export function joinTable(state, playerId, nickname, buyin = 1000) {
+export function joinTable(state, playerId, nickname, userId, buyin = 1000) {
     if (state.players[playerId])
         return state; // idempotent
-    state.players[playerId] = { id: playerId, nickname, chips: buyin, hand: [], hasFolded: false };
+    state.players[playerId] = { id: playerId, userId, nickname, chips: buyin, hand: [], hasFolded: false };
     state.seats.push(playerId);
     return state;
 }
