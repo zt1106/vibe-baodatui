@@ -4,7 +4,7 @@ test.describe('Home hero onboarding', () => {
   test('enters the lobby with a trimmed nickname', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('img', { name: 'Stacked poker chip logo' })).toBeVisible();
+    await expect(page.getByRole('img', { name: '抱大腿 logo' })).toBeVisible();
     const nicknameInput = page.getByTestId('nickname-input');
     await expect(nicknameInput).toBeVisible();
 
