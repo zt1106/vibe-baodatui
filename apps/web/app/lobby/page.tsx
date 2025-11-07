@@ -3,14 +3,34 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { useHeartbeat } from '../../lib/heartbeat';
 import { ensureUser, loadStoredUser, persistStoredUser, clearStoredUser, type StoredUser } from '../../lib/auth';
 
 const NICKNAME_STORAGE_KEY = 'nickname';
 
+type RoomStatus = 'waiting' | 'in-progress' | 'full';
+
+type Room = {
+  id: string;
+  status: RoomStatus;
+  players: number;
+  capacity: number;
+};
+
+type Notification = {
+  id: string;
+  message: string;
+  tone: 'info' | 'warning';
+};
+
 export default function LobbyPage() {
   const router = useRouter();
+  const heartbeat = useHeartbeat();
   const [user, setUser] = useState<StoredUser | null>(null);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [authStatus, setAuthStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomsStatus, setRoomsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [error, setError] = useState<string | null>(null);
   const apiBaseUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
@@ -19,7 +39,7 @@ export default function LobbyPage() {
 
   useEffect(() => {
     const bootstrap = async () => {
-      setStatus('loading');
+      setAuthStatus('loading');
       setError(null);
       try {
         const storedUser = loadStoredUser();
@@ -33,16 +53,47 @@ export default function LobbyPage() {
           window.localStorage.setItem(NICKNAME_STORAGE_KEY, authenticated.nickname);
         }
         setUser(authenticated);
-        setStatus('ready');
+        setAuthStatus('ready');
       } catch (err) {
         console.error('[web] failed to ensure user on lobby load', err);
         setError('无法登录，请返回首页重试。');
-        setStatus('error');
+        setAuthStatus('error');
       }
     };
 
     bootstrap();
   }, [apiBaseUrl]);
+
+  useEffect(() => {
+    if (authStatus !== 'ready') {
+      return;
+    }
+    setRoomsStatus('loading');
+    const placeholderRooms: Room[] = [
+      { id: 'A-1024', status: 'waiting', players: 1, capacity: 4 },
+      { id: 'B-2048', status: 'in-progress', players: 3, capacity: 4 },
+      { id: 'C-4096', status: 'waiting', players: 2, capacity: 6 },
+      { id: 'D-8192', status: 'full', players: 6, capacity: 6 },
+      { id: 'E-16384', status: 'waiting', players: 1, capacity: 2 },
+      { id: 'F-32768', status: 'in-progress', players: 4, capacity: 5 },
+      { id: 'G-65536', status: 'waiting', players: 2, capacity: 5 },
+      { id: 'H-131072', status: 'in-progress', players: 3, capacity: 6 },
+      { id: 'I-262144', status: 'waiting', players: 1, capacity: 3 },
+      { id: 'J-524288', status: 'full', players: 8, capacity: 8 },
+      { id: 'K-1048576', status: 'waiting', players: 2, capacity: 4 },
+      { id: 'L-2097152', status: 'in-progress', players: 4, capacity: 6 },
+      { id: 'M-4194304', status: 'waiting', players: 3, capacity: 5 },
+      { id: 'N-8388608', status: 'in-progress', players: 5, capacity: 6 },
+      { id: 'O-16777216', status: 'full', players: 6, capacity: 6 }
+    ];
+    const placeholderNotifications: Notification[] = [
+      { id: 'notice-1', message: '今晚 22:00 维护期间暂停匹配。', tone: 'warning' },
+      { id: 'notice-2', message: '全新牌桌动画将在下周上线！', tone: 'info' }
+    ];
+    setRooms(placeholderRooms);
+    setNotifications(placeholderNotifications);
+    setRoomsStatus('ready');
+  }, [authStatus]);
 
   const handleBackHome = useCallback(() => {
     router.push('/');
@@ -54,77 +105,68 @@ export default function LobbyPage() {
       window.localStorage.removeItem(NICKNAME_STORAGE_KEY);
     }
     setUser(null);
-    setStatus('error');
+    setAuthStatus('error');
     setError('已登出，请返回首页重新登录。');
   }, []);
+
+  const renderRoomStatus = (status: RoomStatus) => {
+    switch (status) {
+      case 'waiting':
+        return '等待加入';
+      case 'in-progress':
+        return '对局中';
+      case 'full':
+        return '房间已满';
+      default:
+        return status;
+    }
+  };
+
+  const indicatorColor = (() => {
+    if (heartbeat.status === 'online') return '#22c55e';
+    if (heartbeat.status === 'degraded' || heartbeat.status === 'connecting') return '#facc15';
+    return '#f87171';
+  })();
 
   return (
     <main
       style={{
         minHeight: '100dvh',
         display: 'grid',
-        placeItems: 'center',
+        gridTemplateRows: 'auto 1fr auto',
         background: '#0f172a',
         color: '#e2e8f0',
         padding: '2rem',
+        gap: '2rem'
       }}
     >
-      <section
+      <header
+        data-testid="lobby-user-summary"
         style={{
-          width: 'min(520px, 100%)',
-          display: 'grid',
-          gap: '1.5rem',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          padding: '1rem 1.25rem',
           background: 'rgba(15, 23, 42, 0.78)',
           borderRadius: 24,
-          padding: '2rem',
           border: '1px solid rgba(148, 163, 184, 0.28)',
-          boxShadow: '0 32px 80px rgba(15, 23, 42, 0.55)',
+          boxShadow: '0 32px 80px rgba(15, 23, 42, 0.55)'
         }}
       >
-        <header style={{ display: 'grid', gap: '0.25rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700 }}>玩家登录状态</h1>
-          <p style={{ margin: 0, opacity: 0.7 }}>进入大厅前会自动注册或登录，无需手动操作。</p>
-        </header>
-
-        <div
-          data-testid="lobby-login-status"
-          style={{
-            padding: '1.25rem',
-            borderRadius: 18,
-            border: '1px solid rgba(148, 163, 184, 0.35)',
-            background: user ? 'rgba(22, 163, 74, 0.12)' : 'rgba(248, 113, 113, 0.12)',
-            color: user ? '#4ade80' : '#fca5a5',
-            minHeight: '4.5rem',
-            display: 'grid',
-            gap: '0.35rem',
-          }}
-        >
-          {status === 'loading' ? (
-            <span>正在登录…</span>
-          ) : user ? (
-            <>
-              <span>已登录：{user.nickname}</span>
-              <span style={{ fontSize: '0.95rem', opacity: 0.8 }}>用户编号：{user.id}</span>
-            </>
-          ) : (
-            <span>{error ?? '尚未登录。'}</span>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
           <button
             onClick={handleBackHome}
             style={{
-              flex: 1,
-              minWidth: 160,
-              padding: '0.85rem 1rem',
+              padding: '0.75rem 1.25rem',
               borderRadius: 999,
               background: 'linear-gradient(135deg, #38bdf8, #6366f1)',
               color: '#0f172a',
               border: 'none',
               fontWeight: 600,
               cursor: 'pointer',
-              boxShadow: '0 18px 40px rgba(99, 102, 241, 0.35)',
+              boxShadow: '0 18px 40px rgba(99, 102, 241, 0.35)'
             }}
           >
             返回首页
@@ -132,37 +174,198 @@ export default function LobbyPage() {
           <button
             onClick={handleLogout}
             style={{
-              flex: 1,
-              minWidth: 160,
-              padding: '0.85rem 1rem',
+              padding: '0.75rem 1.25rem',
               borderRadius: 999,
               border: '1px solid rgba(248, 113, 113, 0.45)',
               background: 'rgba(248, 113, 113, 0.08)',
               color: '#fda4af',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: 'pointer'
             }}
           >
             登出
           </button>
         </div>
+        <div style={{ display: 'grid', gap: '0.35rem', minWidth: 0 }}>
+          {authStatus === 'loading' && <span>正在登录…</span>}
+          {authStatus === 'ready' && user && (
+            <>
+              <span style={{ fontWeight: 600 }}>已登录：{user.nickname}</span>
+              <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>用户编号：{user.id}</span>
+            </>
+          )}
+          {authStatus === 'error' && error && (
+            <span style={{ color: '#fca5a5' }}>{error}</span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gap: '0.35rem', textAlign: 'right' }}>
+          <span style={{ fontWeight: 600 }}>房间总数：{rooms.length}</span>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {notifications.map(notification => (
+              <span
+                key={notification.id}
+                style={{
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: 999,
+                  fontSize: '0.85rem',
+                  background:
+                    notification.tone === 'warning'
+                      ? 'rgba(248, 113, 113, 0.18)'
+                      : 'rgba(96, 165, 250, 0.18)',
+                  color: notification.tone === 'warning' ? '#fecaca' : '#bae6fd',
+                  border:
+                    notification.tone === 'warning'
+                      ? '1px solid rgba(248, 113, 113, 0.35)'
+                      : '1px solid rgba(96, 165, 250, 0.45)'
+                }}
+              >
+                {notification.message}
+              </span>
+            ))}
+            {notifications.length === 0 && <span style={{ opacity: 0.7 }}>暂无通知</span>}
+          </div>
+        </div>
+      </header>
 
-        {error && (
+      <section
+        style={{
+          display: 'grid',
+          gap: '1.5rem',
+          padding: '1.5rem',
+          background: 'rgba(15, 23, 42, 0.78)',
+          borderRadius: 24,
+          border: '1px solid rgba(148, 163, 184, 0.28)',
+          boxShadow: '0 32px 80px rgba(15, 23, 42, 0.35)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+            {roomsStatus === 'loading' && '正在加载房间列表…'}
+            {roomsStatus === 'ready' && rooms.length > 0 && `共 ${rooms.length} 个房间`}
+            {roomsStatus === 'ready' && rooms.length === 0 && '当前没有开放的房间'}
+            {roomsStatus === 'error' && '加载房间失败，请稍后再试。'}
+          </span>
+        </div>
+
+        {roomsStatus === 'loading' ? (
+          <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.75 }}>正在准备房间列表…</div>
+        ) : roomsStatus === 'ready' && rooms.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.75 }}>敬请期待新牌桌开放！</div>
+        ) : roomsStatus === 'error' ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#fca5a5' }}>暂时无法获取房间信息。</div>
+        ) : (
           <div
-            role="alert"
             style={{
-              padding: '1rem',
-              borderRadius: 14,
-              background: 'rgba(248, 113, 113, 0.15)',
-              border: '1px solid rgba(248, 113, 113, 0.35)',
-              color: '#fecaca',
-              fontSize: '0.95rem',
+              display: 'grid',
+              gap: '1.25rem',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))'
             }}
           >
-            {error}
+            {rooms.map(room => (
+              <article
+                key={room.id}
+                data-testid="lobby-room-card"
+                style={{
+                  display: 'grid',
+                  gap: '0.75rem',
+                  padding: '1.25rem',
+                  borderRadius: 18,
+                  background: 'rgba(15, 23, 42, 0.9)',
+                  border: '1px solid rgba(148, 163, 184, 0.25)',
+                  boxShadow: '0 18px 48px rgba(15, 23, 42, 0.45)'
+                }}
+              >
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem' }}>房间 {room.id}</h3>
+                  <span
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: 999,
+                      fontSize: '0.8rem',
+                      background:
+                        room.status === 'waiting'
+                          ? 'rgba(34, 197, 94, 0.18)'
+                          : room.status === 'in-progress'
+                          ? 'rgba(234, 179, 8, 0.18)'
+                          : 'rgba(248, 113, 113, 0.18)',
+                      color:
+                        room.status === 'waiting'
+                          ? '#4ade80'
+                          : room.status === 'in-progress'
+                          ? '#facc15'
+                          : '#fca5a5'
+                    }}
+                  >
+                    {renderRoomStatus(room.status)}
+                  </span>
+                </header>
+                <p style={{ margin: 0, opacity: 0.7 }}>
+                  当前人数：{room.players} / {room.capacity}
+                </p>
+                <button
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: 12,
+                    border: 'none',
+                    fontWeight: 600,
+                    cursor: room.status === 'full' ? 'not-allowed' : 'pointer',
+                    background:
+                      room.status === 'full'
+                        ? 'rgba(148, 163, 184, 0.25)'
+                        : 'linear-gradient(135deg, #38bdf8, #6366f1)',
+                    color: room.status === 'full' ? '#94a3b8' : '#0f172a',
+                    opacity: room.status === 'full' ? 0.6 : 1
+                  }}
+                  disabled={room.status === 'full'}
+                >
+                  立即加入
+                </button>
+              </article>
+            ))}
           </div>
         )}
       </section>
+
+      <footer
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.75rem 1.25rem',
+          background: 'rgba(15, 23, 42, 0.78)',
+          borderRadius: 18,
+          border: '1px solid rgba(148, 163, 184, 0.28)'
+        }}
+      >
+        <div
+          data-testid="lobby-connection-indicator"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 600 }}
+        >
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              background: indicatorColor,
+              boxShadow: `0 0 16px ${indicatorColor}`
+            }}
+          />
+          <span>
+            {heartbeat.status === 'online'
+              ? '连接正常'
+              : heartbeat.status === 'degraded'
+              ? '连接不稳定'
+              : heartbeat.status === 'connecting'
+              ? '正在连接…'
+              : '连接已断开'}
+          </span>
+        </div>
+        {heartbeat.latencyMs !== null && (
+          <span style={{ fontSize: '0.9rem', opacity: 0.75 }}>
+            当前延迟：{heartbeat.latencyMs.toFixed(0)} ms
+          </span>
+        )}
+      </footer>
     </main>
   );
 }

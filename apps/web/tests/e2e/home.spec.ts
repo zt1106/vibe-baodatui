@@ -11,7 +11,9 @@ test.describe('Home authentication flow', () => {
 
     await page.getByTestId('enter-lobby-btn').click();
     await expect(page).toHaveURL(/\/lobby$/);
-    await expect(page.getByTestId('lobby-login-status')).toContainText('Alice');
+    await expect(page.getByTestId('lobby-user-summary')).toContainText('Alice');
+    await expect(page.getByTestId('lobby-room-card').first()).toBeVisible();
+    await expect(page.getByTestId('lobby-connection-indicator')).toBeVisible();
 
     await page.goto('/');
     const homeInput = page.getByTestId('nickname-input');
@@ -28,7 +30,9 @@ test.describe('Home authentication flow', () => {
     await page.getByTestId('enter-lobby-btn').click();
 
     await expect(page).toHaveURL(/\/lobby$/);
-    await expect(page.getByTestId('lobby-login-status')).toContainText('Guest');
+    await expect(page.getByTestId('lobby-user-summary')).toContainText('Guest');
+    await expect(page.getByTestId('lobby-room-card').first()).toBeVisible();
+    await expect(page.getByTestId('lobby-connection-indicator')).toBeVisible();
 
     await page.goto('/');
     const homeInput = page.getByTestId('nickname-input');
