@@ -132,11 +132,18 @@ export default function LobbyPage() {
     if (heartbeat.status === 'degraded' || heartbeat.status === 'connecting') return '#facc15';
     return '#f87171';
   })();
+  const roomsSummaryMessage = (() => {
+    if (roomsStatus === 'loading') return '正在加载房间列表…';
+    if (roomsStatus === 'ready' && rooms.length > 0) return `共 ${rooms.length} 个房间`;
+    if (roomsStatus === 'ready' && rooms.length === 0) return '当前没有开放的房间';
+    return null;
+  })();
 
   return (
     <main
       style={{
         minHeight: '100dvh',
+        boxSizing: 'border-box',
         display: 'grid',
         gridTemplateRows: 'auto 1fr auto',
         background: '#0f172a',
@@ -243,13 +250,10 @@ export default function LobbyPage() {
           boxShadow: '0 32px 80px rgba(15, 23, 42, 0.35)'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>
-            {roomsStatus === 'loading' && '正在加载房间列表…'}
-            {roomsStatus === 'ready' && rooms.length > 0 && `共 ${rooms.length} 个房间`}
-            {roomsStatus === 'ready' && rooms.length === 0 && '当前没有开放的房间'}
-            {roomsStatus === 'error' && '加载房间失败，请稍后再试。'}
-          </span>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', minHeight: '1.25rem' }}>
+          {roomsSummaryMessage && (
+            <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>{roomsSummaryMessage}</span>
+          )}
         </div>
 
         {roomsStatus === 'loading' ? (

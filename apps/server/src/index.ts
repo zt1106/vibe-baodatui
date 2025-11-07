@@ -27,7 +27,15 @@ const app = express();
 
 app.use(express.json());
 
-const allowedOrigins = new Set(['http://localhost:3000']);
+const allowedOrigins = new Set(
+  (env.WEB_ORIGINS ?? '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean)
+);
+if (allowedOrigins.size === 0) {
+  allowedOrigins.add('http://localhost:3000');
+}
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.has(origin)) {
@@ -44,8 +52,9 @@ app.use((req, res, next) => {
 });
 
 const server = http.createServer(app);
+const allowedOriginsList = Array.from(allowedOrigins);
 const io = new Server(server, {
-  cors: { origin: ['http://localhost:3000'], credentials: true }
+  cors: { origin: allowedOriginsList, credentials: true }
 });
 const heartbeat = createHeartbeatPublisher(io);
 const stopHeartbeat = heartbeat.start();
