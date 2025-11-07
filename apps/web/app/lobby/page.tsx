@@ -3,34 +3,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { LobbyRoomsResponse } from '@shared/messages';
+import type { LobbyNotification, LobbyRoom } from '@shared/messages';
+
 import { useHeartbeat } from '../../lib/heartbeat';
 import { ensureUser, loadStoredUser, persistStoredUser, clearStoredUser, type StoredUser } from '../../lib/auth';
 
 const NICKNAME_STORAGE_KEY = 'nickname';
-
-type RoomStatus = 'waiting' | 'in-progress' | 'full';
-
-type Room = {
-  id: string;
-  status: RoomStatus;
-  players: number;
-  capacity: number;
-};
-
-type Notification = {
-  id: string;
-  message: string;
-  tone: 'info' | 'warning';
-};
 
 export default function LobbyPage() {
   const router = useRouter();
   const heartbeat = useHeartbeat();
   const [user, setUser] = useState<StoredUser | null>(null);
   const [authStatus, setAuthStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const [rooms, setRooms] = useState<LobbyRoom[]>([]);
   const [roomsStatus, setRoomsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<LobbyNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
   const apiBaseUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
@@ -68,32 +56,49 @@ export default function LobbyPage() {
     if (authStatus !== 'ready') {
       return;
     }
-    setRoomsStatus('loading');
-    const placeholderRooms: Room[] = [
-      { id: 'A-1024', status: 'waiting', players: 1, capacity: 4 },
-      { id: 'B-2048', status: 'in-progress', players: 3, capacity: 4 },
-      { id: 'C-4096', status: 'waiting', players: 2, capacity: 6 },
-      { id: 'D-8192', status: 'full', players: 6, capacity: 6 },
-      { id: 'E-16384', status: 'waiting', players: 1, capacity: 2 },
-      { id: 'F-32768', status: 'in-progress', players: 4, capacity: 5 },
-      { id: 'G-65536', status: 'waiting', players: 2, capacity: 5 },
-      { id: 'H-131072', status: 'in-progress', players: 3, capacity: 6 },
-      { id: 'I-262144', status: 'waiting', players: 1, capacity: 3 },
-      { id: 'J-524288', status: 'full', players: 8, capacity: 8 },
-      { id: 'K-1048576', status: 'waiting', players: 2, capacity: 4 },
-      { id: 'L-2097152', status: 'in-progress', players: 4, capacity: 6 },
-      { id: 'M-4194304', status: 'waiting', players: 3, capacity: 5 },
-      { id: 'N-8388608', status: 'in-progress', players: 5, capacity: 6 },
-      { id: 'O-16777216', status: 'full', players: 6, capacity: 6 }
-    ];
-    const placeholderNotifications: Notification[] = [
-      { id: 'notice-1', message: '今晚 22:00 维护期间暂停匹配。', tone: 'warning' },
-      { id: 'notice-2', message: '全新牌桌动画将在下周上线！', tone: 'info' }
-    ];
-    setRooms(placeholderRooms);
-    setNotifications(placeholderNotifications);
-    setRoomsStatus('ready');
-  }, [authStatus]);
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    const loadRooms = async () => {
+      setRoomsStatus('loading');
+      try {
+        const response = await fetch(`${apiBaseUrl}/lobby/rooms`, {
+          signal: controller.signal,
+          credentials: 'include'
+        });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        const payload = await response.json();
+        const parsed = LobbyRoomsResponse.safeParse(payload);
+        if (!parsed.success) {
+          throw new Error('Invalid lobby response');
+        }
+        if (cancelled) {
+          return;
+        }
+        setRooms(parsed.data.rooms);
+        setNotifications(parsed.data.notifications);
+        setRoomsStatus('ready');
+      } catch (err) {
+        if (controller.signal.aborted || cancelled) {
+          return;
+        }
+        console.error('[web] failed to load lobby rooms', err);
+        setRooms([]);
+        setNotifications([]);
+        setRoomsStatus('error');
+      }
+    };
+
+    loadRooms();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [apiBaseUrl, authStatus]);
 
   const handleBackHome = useCallback(() => {
     router.push('/');
@@ -109,7 +114,7 @@ export default function LobbyPage() {
     setError('已登出，请返回首页重新登录。');
   }, []);
 
-  const renderRoomStatus = (status: RoomStatus) => {
+  const renderRoomStatus = (status: LobbyRoom['status']) => {
     switch (status) {
       case 'waiting':
         return '等待加入';
