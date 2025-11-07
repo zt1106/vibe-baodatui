@@ -16,6 +16,8 @@ Run commands from the repository root unless noted.
 - `pnpm test`: execute all Vitest suites across apps and packages.
 - `pnpm typecheck`: run the TypeScript project references.
 - `pnpm e2e`: launch Playwright end-to-end specs for the web experience.
+  - First-time setup in CI or fresh containers requires Playwright browsers. Run `pnpm -C apps/web exec playwright install --with-deps` once to provision Chromium/Firefox/WebKit and system deps before executing the suite.
+  - The Playwright specs assume the Next.js client and Express API are already running. Start them with `pnpm dev` in another terminal and keep the process alive while `pnpm e2e` runs.
 Target individual scripts with `pnpm -C apps/<name> <script>` (for example, `pnpm -C apps/server prisma:generate`).
 
 ## Coding Style & Naming Conventions
