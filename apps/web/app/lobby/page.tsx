@@ -132,24 +132,37 @@ export default function LobbyPage() {
     if (heartbeat.status === 'degraded' || heartbeat.status === 'connecting') return '#facc15';
     return '#f87171';
   })();
-  const roomsSummaryMessage = (() => {
-    if (roomsStatus === 'loading') return '正在加载房间列表…';
-    if (roomsStatus === 'ready' && rooms.length > 0) return `共 ${rooms.length} 个房间`;
-    if (roomsStatus === 'ready' && rooms.length === 0) return '当前没有开放的房间';
-    return null;
-  })();
+  // Provide deterministic mock rooms so the compact layout can be previewed locally with many cards.
+  const mockRooms = useMemo<LobbyRoom[]>(() => {
+    const statuses: LobbyRoom['status'][] = ['waiting', 'in-progress', 'full'];
+    return Array.from({ length: 50 }, (_, index) => ({
+      id: `mock-${index + 1}`,
+      status: statuses[index % statuses.length],
+      players: (index * 2) % 6,
+      capacity: 6
+    }));
+  }, []);
+  const enableMockRoomsPreview = process.env.NODE_ENV !== 'production';
+  const visibleRooms =
+    enableMockRoomsPreview && roomsStatus === 'ready'
+      ? rooms.length >= mockRooms.length
+        ? rooms
+        : [...rooms, ...mockRooms.slice(rooms.length)]
+      : rooms;
+  const showEmptyState = roomsStatus === 'ready' && rooms.length === 0 && !enableMockRoomsPreview;
 
   return (
     <main
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
         boxSizing: 'border-box',
         display: 'grid',
         gridTemplateRows: 'auto 1fr auto',
         background: '#0f172a',
         color: '#e2e8f0',
         padding: '2rem',
-        gap: '2rem'
+        gap: '2rem',
+        overflow: 'hidden'
       }}
     >
       <header
@@ -211,7 +224,7 @@ export default function LobbyPage() {
           )}
         </div>
         <div style={{ display: 'grid', gap: '0.35rem', textAlign: 'right' }}>
-          <span style={{ fontWeight: 600 }}>房间总数：{rooms.length}</span>
+          <span style={{ fontWeight: 600 }}>房间总数：{visibleRooms.length}</span>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
             {notifications.map(notification => (
               <span
@@ -247,90 +260,116 @@ export default function LobbyPage() {
           background: 'rgba(15, 23, 42, 0.78)',
           borderRadius: 24,
           border: '1px solid rgba(148, 163, 184, 0.28)',
-          boxShadow: '0 32px 80px rgba(15, 23, 42, 0.35)'
+          boxShadow: '0 32px 80px rgba(15, 23, 42, 0.35)',
+          overflowY: 'auto',
+          minHeight: 0
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', minHeight: '1.25rem' }}>
-          {roomsSummaryMessage && (
-            <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>{roomsSummaryMessage}</span>
-          )}
-        </div>
-
         {roomsStatus === 'loading' ? (
           <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.75 }}>正在准备房间列表…</div>
-        ) : roomsStatus === 'ready' && rooms.length === 0 ? (
+        ) : showEmptyState ? (
           <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.75 }}>敬请期待新牌桌开放！</div>
         ) : roomsStatus === 'error' ? (
           <div style={{ textAlign: 'center', padding: '2rem', color: '#fca5a5' }}>暂时无法获取房间信息。</div>
         ) : (
           <div
             style={{
-              display: 'grid',
-              gap: '1.25rem',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))'
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              justifyContent: 'flex-start',
+              alignContent: 'flex-start'
             }}
           >
-            {rooms.map(room => (
-              <article
-                key={room.id}
-                data-testid="lobby-room-card"
-                style={{
-                  display: 'grid',
-                  gap: '0.75rem',
-                  padding: '1.25rem',
-                  borderRadius: 18,
-                  background: 'rgba(15, 23, 42, 0.9)',
-                  border: '1px solid rgba(148, 163, 184, 0.25)',
-                  boxShadow: '0 18px 48px rgba(15, 23, 42, 0.45)'
-                }}
-              >
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem' }}>房间 {room.id}</h3>
-                  <span
+            {visibleRooms.map(room => {
+              const isRoomFull = room.status === 'full';
+              return (
+                <article
+                  key={room.id}
+                  data-testid="lobby-room-card"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '0.35rem',
+                    padding: '1rem',
+                    borderRadius: 14,
+                    background: 'rgba(15, 23, 42, 0.9)',
+                    border: '1px solid rgba(148, 163, 184, 0.25)',
+                    boxShadow: '0 18px 48px rgba(15, 23, 42, 0.45)',
+                    width: '240px',
+                    height: '100px',
+                    flex: '0 0 240px'
+                  }}
+                >
+                  <header
                     style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: 999,
-                      fontSize: '0.8rem',
-                      background:
-                        room.status === 'waiting'
-                          ? 'rgba(34, 197, 94, 0.18)'
-                          : room.status === 'in-progress'
-                          ? 'rgba(234, 179, 8, 0.18)'
-                          : 'rgba(248, 113, 113, 0.18)',
-                      color:
-                        room.status === 'waiting'
-                          ? '#4ade80'
-                          : room.status === 'in-progress'
-                          ? '#facc15'
-                          : '#fca5a5'
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.75rem'
                     }}
                   >
-                    {renderRoomStatus(room.status)}
-                  </span>
-                </header>
-                <p style={{ margin: 0, opacity: 0.7 }}>
-                  当前人数：{room.players} / {room.capacity}
-                </p>
-                <button
-                  style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: 12,
-                    border: 'none',
-                    fontWeight: 600,
-                    cursor: room.status === 'full' ? 'not-allowed' : 'pointer',
-                    background:
-                      room.status === 'full'
-                        ? 'rgba(148, 163, 184, 0.25)'
-                        : 'linear-gradient(135deg, #38bdf8, #6366f1)',
-                    color: room.status === 'full' ? '#94a3b8' : '#0f172a',
-                    opacity: room.status === 'full' ? 0.6 : 1
-                  }}
-                  disabled={room.status === 'full'}
-                >
-                  立即加入
-                </button>
-              </article>
-            ))}
+                    <h3 style={{ margin: 0, fontSize: '1rem' }}>房间 {room.id}</h3>
+                    <span
+                      style={{
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: 999,
+                        fontSize: '0.75rem',
+                        background:
+                          room.status === 'waiting'
+                            ? 'rgba(34, 197, 94, 0.18)'
+                            : room.status === 'in-progress'
+                            ? 'rgba(234, 179, 8, 0.18)'
+                            : 'rgba(248, 113, 113, 0.18)',
+                        color:
+                          room.status === 'waiting'
+                            ? '#4ade80'
+                            : room.status === 'in-progress'
+                            ? '#facc15'
+                            : '#fca5a5'
+                      }}
+                    >
+                      {renderRoomStatus(room.status)}
+                    </span>
+                  </header>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem',
+                      flexWrap: 'wrap',
+                      marginTop: 'auto'
+                    }}
+                  >
+                    <p style={{ margin: 0, opacity: 0.75, fontSize: '0.9rem' }}>
+                      当前人数：{room.players} / {room.capacity}
+                    </p>
+                    <button
+                      style={{
+                        padding: '0.45rem 0.95rem',
+                        borderRadius: 999,
+                        border: 'none',
+                        fontWeight: 600,
+                        fontSize: '0.8rem',
+                        cursor: isRoomFull ? 'not-allowed' : 'pointer',
+                        background: isRoomFull
+                          ? 'rgba(148, 163, 184, 0.25)'
+                          : 'linear-gradient(135deg, #38bdf8, #6366f1)',
+                        color: isRoomFull ? '#94a3b8' : '#0f172a',
+                        opacity: isRoomFull ? 0.6 : 1,
+                        boxShadow: isRoomFull ? 'none' : '0 12px 28px rgba(56, 189, 248, 0.35)',
+                        transition: 'transform 120ms ease, box-shadow 120ms ease'
+                      }}
+                      disabled={isRoomFull}
+                    >
+                      立即加入
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
