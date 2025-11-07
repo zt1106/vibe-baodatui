@@ -64,6 +64,7 @@ export type Bet = z.infer<typeof Bet>;
 
 export const ServerState = z.object({
   tableId: z.string(),
+  room: LobbyRoom,
   seats: z.array(z.object({
     id: z.string(),
     userId: z.number().int().positive(),

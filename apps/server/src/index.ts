@@ -12,7 +12,9 @@ import {
   LoginUserRequest,
   LoginUserResponse
 } from '@shared/messages';
+import type { LobbyRoom } from '@shared/messages';
 import { createTable, joinTable, bet as coreBet, deal } from '@game-core/engine';
+import type { TableState } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
 import { createHeartbeatPublisher } from './infrastructure/heartbeat';
 import { createLobbyRegistry, deriveLobbyRoomStatus } from './infrastructure/lobbyRegistry';
@@ -50,7 +52,32 @@ const io = new Server(server, {
 const heartbeat = createHeartbeatPublisher(io);
 const stopHeartbeat = heartbeat.start();
 const users = createUserRegistry();
-const lobby = createLobbyRegistry();
+
+type TableConfiguration = {
+  id: string;
+  capacity: number;
+  seed: string;
+};
+
+const tableConfigurations: TableConfiguration[] = [
+  { id: 'default', capacity: 6, seed: 'seed-proto' }
+];
+
+const tableConfigById = new Map<string, TableConfiguration>();
+for (const config of tableConfigurations) {
+  tableConfigById.set(config.id, config);
+}
+
+const lobby = createLobbyRegistry({
+  rooms: tableConfigurations.map((config) => ({
+    id: config.id,
+    capacity: config.capacity,
+    players: 0,
+    status: deriveLobbyRoomStatus(0, config.capacity)
+  }))
+});
+
+const tables = new Map<string, TableState>();
 
 const normalizeNickname = (value: string) => value.trim().toLowerCase();
 
@@ -92,21 +119,36 @@ app.post('/auth/login', (req, res) => {
   }
 });
 
-// One in-memory table for the prototype
-const TABLE_ID = 'default';
-const TABLE_CAPACITY = 6;
-const state = createTable(TABLE_ID, 'seed-proto');
-
-function updateLobbyFromState() {
-  lobby.upsertRoom({
-    id: TABLE_ID,
-    capacity: TABLE_CAPACITY,
-    players: state.seats.length,
-    status: deriveLobbyRoomStatus(state.seats.length, TABLE_CAPACITY)
-  });
+function getTableConfig(tableId: string) {
+  return tableConfigById.get(tableId);
 }
 
-updateLobbyFromState();
+function getTableState(tableId: string) {
+  return tables.get(tableId);
+}
+
+function getOrCreateTableState(tableId: string) {
+  const config = getTableConfig(tableId);
+  if (!config) return undefined;
+  let table = getTableState(tableId);
+  if (!table) {
+    table = createTable(tableId, config.seed);
+    tables.set(tableId, table);
+  }
+  return table;
+}
+
+function buildRoomSnapshot(tableId: string, table?: TableState): LobbyRoom | undefined {
+  const config = getTableConfig(tableId);
+  if (!config) return undefined;
+  const players = table?.seats.length ?? 0;
+  return {
+    id: tableId,
+    capacity: config.capacity,
+    players,
+    status: deriveLobbyRoomStatus(players, config.capacity)
+  };
+}
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('/ready', (_req, res) => {
@@ -127,13 +169,12 @@ io.on('connection', (socket) => {
   heartbeat.handleConnection(socket);
   heartbeat.publish();
 
-  // send snapshot
-  emitState();
-
   socket.on('joinTable', (payload) => {
     const parsed = JoinTable.safeParse(payload);
     if (!parsed.success) return;
-    if (parsed.data.tableId !== TABLE_ID) {
+    const tableId = parsed.data.tableId;
+    const config = getTableConfig(tableId);
+    if (!config) {
       socket.emit('errorMessage', { message: 'Unknown table' });
       return;
     }
@@ -173,28 +214,41 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const alreadySeated = state.seats.some(id => state.players[id]?.userId === user.id);
+    const table = getOrCreateTableState(tableId);
+    if (!table) {
+      socket.emit('errorMessage', { message: 'Unknown table' });
+      return;
+    }
+
+    if (table.seats.length >= config.capacity) {
+      socket.emit('errorMessage', { message: 'Table is full' });
+      return;
+    }
+
+    const alreadySeated = table.seats.some(id => table.players[id]?.userId === user.id);
     if (alreadySeated) {
       socket.emit('errorMessage', { message: 'User already seated at the table' });
       return;
     }
 
-    joinTable(state, socket.id, user.nickname, user.id);
-    deal(state, 2); // auto-deal for demo
-    updateLobbyFromState();
-    emitState();
+    joinTable(table, socket.id, user.nickname, user.id);
+    deal(table, 2); // auto-deal for demo
+    socket.join(tableId);
+    emitState(tableId);
   });
 
   socket.on('bet', (payload) => {
     const parsed = Bet.safeParse(payload);
     if (!parsed.success) return;
-    if (parsed.data.tableId !== TABLE_ID) {
+    const tableId = parsed.data.tableId;
+    const table = getTableState(tableId);
+    if (!table) {
       socket.emit('errorMessage', { message: 'Unknown table' });
       return;
     }
     try {
-      coreBet(state, socket.id, parsed.data.chips);
-      emitState();
+      coreBet(table, socket.id, parsed.data.chips);
+      emitState(tableId);
     } catch (e) {
       socket.emit('errorMessage', { message: (e as Error).message });
     }
@@ -206,16 +260,22 @@ io.on('connection', (socket) => {
   });
 });
 
-function emitState() {
+function emitState(tableId: string) {
+  const table = getTableState(tableId);
+  if (!table) return;
+  const room = buildRoomSnapshot(tableId, table);
+  if (!room) return;
+  lobby.upsertRoom(room);
   const snapshot: ServerState = {
-    tableId: TABLE_ID,
-    seats: state.seats.map(id => {
-      const p = state.players[id];
+    tableId: table.id,
+    room,
+    seats: table.seats.map(id => {
+      const p = table.players[id];
       return { id: p.id, userId: p.userId, nickname: p.nickname, chips: p.chips };
     }),
-    pot: state.pot
+    pot: table.pot
   };
-  io.emit('state', snapshot);
+  io.to(tableId).emit('state', snapshot);
 }
 
 server.listen(Number(env.PORT), () => {
