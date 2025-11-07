@@ -3,6 +3,30 @@ import { z } from 'zod';
 
 const nicknameSchema = z.string().trim().min(1).max(32);
 
+export const LobbyRoomStatus = z.enum(['waiting', 'in-progress', 'full']);
+export type LobbyRoomStatus = z.infer<typeof LobbyRoomStatus>;
+
+export const LobbyRoom = z.object({
+  id: z.string().min(1),
+  status: LobbyRoomStatus,
+  players: z.number().int().min(0),
+  capacity: z.number().int().positive()
+});
+export type LobbyRoom = z.infer<typeof LobbyRoom>;
+
+export const LobbyNotification = z.object({
+  id: z.string().min(1),
+  message: z.string().min(1),
+  tone: z.enum(['info', 'warning'])
+});
+export type LobbyNotification = z.infer<typeof LobbyNotification>;
+
+export const LobbyRoomsResponse = z.object({
+  rooms: z.array(LobbyRoom),
+  notifications: z.array(LobbyNotification)
+});
+export type LobbyRoomsResponse = z.infer<typeof LobbyRoomsResponse>;
+
 export const UserPayload = z.object({
   id: z.number().int().positive(),
   nickname: nicknameSchema

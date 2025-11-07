@@ -15,6 +15,7 @@ import {
 import { createTable, joinTable, bet as coreBet, deal } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
 import { createHeartbeatPublisher } from './infrastructure/heartbeat';
+import { createLobbyRegistry, deriveLobbyRoomStatus } from './infrastructure/lobbyRegistry';
 import {
   DuplicateNicknameError,
   UserNotFoundError,
@@ -49,6 +50,7 @@ const io = new Server(server, {
 const heartbeat = createHeartbeatPublisher(io);
 const stopHeartbeat = heartbeat.start();
 const users = createUserRegistry();
+const lobby = createLobbyRegistry();
 
 const normalizeNickname = (value: string) => value.trim().toLowerCase();
 
@@ -92,12 +94,33 @@ app.post('/auth/login', (req, res) => {
 
 // One in-memory table for the prototype
 const TABLE_ID = 'default';
+const TABLE_CAPACITY = 6;
 const state = createTable(TABLE_ID, 'seed-proto');
+
+function updateLobbyFromState() {
+  lobby.upsertRoom({
+    id: TABLE_ID,
+    capacity: TABLE_CAPACITY,
+    players: state.seats.length,
+    status: deriveLobbyRoomStatus(state.seats.length, TABLE_CAPACITY)
+  });
+}
+
+updateLobbyFromState();
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('/ready', (_req, res) => {
   const snapshot = heartbeat.snapshot();
   res.json({ ok: snapshot.status === 'ok', uptimeMs: snapshot.uptimeMs, connections: snapshot.connections });
+});
+
+app.get('/lobby/rooms', (_req, res) => {
+  try {
+    res.json(lobby.snapshot());
+  } catch (error) {
+    console.error('[server] failed to build lobby snapshot', error);
+    res.status(500).json({ error: 'Failed to load lobby rooms' });
+  }
 });
 
 io.on('connection', (socket) => {
@@ -158,6 +181,7 @@ io.on('connection', (socket) => {
 
     joinTable(state, socket.id, user.nickname, user.id);
     deal(state, 2); // auto-deal for demo
+    updateLobbyFromState();
     emitState();
   });
 
