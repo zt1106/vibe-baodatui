@@ -27,6 +27,27 @@ export const LobbyRoomsResponse = z.object({
 });
 export type LobbyRoomsResponse = z.infer<typeof LobbyRoomsResponse>;
 
+export const TablePlayer = z.object({
+  userId: z.number().int().positive(),
+  nickname: nicknameSchema,
+  chips: z.number().int().min(0)
+});
+export type TablePlayer = z.infer<typeof TablePlayer>;
+
+export const TableConfig = z.object({
+  capacity: z.number().int().positive(),
+  minimumPlayers: z.number().int().min(0)
+});
+export type TableConfig = z.infer<typeof TableConfig>;
+
+export const TablePrepareResponse = z.object({
+  tableId: z.string().min(1),
+  status: LobbyRoomStatus,
+  players: z.array(TablePlayer),
+  config: TableConfig
+});
+export type TablePrepareResponse = z.infer<typeof TablePrepareResponse>;
+
 export const UserPayload = z.object({
   id: z.number().int().positive(),
   nickname: nicknameSchema

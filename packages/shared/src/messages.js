@@ -22,6 +22,24 @@ export const LobbyRoomsResponse = z.object({
     notifications: z.array(LobbyNotification)
 });
 
+export const TablePlayer = z.object({
+    userId: z.number().int().positive(),
+    nickname: nicknameSchema,
+    chips: z.number().int().min(0)
+});
+
+export const TableConfig = z.object({
+    capacity: z.number().int().positive(),
+    minimumPlayers: z.number().int().min(0)
+});
+
+export const TablePrepareResponse = z.object({
+    tableId: z.string().min(1),
+    status: LobbyRoomStatus,
+    players: z.array(TablePlayer),
+    config: TableConfig
+});
+
 export const UserPayload = z.object({
     id: z.number().int().positive(),
     nickname: nicknameSchema

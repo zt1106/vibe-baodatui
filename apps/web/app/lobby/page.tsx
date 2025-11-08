@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { LobbyRoomsResponse } from '@shared/messages';
-import type { LobbyNotification, LobbyRoom } from '@shared/messages';
+import { LobbyRoomsResponse, TablePrepareResponse as TablePrepareResponseSchema } from '@shared/messages';
+import type { LobbyNotification, LobbyRoom, TablePrepareResponse } from '@shared/messages';
 
 import { useHeartbeat } from '../../lib/heartbeat';
 import { ensureUser, loadStoredUser, persistStoredUser, clearStoredUser, type StoredUser } from '../../lib/auth';
@@ -21,6 +21,8 @@ export default function LobbyPage() {
   const [roomsStatus, setRoomsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [notifications, setNotifications] = useState<LobbyNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [roomActionError, setRoomActionError] = useState<string | null>(null);
   const apiBaseUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
     return base.replace(/\/$/, '');
@@ -115,6 +117,39 @@ export default function LobbyPage() {
     setError('已登出，请返回首页重新登录。');
   }, []);
 
+  const handleCreateRoom = useCallback(async () => {
+    if (isCreatingRoom) {
+      return;
+    }
+    setRoomActionError(null);
+    setIsCreatingRoom(true);
+    try {
+      const response = await fetch(`${apiBaseUrl}/tables`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      const payload = await response.json();
+      const parsed = TablePrepareResponseSchema.safeParse(payload);
+      if (!parsed.success) {
+        throw new Error('Invalid table payload');
+      }
+      const table: TablePrepareResponse = parsed.data;
+      router.push(`/game/${encodeURIComponent(table.tableId)}/prepare`);
+    } catch (err) {
+      console.error('[web] failed to create room', err);
+      setRoomActionError('创建房间失败，请稍后再试。');
+    } finally {
+      setIsCreatingRoom(false);
+    }
+  }, [apiBaseUrl, isCreatingRoom, router]);
+
+  const handleEnterGame = useCallback((roomId: string) => {
+    router.push(`/game/${encodeURIComponent(roomId)}/prepare`);
+  }, [router]);
+
   const renderRoomStatus = (status: LobbyRoom['status']) => {
     switch (status) {
       case 'waiting':
@@ -133,24 +168,7 @@ export default function LobbyPage() {
     if (heartbeat.status === 'degraded' || heartbeat.status === 'connecting') return '#facc15';
     return '#f87171';
   })();
-  // Provide deterministic mock rooms so the compact layout can be previewed locally with many cards.
-  const mockRooms = useMemo<LobbyRoom[]>(() => {
-    const statuses: LobbyRoom['status'][] = ['waiting', 'in-progress', 'full'];
-    return Array.from({ length: 50 }, (_, index) => ({
-      id: `mock-${index + 1}`,
-      status: statuses[index % statuses.length],
-      players: (index * 2) % 6,
-      capacity: 6
-    }));
-  }, []);
-  const enableMockRoomsPreview = process.env.NODE_ENV !== 'production';
-  const visibleRooms =
-    enableMockRoomsPreview && roomsStatus === 'ready'
-      ? rooms.length >= mockRooms.length
-        ? rooms
-        : [...rooms, ...mockRooms.slice(rooms.length)]
-      : rooms;
-  const showEmptyState = roomsStatus === 'ready' && rooms.length === 0 && !enableMockRoomsPreview;
+  const showEmptyState = roomsStatus === 'ready' && rooms.length === 0;
 
   return (
     <main
@@ -198,6 +216,23 @@ export default function LobbyPage() {
             返回首页
           </button>
           <button
+            onClick={handleCreateRoom}
+            disabled={isCreatingRoom || authStatus !== 'ready'}
+            style={{
+              padding: '0.75rem 1.25rem',
+              borderRadius: 999,
+              border: 'none',
+              background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+              color: '#0f172a',
+              fontWeight: 600,
+              cursor: isCreatingRoom || authStatus !== 'ready' ? 'not-allowed' : 'pointer',
+              opacity: isCreatingRoom || authStatus !== 'ready' ? 0.6 : 1,
+              boxShadow: '0 18px 40px rgba(249, 115, 22, 0.35)'
+            }}
+          >
+            {isCreatingRoom ? '创建中…' : '创建房间'}
+          </button>
+          <button
             onClick={handleLogout}
             style={{
               padding: '0.75rem 1.25rem',
@@ -225,7 +260,7 @@ export default function LobbyPage() {
           )}
         </div>
         <div style={{ display: 'grid', gap: '0.35rem', textAlign: 'right' }}>
-          <span style={{ fontWeight: 600 }}>房间总数：{visibleRooms.length}</span>
+          <span style={{ fontWeight: 600 }}>房间总数：{rooms.length}</span>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
             {notifications.map(notification => (
               <span
@@ -252,6 +287,20 @@ export default function LobbyPage() {
           </div>
         </div>
       </header>
+
+      {roomActionError && (
+        <div
+          style={{
+            padding: '0.85rem 1.25rem',
+            borderRadius: 18,
+            border: '1px solid rgba(248, 113, 113, 0.35)',
+            background: 'rgba(248, 113, 113, 0.12)',
+            color: '#fecaca'
+          }}
+        >
+          {roomActionError}
+        </div>
+      )}
 
       <section
         style={{
@@ -282,7 +331,7 @@ export default function LobbyPage() {
               alignContent: 'flex-start'
             }}
           >
-            {visibleRooms.map(room => {
+            {rooms.map(room => {
               const isRoomFull = room.status === 'full';
               return (
                 <article
@@ -348,6 +397,12 @@ export default function LobbyPage() {
                       当前人数：{room.players} / {room.capacity}
                     </p>
                     <button
+                      data-testid="enter-game-button"
+                      onClick={() => {
+                        if (!isRoomFull) {
+                          handleEnterGame(room.id);
+                        }
+                      }}
                       style={{
                         padding: '0.45rem 0.95rem',
                         borderRadius: 999,
@@ -365,7 +420,7 @@ export default function LobbyPage() {
                       }}
                       disabled={isRoomFull}
                     >
-                      立即加入
+                      进入牌局
                     </button>
                   </div>
                 </article>

@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import express from 'express';
 import http from 'http';
+import { randomUUID } from 'crypto';
 import { Server } from 'socket.io';
 import {
   Bet,
@@ -10,7 +11,8 @@ import {
   RegisterUserRequest,
   RegisterUserResponse,
   LoginUserRequest,
-  LoginUserResponse
+  LoginUserResponse,
+  TablePrepareResponse
 } from '@shared/messages';
 import { createTable, joinTable, bet as coreBet, deal } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
@@ -61,6 +63,87 @@ const stopHeartbeat = heartbeat.start();
 const users = createUserRegistry();
 const lobby = createLobbyRegistry();
 
+type ManagedTable = {
+  id: string;
+  state: ReturnType<typeof createTable>;
+  config: {
+    capacity: number;
+    minimumPlayers: number;
+  };
+};
+
+const TABLE_CAPACITY = 6;
+const TABLE_MIN_PLAYERS = 2;
+const tables = new Map<string, ManagedTable>();
+const socketTable = new Map<string, string>();
+
+const generateTableId = () => {
+  let id = '';
+  do {
+    id = `room-${randomUUID().slice(0, 8)}`;
+  } while (tables.has(id));
+  return id;
+};
+
+function normalizeTableId(id: string) {
+  return id.trim();
+}
+
+function updateLobbyFromState(tableId: string) {
+  const managed = tables.get(tableId);
+  if (!managed) return;
+  const {
+    state,
+    config: { capacity }
+  } = managed;
+  lobby.upsertRoom({
+    id: tableId,
+    capacity,
+    players: state.seats.length,
+    status: deriveLobbyRoomStatus(state.seats.length, capacity)
+  });
+}
+
+function buildPreparePayload(table: ManagedTable) {
+  return TablePrepareResponse.parse({
+    tableId: table.id,
+    status: deriveLobbyRoomStatus(table.state.seats.length, table.config.capacity),
+    players: table.state.seats
+      .map(playerId => table.state.players[playerId])
+      .filter((player): player is NonNullable<typeof player> => Boolean(player))
+      .map(player => ({
+        userId: player.userId,
+        nickname: player.nickname,
+        chips: player.chips
+      })),
+    config: {
+      capacity: table.config.capacity,
+      minimumPlayers: table.config.minimumPlayers
+    }
+  });
+}
+
+function createManagedTable(id = generateTableId()): ManagedTable {
+  const normalizedId = normalizeTableId(id);
+  if (!normalizedId) {
+    throw new Error('Invalid table id');
+  }
+  if (tables.has(normalizedId)) {
+    throw new Error(`Table ${normalizedId} already exists`);
+  }
+  const managed: ManagedTable = {
+    id: normalizedId,
+    state: createTable(normalizedId, `seed-${normalizedId}`),
+    config: {
+      capacity: TABLE_CAPACITY,
+      minimumPlayers: Math.min(TABLE_MIN_PLAYERS, TABLE_CAPACITY)
+    }
+  };
+  tables.set(normalizedId, managed);
+  updateLobbyFromState(normalizedId);
+  return managed;
+}
+
 const normalizeNickname = (value: string) => value.trim().toLowerCase();
 
 app.post('/auth/register', (req, res) => {
@@ -101,21 +184,6 @@ app.post('/auth/login', (req, res) => {
   }
 });
 
-// One in-memory table for the prototype
-const TABLE_ID = 'default';
-const TABLE_CAPACITY = 6;
-const state = createTable(TABLE_ID, 'seed-proto');
-
-function updateLobbyFromState() {
-  lobby.upsertRoom({
-    id: TABLE_ID,
-    capacity: TABLE_CAPACITY,
-    players: state.seats.length,
-    status: deriveLobbyRoomStatus(state.seats.length, TABLE_CAPACITY)
-  });
-}
-
-updateLobbyFromState();
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('/ready', (_req, res) => {
@@ -132,18 +200,49 @@ app.get('/lobby/rooms', (_req, res) => {
   }
 });
 
+app.get('/tables/:tableId/prepare', (req, res) => {
+  const requestedId = normalizeTableId(req.params.tableId ?? '');
+  const table = tables.get(requestedId);
+  if (!table) {
+    res.status(404).json({ error: 'Unknown table' });
+    return;
+  }
+  try {
+    res.json(buildPreparePayload(table));
+  } catch (error) {
+    console.error('[server] failed to build prepare snapshot', error);
+    res.status(500).json({ error: 'Failed to load table' });
+  }
+});
+
+app.post('/tables', (_req, res) => {
+  try {
+    const table = createManagedTable();
+    res.status(201).json(buildPreparePayload(table));
+  } catch (error) {
+    console.error('[server] failed to create table', error);
+    res.status(500).json({ error: 'Failed to create table' });
+  }
+});
+
 io.on('connection', (socket) => {
   heartbeat.handleConnection(socket);
   heartbeat.publish();
 
-  // send snapshot
-  emitState();
+  tables.forEach((_table, tableId) => emitState(tableId));
 
   socket.on('joinTable', (payload) => {
     const parsed = JoinTable.safeParse(payload);
     if (!parsed.success) return;
-    if (parsed.data.tableId !== TABLE_ID) {
+    const tableId = normalizeTableId(parsed.data.tableId ?? '');
+    const table = tables.get(tableId);
+    if (!table) {
       socket.emit('errorMessage', { message: 'Unknown table' });
+      return;
+    }
+
+    if (table.state.seats.length >= table.config.capacity) {
+      socket.emit('errorMessage', { message: 'Table is full' });
       return;
     }
 
@@ -182,47 +281,62 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const alreadySeated = state.seats.some(id => state.players[id]?.userId === user.id);
+    const alreadySeated = table.state.seats.some(id => table.state.players[id]?.userId === user.id);
     if (alreadySeated) {
       socket.emit('errorMessage', { message: 'User already seated at the table' });
       return;
     }
 
-    joinTable(state, socket.id, user.nickname, user.id);
-    deal(state, 2); // auto-deal for demo
-    updateLobbyFromState();
-    emitState();
+    joinTable(table.state, socket.id, user.nickname, user.id);
+    deal(table.state, 2); // auto-deal for demo
+    socketTable.set(socket.id, tableId);
+    updateLobbyFromState(tableId);
+    emitState(tableId);
   });
 
   socket.on('bet', (payload) => {
     const parsed = Bet.safeParse(payload);
     if (!parsed.success) return;
-    if (parsed.data.tableId !== TABLE_ID) {
+    const tableId = normalizeTableId(parsed.data.tableId ?? '');
+    const table = tables.get(tableId);
+    if (!table) {
       socket.emit('errorMessage', { message: 'Unknown table' });
       return;
     }
+    if (socketTable.get(socket.id) !== tableId) {
+      socket.emit('errorMessage', { message: 'Player not seated at this table' });
+      return;
+    }
     try {
-      coreBet(state, socket.id, parsed.data.chips);
-      emitState();
+      coreBet(table.state, socket.id, parsed.data.chips);
+      emitState(tableId);
     } catch (e) {
       socket.emit('errorMessage', { message: (e as Error).message });
     }
   });
 
   socket.on('disconnect', () => {
+    socketTable.delete(socket.id);
     // For simplicity, keep player entry; production would handle seats cleanup/timeouts.
     heartbeat.publish();
   });
 });
 
-function emitState() {
+function emitState(tableId: string) {
+  const table = tables.get(tableId);
+  if (!table) return;
   const snapshot: ServerState = {
-    tableId: TABLE_ID,
-    seats: state.seats.map(id => {
-      const p = state.players[id];
-      return { id: p.id, userId: p.userId, nickname: p.nickname, chips: p.chips };
-    }),
-    pot: state.pot
+    tableId: table.id,
+    seats: table.state.seats
+      .map(id => table.state.players[id])
+      .filter((player): player is NonNullable<typeof player> => Boolean(player))
+      .map(player => ({
+        id: player.id,
+        userId: player.userId,
+        nickname: player.nickname,
+        chips: player.chips
+      })),
+    pot: table.state.pot
   };
   io.emit('state', snapshot);
 }
