@@ -24,6 +24,11 @@ export const LobbyRoomsResponse = z.object({
 
 export const TablePlayer = z.object({
     userId: z.number().int().positive(),
+    nickname: nicknameSchema,
+    prepared: z.boolean()
+});
+export const TableHost = z.object({
+    userId: z.number().int().positive(),
     nickname: nicknameSchema
 });
 
@@ -35,6 +40,7 @@ export const TableConfig = z.object({
 export const TablePrepareResponse = z.object({
     tableId: z.string().min(1),
     status: LobbyRoomStatus,
+    host: TableHost,
     players: z.array(TablePlayer),
     config: TableConfig
 });
@@ -61,13 +67,31 @@ export const JoinTable = z.object({
     nickname: nicknameSchema,
     userId: z.number().int().positive().optional()
 });
+export const CreateTableRequest = z.object({
+    host: TableHost
+});
+export const TableStartRequest = z.object({
+    tableId: z.string().min(1)
+});
+export const TableKickRequest = z.object({
+    tableId: z.string().min(1),
+    userId: z.number().int().positive()
+});
+export const TableConfigUpdateRequest = z.object({
+    tableId: z.string().min(1),
+    minimumPlayers: z.number().int().min(1)
+});
 
 export const ServerState = z.object({
     tableId: z.string(),
+    status: LobbyRoomStatus,
+    host: TableHost,
+    config: TableConfig,
     seats: z.array(z.object({
         id: z.string(),
         userId: z.number().int().positive(),
-        nickname: nicknameSchema
+        nickname: nicknameSchema,
+        prepared: z.boolean()
     }))
 });
 
@@ -76,4 +100,8 @@ export const Heartbeat = z.object({
     timestamp: z.number().int(),
     uptimeMs: z.number().int().min(0),
     connections: z.number().int().min(0)
+});
+export const TablePreparedRequest = z.object({
+    tableId: z.string().min(1),
+    prepared: z.boolean()
 });

@@ -121,12 +121,23 @@ export default function LobbyPage() {
     if (isCreatingRoom) {
       return;
     }
+    if (!user) {
+      setRoomActionError('请先完成登录。');
+      return;
+    }
     setRoomActionError(null);
     setIsCreatingRoom(true);
     try {
       const response = await fetch(`${apiBaseUrl}/tables`, {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host: {
+            userId: user.id,
+            nickname: user.nickname
+          }
+        })
       });
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`);
@@ -144,7 +155,7 @@ export default function LobbyPage() {
     } finally {
       setIsCreatingRoom(false);
     }
-  }, [apiBaseUrl, isCreatingRoom, router]);
+  }, [apiBaseUrl, isCreatingRoom, router, user]);
 
   const handleEnterGame = useCallback((roomId: string) => {
     router.push(`/game/${encodeURIComponent(roomId)}/prepare`);

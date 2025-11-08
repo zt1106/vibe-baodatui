@@ -60,7 +60,7 @@ export default function PreparePage({ params }: PreparePageProps) {
   const [prepareStatus, setPrepareStatus] = useState<AsyncState>('idle');
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const [isPrepared, setIsPrepared] = useState(false);
+  const [configDraft, setConfigDraft] = useState<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const apiBaseUrl = useMemo(() => {
@@ -97,6 +97,14 @@ export default function PreparePage({ params }: PreparePageProps) {
   }, [apiBaseUrl, tableId]);
 
   useEffect(() => {
+    if (!prepareState) {
+      setConfigDraft(null);
+      return;
+    }
+    setConfigDraft(prepareState.config.minimumPlayers);
+  }, [prepareState]);
+
+  useEffect(() => {
     if (authStatus !== 'ready' || !tableId) return;
     let cancelled = false;
     const controller = new AbortController();
@@ -125,7 +133,7 @@ export default function PreparePage({ params }: PreparePageProps) {
             return {
               ...parsed.data,
               players: nextPlayers,
-              status: deriveTableStatus(nextPlayers.length, parsed.data.config.capacity)
+              status: prev.status
             };
           }
           return parsed.data;
@@ -172,17 +180,16 @@ export default function PreparePage({ params }: PreparePageProps) {
       if (!active || payload.tableId !== tableId) {
         return;
       }
-      setPrepareState(prev => {
-        const config = prev?.config ?? DEFAULT_TABLE_CONFIG;
-        return {
-          tableId: payload.tableId,
-          status: deriveTableStatus(payload.seats.length, config.capacity),
-          players: payload.seats.map(player => ({
-            userId: player.userId,
-            nickname: player.nickname
-          })),
-          config
-        };
+      setPrepareState({
+        tableId: payload.tableId,
+        status: payload.status,
+        host: payload.host,
+        players: payload.seats.map(player => ({
+          userId: player.userId,
+          nickname: player.nickname,
+          prepared: player.prepared
+        })),
+        config: payload.config
       });
       setPrepareStatus('ready');
       setPrepareError(null);
@@ -201,16 +208,25 @@ export default function PreparePage({ params }: PreparePageProps) {
       setPrepareError(payload?.message ?? '加入房间失败，请稍后再试。');
     });
 
+    socket.on('kicked', (payload: { tableId?: string }) => {
+      if (!active) return;
+      if (payload?.tableId !== tableId) return;
+      setPrepareError('你已被房主移出房间。');
+      setPrepareStatus('error');
+      setTimeout(() => router.push('/lobby'), 1200);
+    });
+
     return () => {
       active = false;
       socket.off('connect', requestJoin);
       socket.off('reconnect', requestJoin);
       socket.off('state', handleState);
       socket.off('errorMessage');
+      socket.off('kicked');
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [apiBaseUrl, authStatus, tableId, user?.id, user?.nickname]);
+  }, [apiBaseUrl, authStatus, tableId, router, user?.id, user?.nickname]);
 
   const handleManualRefresh = useCallback(() => {
     setReloadToken(token => token + 1);
@@ -220,12 +236,73 @@ export default function PreparePage({ params }: PreparePageProps) {
     router.push('/lobby');
   }, [router]);
 
-  const handleTogglePrepared = useCallback(() => {
-    setIsPrepared(prev => !prev);
+  const sendTableEvent = useCallback((event: string, payload: Record<string, unknown>) => {
+    const socket = socketRef.current;
+    if (!socket) {
+      setPrepareError('连接未建立，稍后再试。');
+      return false;
+    }
+    socket.emit(event, payload);
+    return true;
   }, []);
+
+  const handleStartGame = useCallback(() => {
+    sendTableEvent('table:start', { tableId });
+  }, [sendTableEvent, tableId]);
+
+  const handleKickPlayer = useCallback(
+    (targetUserId: number) => {
+      sendTableEvent('table:kick', { tableId, userId: targetUserId });
+    },
+    [sendTableEvent, tableId]
+  );
+
+  const handleAdjustMinimumPlayers = useCallback(
+    (delta: number, min = 1, max = DEFAULT_TABLE_CONFIG.capacity) => {
+      setConfigDraft(current => {
+        const baseline =
+          current ??
+          prepareState?.config.minimumPlayers ??
+          DEFAULT_TABLE_CONFIG.minimumPlayers;
+        const next = Math.min(Math.max(baseline + delta, min), max);
+        return next;
+      });
+    },
+    [prepareState?.config.minimumPlayers]
+  );
+
+  const handleSaveConfig = useCallback(() => {
+    if (configDraft === null) return;
+    sendTableEvent('table:updateConfig', { tableId, minimumPlayers: configDraft });
+  }, [configDraft, sendTableEvent, tableId]);
 
   const playerCount = prepareState?.players.length ?? 0;
   const capacity = prepareState?.config.capacity ?? 0;
+  const minimumPlayers = prepareState?.config.minimumPlayers ?? DEFAULT_TABLE_CONFIG.minimumPlayers;
+  const resolvedCapacity = capacity || DEFAULT_TABLE_CONFIG.capacity;
+  const isHost = Boolean(user && prepareState && prepareState.host.userId === user.id);
+  const selfPlayer = useMemo(() => {
+    if (!prepareState || !user) return null;
+    return prepareState.players.find(player => player.userId === user.id) ?? null;
+  }, [prepareState, user?.id]);
+  const isSelfSeated = Boolean(selfPlayer);
+  const selfPrepared = Boolean(selfPlayer?.prepared);
+  const canHostStart = isHost && playerCount >= minimumPlayers;
+  const configIsDirty = Boolean(
+    isHost &&
+      prepareState &&
+      configDraft !== null &&
+      configDraft !== prepareState.config.minimumPlayers
+  );
+  const canTogglePrepared = prepareStatus === 'ready' && isSelfSeated;
+  const preparedButtonLabel = !isSelfSeated ? '等待入座' : selfPrepared ? '已准备' : '准备';
+  const handleTogglePrepared = useCallback(() => {
+    if (!isSelfSeated) {
+      setPrepareError('请先加入座位。');
+      return;
+    }
+    sendTableEvent('table:setPrepared', { tableId, prepared: !selfPrepared });
+  }, [isSelfSeated, selfPrepared, sendTableEvent, tableId]);
   const seats = useMemo(() => {
     if (!prepareState) return [];
     const total = prepareState.config.capacity;
@@ -240,7 +317,7 @@ export default function PreparePage({ params }: PreparePageProps) {
   return (
     <main
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         padding: '2rem',
@@ -248,7 +325,8 @@ export default function PreparePage({ params }: PreparePageProps) {
         background:
           'radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.08), transparent 50%), #020617',
         color: '#e2e8f0',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}
     >
       <header
@@ -287,6 +365,11 @@ export default function PreparePage({ params }: PreparePageProps) {
           {user && (
             <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>
               当前用户：{user.nickname}（ID {user.id}）
+            </span>
+          )}
+          {prepareState?.host && (
+            <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>
+              房主：{prepareState.host.nickname}（ID {prepareState.host.userId}）
             </span>
           )}
           {authStatus === 'loading' && <span style={{ opacity: 0.7 }}>正在验证用户身份…</span>}
@@ -413,8 +496,50 @@ export default function PreparePage({ params }: PreparePageProps) {
                   <span style={{ fontSize: '0.85rem', opacity: 0.75 }}>座位 {seatNumber}</span>
                   {player ? (
                     <>
-                      <strong style={{ fontSize: '1.05rem' }}>{player.nickname}</strong>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                        <strong style={{ fontSize: '1.05rem' }}>{player.nickname}</strong>
+                        {prepareState?.host.userId === player.userId && (
+                          <span
+                            style={{
+                              padding: '0.1rem 0.5rem',
+                              borderRadius: 999,
+                              fontSize: '0.75rem',
+                              background: 'rgba(234, 179, 8, 0.2)',
+                              color: '#facc15'
+                            }}
+                          >
+                            房主
+                          </span>
+                        )}
+                      </div>
                       <span style={{ fontSize: '0.9rem', opacity: 0.75 }}>ID：{player.userId}</span>
+                      <span
+                        style={{
+                          fontSize: '0.85rem',
+                          color: player.prepared ? '#4ade80' : '#f87171',
+                          fontWeight: 600
+                        }}
+                      >
+                        {player.prepared ? '已准备' : '未准备'}
+                      </span>
+                      {isHost && user && player.userId !== user.id && prepareState?.host.userId !== player.userId && (
+                        <button
+                          type="button"
+                          onClick={() => handleKickPlayer(player.userId)}
+                          style={{
+                            marginTop: '0.35rem',
+                            padding: '0.45rem 0.9rem',
+                            borderRadius: 10,
+                            border: '1px solid rgba(248, 113, 113, 0.5)',
+                            background: 'rgba(248, 113, 113, 0.12)',
+                            color: '#fecaca',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          移出房间
+                        </button>
+                      )}
                     </>
                   ) : (
                     <span style={{ opacity: 0.5 }}>空位，等待玩家加入…</span>
@@ -432,6 +557,104 @@ export default function PreparePage({ params }: PreparePageProps) {
             gap: '1.25rem'
           }}
         >
+          {isHost && (
+            <section
+              style={{
+                background: 'rgba(15, 23, 42, 0.9)',
+                borderRadius: 24,
+                border: '1px solid rgba(34, 197, 94, 0.25)',
+                padding: '1.5rem',
+                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.4)',
+                display: 'grid',
+                gap: '1rem'
+              }}
+            >
+              <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ margin: 0 }}>房主控制台</h2>
+                <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                  当前人数：{playerCount} / {capacity || '—'}
+                </span>
+              </header>
+              <button
+                type="button"
+                onClick={handleStartGame}
+                disabled={!canHostStart}
+                style={{
+                  padding: '0.9rem 1.25rem',
+                  borderRadius: 18,
+                  border: 'none',
+                  background: canHostStart
+                    ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+                    : 'rgba(148, 163, 184, 0.25)',
+                  color: canHostStart ? '#022c22' : '#94a3b8',
+                  fontWeight: 700,
+                  cursor: canHostStart ? 'pointer' : 'not-allowed',
+                  boxShadow: canHostStart ? '0 20px 40px rgba(34, 197, 94, 0.25)' : 'none'
+                }}
+              >
+                开始对局
+              </button>
+              <div style={{ display: 'grid', gap: '0.5rem' }}>
+                <span style={{ fontWeight: 600 }}>最少开局人数</span>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleAdjustMinimumPlayers(-1, 1, resolvedCapacity)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 12,
+                      border: '1px solid rgba(148, 163, 184, 0.4)',
+                      background: 'rgba(15, 23, 42, 0.6)',
+                      color: '#e2e8f0',
+                      fontSize: '1.25rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    −
+                  </button>
+                  <strong style={{ fontSize: '1.4rem', minWidth: 40, textAlign: 'center' }}>
+                    {configDraft ?? minimumPlayers}
+                  </strong>
+                  <button
+                    type="button"
+                    onClick={() => handleAdjustMinimumPlayers(1, 1, resolvedCapacity)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 12,
+                      border: '1px solid rgba(148, 163, 184, 0.4)',
+                      background: 'rgba(15, 23, 42, 0.6)',
+                      color: '#e2e8f0',
+                      fontSize: '1.25rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ＋
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveConfig}
+                    disabled={!configIsDirty}
+                    style={{
+                      padding: '0.65rem 1.1rem',
+                      borderRadius: 12,
+                      border: 'none',
+                      background: configIsDirty
+                        ? 'linear-gradient(135deg, #38bdf8, #6366f1)'
+                        : 'rgba(148, 163, 184, 0.25)',
+                      color: configIsDirty ? '#0f172a' : '#94a3b8',
+                      fontWeight: 600,
+                      cursor: configIsDirty ? 'pointer' : 'not-allowed'
+                    }}
+                  >
+                    保存配置
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
           <section
             style={{
               background: 'rgba(15, 23, 42, 0.85)',
@@ -455,23 +678,30 @@ export default function PreparePage({ params }: PreparePageProps) {
             <button
               type="button"
               onClick={handleTogglePrepared}
-              disabled={prepareStatus !== 'ready'}
+              disabled={!canTogglePrepared}
               style={{
                 padding: '0.9rem 1.25rem',
                 borderRadius: 18,
                 border: 'none',
-                background: isPrepared
+                background: selfPrepared
                   ? 'linear-gradient(135deg, #22c55e, #16a34a)'
                   : 'linear-gradient(135deg, #38bdf8, #6366f1)',
-                color: '#0f172a',
+                color: selfPrepared ? '#022c22' : '#0f172a',
                 fontWeight: 700,
-                cursor: prepareStatus !== 'ready' ? 'not-allowed' : 'pointer',
-                opacity: prepareStatus !== 'ready' ? 0.6 : 1,
-                boxShadow: '0 20px 40px rgba(56, 189, 248, 0.25)'
+                cursor: canTogglePrepared ? 'pointer' : 'not-allowed',
+                opacity: canTogglePrepared ? 1 : 0.6,
+                boxShadow: selfPrepared ? '0 20px 40px rgba(34, 197, 94, 0.25)' : '0 20px 40px rgba(56, 189, 248, 0.25)'
               }}
             >
-              {isPrepared ? '已准备' : '准备'}
+              {preparedButtonLabel}
             </button>
+            <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+              {isSelfSeated
+                ? selfPrepared
+                  ? '已准备，等待其他玩家。'
+                  : '点击准备后，房主即可开始游戏。'
+                : '加入座位后即可准备。'}
+            </span>
           </section>
 
           <section

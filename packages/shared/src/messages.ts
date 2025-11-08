@@ -29,9 +29,16 @@ export type LobbyRoomsResponse = z.infer<typeof LobbyRoomsResponse>;
 
 export const TablePlayer = z.object({
   userId: z.number().int().positive(),
-  nickname: nicknameSchema
+  nickname: nicknameSchema,
+  prepared: z.boolean()
 });
 export type TablePlayer = z.infer<typeof TablePlayer>;
+
+export const TableHost = z.object({
+  userId: z.number().int().positive(),
+  nickname: nicknameSchema
+});
+export type TableHost = z.infer<typeof TableHost>;
 
 export const TableConfig = z.object({
   capacity: z.number().int().positive(),
@@ -42,6 +49,7 @@ export type TableConfig = z.infer<typeof TableConfig>;
 export const TablePrepareResponse = z.object({
   tableId: z.string().min(1),
   status: LobbyRoomStatus,
+  host: TableHost,
   players: z.array(TablePlayer),
   config: TableConfig
 });
@@ -76,15 +84,47 @@ export const JoinTable = z.object({
 });
 export type JoinTable = z.infer<typeof JoinTable>;
 
+export const CreateTableRequest = z.object({
+  host: TableHost
+});
+export type CreateTableRequest = z.infer<typeof CreateTableRequest>;
+
+export const TableStartRequest = z.object({
+  tableId: z.string().min(1)
+});
+export type TableStartRequest = z.infer<typeof TableStartRequest>;
+
+export const TableKickRequest = z.object({
+  tableId: z.string().min(1),
+  userId: z.number().int().positive()
+});
+export type TableKickRequest = z.infer<typeof TableKickRequest>;
+
+export const TableConfigUpdateRequest = z.object({
+  tableId: z.string().min(1),
+  minimumPlayers: z.number().int().min(1)
+});
+export type TableConfigUpdateRequest = z.infer<typeof TableConfigUpdateRequest>;
+
 export const ServerState = z.object({
   tableId: z.string(),
+  status: LobbyRoomStatus,
+  host: TableHost,
+  config: TableConfig,
   seats: z.array(z.object({
     id: z.string(),
     userId: z.number().int().positive(),
-    nickname: nicknameSchema
+    nickname: nicknameSchema,
+    prepared: z.boolean()
   }))
 });
 export type ServerState = z.infer<typeof ServerState>;
+
+export const TablePreparedRequest = z.object({
+  tableId: z.string().min(1),
+  prepared: z.boolean()
+});
+export type TablePreparedRequest = z.infer<typeof TablePreparedRequest>;
 
 export const Heartbeat = z.object({
   status: z.literal('ok'),
