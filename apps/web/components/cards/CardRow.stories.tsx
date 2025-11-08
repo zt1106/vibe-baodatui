@@ -14,11 +14,38 @@ const meta = {
   args: {
     cards: createSampleHand(),
     overlap: 0.4,
-    selectMode: 'none'
+    selectMode: 'none',
+    size: 'md',
+    align: 'center',
+    orientation: 'bottom'
+  },
+  argTypes: {
+    size: {
+      control: { type: 'inline-radio' },
+      options: ['xs', 'sm', 'md', 'lg']
+    },
+    align: {
+      control: { type: 'radio' },
+      options: ['left', 'center', 'right']
+    },
+    orientation: {
+      control: { type: 'inline-radio' },
+      options: ['top', 'bottom']
+    },
+    overlap: {
+      control: { type: 'range', min: 0.2, max: 0.8, step: 0.05 }
+    }
   },
   tags: ['autodocs'],
   decorators: [Story => (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '3rem 1rem', background: '#020617' }}>
+    <div
+      style={{
+        maxWidth: 1080,
+        margin: '0 auto',
+        padding: '4rem 2rem',
+        background: 'radial-gradient(circle at 20% 20%, rgba(32, 54, 94, 0.45), rgba(3, 7, 18, 0.95))'
+      }}
+    >
       <Story />
     </div>
   )]
