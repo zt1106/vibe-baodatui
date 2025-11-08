@@ -1,6 +1,8 @@
-export type Suit = 'S' | 'H' | 'D' | 'C';
-export type SuitSymbol = '♠' | '♥' | '♦' | '♣';
-export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K';
+export type StandardSuit = 'S' | 'H' | 'D' | 'C';
+export type JokerSuit = 'JB' | 'JR';
+export type Suit = StandardSuit | JokerSuit;
+export type SuitSymbol = '♠' | '♥' | '♦' | '♣' | '🃏';
+export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'Joker';
 export type CardId = `${Rank}${Suit}`;
 export type CardSize = 'xs' | 'sm' | 'md' | 'lg';
 export interface CardMeta {
@@ -20,7 +22,7 @@ export interface CardLayout {
     y: number;
     rot: number;
 }
-export declare const SUITS: Suit[];
+export declare const SUITS: StandardSuit[];
 export declare const RANKS: Rank[];
 export declare const SUIT_SYMBOLS: Record<Suit, SuitSymbol>;
 export declare const SYMBOL_TO_SUIT: Record<SuitSymbol, Suit>;

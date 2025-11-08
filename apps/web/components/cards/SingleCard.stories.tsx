@@ -17,11 +17,11 @@ const meta = {
   argTypes: {
     rank: {
       control: { type: 'select' },
-      options: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
+      options: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'Joker']
     },
     suit: {
       control: { type: 'select' },
-      options: ['S', 'H', 'D', 'C']
+      options: ['S', 'H', 'D', 'C', 'JB', 'JR']
     },
     contentScale: {
       control: { type: 'range', min: 0.6, max: 1.6, step: 0.05 }
@@ -51,6 +51,19 @@ export const Selected: Story = {
     selected: true,
     highlighted: true,
     meta: { selectable: true }
+  }
+};
+
+export const Jokers: Story = {
+  render: args => (
+    <div style={{ display: 'flex', gap: '1rem' }}>
+      <SingleCard {...args} suit="JB" rank="Joker" />
+      <SingleCard {...args} suit="JR" rank="Joker" />
+    </div>
+  ),
+  args: {
+    rank: 'Joker',
+    suit: 'JB'
   }
 };
 

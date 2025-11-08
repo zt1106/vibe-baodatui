@@ -2,6 +2,8 @@ import clsx from 'clsx';
 import type { HTMLAttributes } from 'react';
 import { type Card, SUIT_SYMBOLS, SUIT_TINT } from '@poker/core-cards';
 
+import { JokerIcon } from './JokerIcon';
+
 export type CardFaceVariant = 'classic' | 'minimal' | 'outline';
 
 export interface CardFaceProps extends HTMLAttributes<HTMLDivElement> {
@@ -17,8 +19,10 @@ const FACE_VARIANTS: Record<CardFaceVariant, { background: string; border: strin
 
 export function CardFace({ card, variant = 'classic', className, style, ...rest }: CardFaceProps) {
   const palette = FACE_VARIANTS[variant] ?? FACE_VARIANTS.classic;
-  const accent = SUIT_TINT[card.suit] === 'red' ? '#f87171' : palette.foreground;
-  const symbol = SUIT_SYMBOLS[card.suit];
+  const isJoker = card.rank === 'Joker';
+  const jokerTone = card.suit === 'JR' ? 'red' : 'black';
+  const accent = isJoker ? (jokerTone === 'red' ? '#f87171' : '#38bdf8') : SUIT_TINT[card.suit] === 'red' ? '#f87171' : palette.foreground;
+  const symbol = isJoker ? null : SUIT_SYMBOLS[card.suit];
 
   const cornerBaseStyle = {
     display: 'flex',
@@ -56,6 +60,18 @@ export function CardFace({ card, variant = 'classic', className, style, ...rest 
     marginRight: 'var(--v-card-face-left-offset, 0)'
   };
 
+  const renderCornerContent = () => {
+    if (isJoker) {
+      return <JokerIcon tone={jokerTone} size={28} />;
+    }
+    return (
+      <>
+        <span style={cornerTextStyle}>{card.rank}</span>
+        <span style={cornerSuitStyle}>{symbol}</span>
+      </>
+    );
+  };
+
   return (
     <div
       {...rest}
@@ -76,17 +92,11 @@ export function CardFace({ card, variant = 'classic', className, style, ...rest 
         ...style
       }}
     >
-      <div style={topCornerStyle}>
-        <span style={cornerTextStyle}>{card.rank}</span>
-        <span style={cornerSuitStyle}>{symbol}</span>
-      </div>
+      <div style={topCornerStyle}>{renderCornerContent()}</div>
       <div style={centerSymbolStyle} aria-hidden>
-        {symbol}
+        {isJoker ? <JokerIcon tone={jokerTone} size={56} /> : symbol}
       </div>
-      <div style={bottomCornerStyle}>
-        <span style={cornerTextStyle}>{card.rank}</span>
-        <span style={cornerSuitStyle}>{symbol}</span>
-      </div>
+      <div style={bottomCornerStyle}>{renderCornerContent()}</div>
       {card.meta?.tags && card.meta.tags.length > 0 && (
         <div
           style={{

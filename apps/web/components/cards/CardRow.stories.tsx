@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useMemo, useState } from 'react';
 
+import { makeCard } from '@poker/core-cards';
 import { CardRow } from '@poker/ui-cards';
 
 import { createSampleHand } from './sampleData';
@@ -58,5 +59,26 @@ export const Selectable: Story = {
         onSelect={(next) => setSelected(next)}
       />
     );
+  }
+};
+
+function createJokerRow() {
+  const sample = createSampleHand(7, 3);
+  return [
+    {
+      ...makeCard('Joker', 'JB', true),
+      meta: { tags: ['Black Joker'] }
+    },
+    {
+      ...makeCard('Joker', 'JR', true),
+      meta: { tags: ['Red Joker'] }
+    },
+    ...sample
+  ];
+}
+
+export const WithJokers: Story = {
+  args: {
+    cards: createJokerRow()
   }
 };

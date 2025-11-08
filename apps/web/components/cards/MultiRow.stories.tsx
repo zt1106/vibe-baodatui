@@ -1,3 +1,5 @@
+import type { Card } from '@poker/core-cards';
+import { makeCard } from '@poker/core-cards';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { MultiRow } from './MultiRow';
@@ -34,5 +36,27 @@ export const TableOfSix: Story = {
     rowGap: 24,
     overlap: 0.3,
     align: 'right'
+  }
+};
+
+function attachJokers(row: Card[]) {
+  return [
+    {
+      ...makeCard('Joker', 'JB', true),
+      meta: { tags: ['Black Joker'] }
+    },
+    {
+      ...makeCard('Joker', 'JR', true),
+      meta: { tags: ['Red Joker'] }
+    },
+    ...row
+  ];
+}
+
+export const JokerTable: Story = {
+  args: {
+    rows: createSampleRows({ rows: 2, cardsPerRow: 3, seed: 6 }).map(row => attachJokers(row)),
+    rowGap: 20,
+    overlap: 0.35
   }
 };

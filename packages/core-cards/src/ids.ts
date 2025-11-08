@@ -1,4 +1,4 @@
-import { Card, CardId, Rank, RANKS, Suit, SUITS } from './types';
+import { Card, CardId, Rank, RANKS, Suit, SUITS, JokerSuit } from './types';
 
 function normalizeRank(rank: Rank) {
   return rank;
@@ -8,8 +8,12 @@ export function createCardId(rank: Rank, suit: Suit): CardId {
   return `${rank}${suit}` as CardId;
 }
 
+const JOKER_SUITS = ['JB', 'JR'] as JokerSuit[];
+const RANK_PATTERN = [...RANKS, 'Joker'].join('|');
+const SUIT_PATTERN = [...SUITS, ...JOKER_SUITS].join('|');
+
 export function parseCardId(id: string): { rank: Rank; suit: Suit } | null {
-  const match = id.match(/^(A|[2-9]|10|J|Q|K)([SHDC])$/);
+  const match = id.match(new RegExp(`^(${RANK_PATTERN})(${SUIT_PATTERN})$`));
   if (!match) return null;
   const [, rank, suit] = match;
   return { rank: rank as Rank, suit: suit as Suit };
@@ -31,6 +35,9 @@ export function makeDeck(options: { faceUp?: boolean } = {}): Card[] {
     for (const rank of RANKS) {
       cards.push(makeCard(rank, suit, faceUp));
     }
+  }
+  for (const suit of JOKER_SUITS) {
+    cards.push(makeCard('Joker', suit, faceUp));
   }
   return cards;
 }
