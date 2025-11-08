@@ -40,7 +40,7 @@ export function CardRow({
   orientation = 'bottom',
   maxAngle,
   radius,
-  overlap = 0.35,
+  overlap = 0,
   layoutIdPrefix = 'card-row',
   selectMode = 'none',
   selectedIds,
@@ -53,7 +53,8 @@ export function CardRow({
   const selection = isControlled ? selectedIds! : internalSelected;
   const selectedSet = useMemo(() => new Set(selection), [selection]);
   const { width: cardWidth, height: cardHeight } = getCardDimensions(size);
-  const approxRowWidth = cardWidth + Math.max(cards.length - 1, 0) * cardWidth * (1 - overlap);
+  const normOverlap = Math.min(Math.max(overlap, 0), 1);
+  const approxRowWidth = cardWidth + Math.max(cards.length - 1, 0) * cardWidth * Math.max(1 - normOverlap, 0);
   const alignOffset =
     align === 'left'
       ? -approxRowWidth / 2 + cardWidth / 2
@@ -61,14 +62,16 @@ export function CardRow({
         ? approxRowWidth / 2 - cardWidth / 2
         : 0;
 
+  const computedRadius = (radius ?? 420) * Math.max(1 - normOverlap, 0);
+  const computedMaxAngle = (maxAngle ?? 22) * Math.max(1 - normOverlap, 0);
   const positions = useMemo(
     () =>
       fanLayout(cards.length, {
-        maxAngle,
-        radius,
+        maxAngle: computedMaxAngle,
+        radius: computedRadius,
         pivot: align
       }),
-    [cards.length, maxAngle, radius, align]
+    [cards.length, computedMaxAngle, computedRadius, align]
   );
 
   const handleSelect = (card: Card) => {

@@ -114,6 +114,10 @@ export function PlayingCard({
     ...(styleRest as MotionStyle),
     transformOrigin: 'center center'
   };
+  const transformTemplate = (transform?: string, generatedTransform?: string) => {
+    const fragments = [transform, generatedTransform].filter(Boolean);
+    return fragments.length > 0 ? fragments.join(' ') : 'none';
+  };
 
   const cancelLongPress = () => {
     if (longPressTimer.current != null) {
@@ -183,6 +187,7 @@ export function PlayingCard({
       onClick={handleClick}
       onDragStartCapture={handleDragStart}
       whileHover={disabled ? undefined : { y: -4 }}
+      transformTemplate={transformTemplate}
     >
       <motion.div
         className="v-card-3d"

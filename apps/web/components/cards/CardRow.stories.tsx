@@ -33,8 +33,9 @@ export const Default: Story = {};
 
 export const TightOverlap: Story = {
   args: {
-    overlap: 0.65,
-    cards: createSampleHand(2)
+    overlap: 0.5,
+    cards: createSampleHand(7),
+    align: 'left'
   }
 };
 
