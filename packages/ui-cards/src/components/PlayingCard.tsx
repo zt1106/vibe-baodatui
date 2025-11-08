@@ -68,8 +68,25 @@ export function PlayingCard({
 }: PlayingCardProps) {
   const longPressTimer = useRef<number | null>(null);
   const cssVars = useMemo(() => resolveCardCssVars(size), [size]);
-  const { transform: inheritedTransform, ...styleRest } = style ?? {};
+  const { transform: inheritedTransform, filter: inheritedFilter, ...styleRest } = style ?? {};
   const cursor = disabled ? 'not-allowed' : draggable ? 'grab' : onClick ? 'pointer' : 'default';
+  const baseShadow = ELEVATION_SHADOW[elevation];
+  const highlightFrame = highlighted ? (
+    <div
+      aria-hidden
+      style={{
+        position: 'absolute',
+        inset: '-4px',
+        border: '2px solid rgba(56, 189, 248, 0.9)',
+        borderRadius: 0,
+        pointerEvents: 'none'
+      }}
+    />
+  ) : null;
+  const selectedFilter = 'invert(0.95) hue-rotate(180deg) saturate(1.1)';
+  const filterValue = selected
+    ? [selectedFilter, inheritedFilter].filter(Boolean).join(' ').trim() || undefined
+    : inheritedFilter;
 
   const combinedStyle: MotionStyle = {
     ...cssVars,
@@ -78,12 +95,12 @@ export function PlayingCard({
     position: 'relative',
     borderRadius: 18,
     perspective: '1200px',
-    boxShadow: ELEVATION_SHADOW[elevation],
+    boxShadow: baseShadow,
     transform: tiltDeg ? `${inheritedTransform ?? ''} rotate(${tiltDeg}deg)`.trim() || undefined : inheritedTransform,
-    outline: selected ? '3px solid rgba(250, 204, 21, 0.9)' : highlighted ? '2px solid rgba(56, 189, 248, 0.7)' : 'none',
     opacity: disabled ? 0.6 : 1,
     cursor,
-    transition: 'outline 0.15s ease, box-shadow 0.2s ease',
+    filter: filterValue,
+    transition: 'filter 0.15s ease, box-shadow 0.2s ease',
     ...(styleRest as MotionStyle),
     transformOrigin: 'center center'
   };
@@ -188,6 +205,7 @@ export function PlayingCard({
           <CardBack variant={backVariant} customPatternUrl={customBackImageUrl} />
         </div>
       </motion.div>
+      {highlightFrame}
       {renderOverlay && (
         <div
           style={{
