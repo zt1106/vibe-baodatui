@@ -115,7 +115,9 @@ export function PlayingCard({
     transformOrigin: 'center center'
   };
   const transformTemplate = (transform?: string, generatedTransform?: string) => {
-    const fragments = [transform, generatedTransform].filter(Boolean);
+    const fragments = [generatedTransform, transform].filter(
+      value => value && value !== 'none'
+    );
     return fragments.length > 0 ? fragments.join(' ') : 'none';
   };
 
