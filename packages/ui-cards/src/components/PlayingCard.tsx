@@ -1,0 +1,204 @@
+'use client';
+
+import clsx from 'clsx';
+import { motion, type HTMLMotionProps, type MotionStyle } from 'framer-motion';
+import {
+  type DragEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+  useMemo,
+  useRef
+} from 'react';
+
+import type { Card, CardSize } from '@poker/core-cards';
+import { resolveCardCssVars } from '@poker/core-cards';
+
+import { flipVariants } from '../motionVariants';
+import { CardBack, type CardBackVariant } from './CardBack';
+import { CardFace, type CardFaceVariant } from './CardFace';
+
+export interface PlayingCardProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
+  card: Card;
+  size?: CardSize;
+  faceVariant?: CardFaceVariant;
+  backVariant?: CardBackVariant;
+  customBackImageUrl?: string;
+  selected?: boolean;
+  highlighted?: boolean;
+  disabled?: boolean;
+  tiltDeg?: number;
+  layoutId?: string;
+  elevation?: 0 | 1 | 2 | 3;
+  draggable?: boolean;
+  dragData?: unknown;
+  onLongPress?: () => void;
+  renderOverlay?: ReactNode;
+}
+
+const ELEVATION_SHADOW: Record<NonNullable<PlayingCardProps['elevation']>, string> = {
+  0: 'none',
+  1: '0 10px 25px rgba(15, 23, 42, 0.28)',
+  2: '0 16px 40px rgba(15, 23, 42, 0.35)',
+  3: '0 28px 70px rgba(15, 23, 42, 0.45)'
+};
+
+export function PlayingCard({
+  card,
+  size = 'md',
+  faceVariant = 'classic',
+  backVariant = 'red',
+  customBackImageUrl,
+  selected,
+  highlighted,
+  disabled,
+  tiltDeg,
+  layoutId,
+  elevation = 1,
+  draggable,
+  dragData,
+  onLongPress,
+  renderOverlay,
+  className,
+  style,
+  onPointerDown,
+  onPointerUp,
+  onClick,
+  ...rest
+}: PlayingCardProps) {
+  const longPressTimer = useRef<number | null>(null);
+  const cssVars = useMemo(() => resolveCardCssVars(size), [size]);
+  const { transform: inheritedTransform, ...styleRest } = style ?? {};
+  const cursor = disabled ? 'not-allowed' : draggable ? 'grab' : onClick ? 'pointer' : 'default';
+
+  const combinedStyle: MotionStyle = {
+    ...cssVars,
+    width: 'var(--card-w)',
+    height: 'var(--card-h)',
+    position: 'relative',
+    borderRadius: 18,
+    perspective: '1200px',
+    boxShadow: ELEVATION_SHADOW[elevation],
+    transform: tiltDeg ? `${inheritedTransform ?? ''} rotate(${tiltDeg}deg)`.trim() || undefined : inheritedTransform,
+    outline: selected ? '3px solid rgba(250, 204, 21, 0.9)' : highlighted ? '2px solid rgba(56, 189, 248, 0.7)' : 'none',
+    opacity: disabled ? 0.6 : 1,
+    cursor,
+    transition: 'outline 0.15s ease, box-shadow 0.2s ease',
+    ...(styleRest as MotionStyle),
+    transformOrigin: 'center center'
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current != null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (disabled) {
+      event.preventDefault();
+      return;
+    }
+    if (onLongPress) {
+      cancelLongPress();
+      longPressTimer.current = window.setTimeout(() => {
+        longPressTimer.current = null;
+        onLongPress();
+      }, 450);
+    }
+    onPointerDown?.(event);
+  };
+
+  const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    cancelLongPress();
+    onPointerUp?.(event);
+  };
+
+  const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
+    if (!draggable) return;
+    if (dragData !== undefined) {
+      try {
+        event.dataTransfer?.setData('application/json', JSON.stringify(dragData));
+      } catch {
+        // Non-serializable data, ignore.
+      }
+    }
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (disabled) {
+      event.preventDefault();
+      return;
+    }
+    onClick?.(event);
+  };
+
+  return (
+    <motion.div
+      {...rest}
+      data-card-id={card.id}
+      data-selected={selected ? 'true' : undefined}
+      data-highlighted={highlighted ? 'true' : undefined}
+      data-disabled={disabled ? 'true' : undefined}
+      layout
+      layoutId={layoutId ?? card.id}
+      draggable={draggable}
+      className={clsx('v-playing-card', className)}
+      style={combinedStyle as MotionStyle}
+      role={onClick ? 'button' : undefined}
+      aria-pressed={selected ?? undefined}
+      aria-disabled={disabled ?? undefined}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={cancelLongPress}
+      onClick={handleClick}
+      onDragStartCapture={handleDragStart}
+      whileHover={disabled ? undefined : { y: -4 }}
+    >
+      <motion.div
+        className="v-card-3d"
+        variants={flipVariants}
+        animate={card.faceUp ? 'face' : 'back'}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 'inherit',
+          transformStyle: 'preserve-3d'
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backfaceVisibility: 'hidden'
+          }}
+        >
+          <CardFace card={card} variant={faceVariant} />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            transform: 'rotateY(180deg)',
+            backfaceVisibility: 'hidden'
+          }}
+        >
+          <CardBack variant={backVariant} customPatternUrl={customBackImageUrl} />
+        </div>
+      </motion.div>
+      {renderOverlay && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none'
+          }}
+        >
+          {renderOverlay}
+        </div>
+      )}
+    </motion.div>
+  );
+}

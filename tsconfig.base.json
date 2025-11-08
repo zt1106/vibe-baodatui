@@ -12,7 +12,9 @@
     "paths": {
       "@game-core/*": ["packages/game-core/src/*"],
       "@shared/*": ["packages/shared/src/*"],
-      "@test-utils/*": ["packages/test-utils/src/*"]
+      "@test-utils/*": ["packages/test-utils/src/*"],
+      "@core-cards/*": ["packages/core-cards/src/*"],
+      "@ui-cards/*": ["packages/ui-cards/src/*"]
     },
     "types": ["node"]
   }

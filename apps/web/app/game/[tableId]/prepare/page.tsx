@@ -13,6 +13,7 @@ import {
   type StoredUser
 } from '../../../../lib/auth';
 import { generateRandomChineseName } from '../../../../lib/nickname';
+import { CardShowcase } from '../../../../components/cards/CardShowcase';
 
 const NICKNAME_STORAGE_KEY = 'nickname';
 
@@ -694,6 +695,8 @@ export default function PreparePage({ params }: PreparePageProps) {
                 : '加入座位后即可准备。'}
             </span>
           </section>
+
+          <CardShowcase />
 
           <section
             style={{
