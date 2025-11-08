@@ -54,19 +54,6 @@ export const Selected: Story = {
   }
 };
 
-export const Jokers: Story = {
-  render: args => (
-    <div style={{ display: 'flex', gap: '1rem' }}>
-      <SingleCard {...args} suit="JB" rank="Joker" />
-      <SingleCard {...args} suit="JR" rank="Joker" />
-    </div>
-  ),
-  args: {
-    rank: 'Joker',
-    suit: 'JB'
-  }
-};
-
 export const Tilted: Story = {
   args: {
     tiltDeg: -10,

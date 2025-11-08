@@ -60,6 +60,35 @@ export function CardFace({ card, variant = 'classic', className, style, ...rest 
     marginRight: 'var(--v-card-face-left-offset, 0)'
   };
 
+  const topCornerLetters = ['J', 'O', 'K', 'E', 'R'];
+  const renderTopCornerContent = () => {
+    if (isJoker) {
+      return (
+        <>
+          {topCornerLetters.map(letter => (
+            <span
+              key={letter}
+              style={{
+                ...cornerTextStyle,
+                lineHeight: 0.9,
+                marginBottom: 0,
+                color: jokerTone === 'black' ? '#0f172a' : accent
+              }}
+            >
+              {letter}
+            </span>
+          ))}
+        </>
+      );
+    }
+    return (
+      <>
+        <span style={cornerTextStyle}>{card.rank}</span>
+        <span style={cornerSuitStyle}>{symbol}</span>
+      </>
+    );
+  };
+
   const renderCornerContent = () => {
     if (isJoker) {
       return <JokerIcon tone={jokerTone} size={28} />;
@@ -92,7 +121,7 @@ export function CardFace({ card, variant = 'classic', className, style, ...rest 
         ...style
       }}
     >
-      <div style={topCornerStyle}>{renderCornerContent()}</div>
+      <div style={topCornerStyle}>{renderTopCornerContent()}</div>
       <div style={centerSymbolStyle} aria-hidden>
         {isJoker ? <JokerIcon tone={jokerTone} size={56} /> : symbol}
       </div>
