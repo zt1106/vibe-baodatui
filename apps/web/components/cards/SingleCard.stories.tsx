@@ -9,10 +9,7 @@ const meta = {
     rank: 'A',
     suit: 'S',
     faceUp: true,
-    elevation: 2,
-    contentScale: 1.2,
-    contentOffsetX: -0.5,
-    contentOffsetY: -0.5
+    elevation: 2
   },
   argTypes: {
     rank: {

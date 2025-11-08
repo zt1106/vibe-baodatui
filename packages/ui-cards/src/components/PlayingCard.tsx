@@ -34,6 +34,9 @@ export interface PlayingCardProps extends Omit<HTMLMotionProps<'div'>, 'children
   dragData?: unknown;
   onLongPress?: () => void;
   renderOverlay?: ReactNode;
+  contentScale?: number;
+  contentOffsetX?: number;
+  contentOffsetY?: number;
 }
 
 const ELEVATION_SHADOW: Record<NonNullable<PlayingCardProps['elevation']>, string> = {
@@ -59,6 +62,9 @@ export function PlayingCard({
   dragData,
   onLongPress,
   renderOverlay,
+  contentScale = 1.2,
+  contentOffsetX = -0.5,
+  contentOffsetY = -0.5,
   className,
   style,
   onPointerDown,
@@ -90,6 +96,10 @@ export function PlayingCard({
 
   const combinedStyle: MotionStyle = {
     ...cssVars,
+    '--v-card-face-corner-size': `${0.9 * contentScale}rem`,
+    '--v-card-face-symbol-size': `${2.4 * contentScale}rem`,
+    '--v-card-face-left-offset': `${contentOffsetX}rem`,
+    '--v-card-face-top-offset': `${contentOffsetY}rem`,
     width: 'var(--card-w)',
     height: 'var(--card-h)',
     position: 'relative',
