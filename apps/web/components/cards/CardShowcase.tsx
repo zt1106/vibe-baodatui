@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 
 import { makeDeck, shuffleDeck } from '@poker/core-cards';
-import { CardRow, CardStack } from '@poker/ui-cards';
+import { CardStack } from '@poker/ui-cards';
+import { SingleCard } from './SingleCard';
 
 export function CardShowcase() {
   const [seed, setSeed] = useState(0);
@@ -20,6 +21,14 @@ export function CardShowcase() {
   }, [seed]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [lastInteraction, setLastInteraction] = useState<string | null>(null);
+
+  const toggleCard = (cardId: string) => {
+    setSelectedIds(prev => {
+      const next = prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId];
+      setLastInteraction(next.length ? `选中 ${next.length} 张` : '未选择任何卡牌');
+      return next;
+    });
+  };
 
   return (
     <section
@@ -54,18 +63,44 @@ export function CardShowcase() {
         </button>
       </header>
 
-      <CardRow
-        cards={sampleHand}
-        size="md"
-        overlap={0.45}
-        selectMode="multi"
-        selectedIds={selectedIds}
-        onSelect={next => {
-          setSelectedIds(next);
-          setLastInteraction(next.length ? `选中 ${next.length} 张` : '未选择任何卡牌');
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '1rem 0'
         }}
-        onCardLongPress={card => setLastInteraction(`长按 ${card.id}`)}
-      />
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 0
+          }}
+        >
+          {sampleHand.map((card, index) => {
+            const isSelected = selectedIds.includes(card.id);
+            return (
+              <SingleCard
+                key={card.id}
+                rank={card.rank}
+                suit={card.suit}
+                faceUp={card.faceUp}
+                meta={card.meta}
+                size="md"
+                selected={isSelected}
+                highlighted={isSelected}
+                tiltDeg={(index - (sampleHand.length - 1) / 2) * 4}
+                onClick={() => toggleCard(card.id)}
+                onLongPress={() => setLastInteraction(`长按 ${card.id}`)}
+                style={{
+                  marginLeft: index === 0 ? 0 : -48
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
 
       <div
         style={{

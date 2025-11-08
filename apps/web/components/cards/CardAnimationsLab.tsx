@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 
 import { makeDeck, shuffleDeck, type Card } from '@poker/core-cards';
-import { CardRow, CardStack } from '@poker/ui-cards';
+import { CardStack } from '@poker/ui-cards';
+import { SingleCard } from './SingleCard';
 
 function decorateCard(card: Card, seatIndex: number, cardIndex: number): Card {
   return {
@@ -76,17 +77,35 @@ export function CardAnimationsLab({ seats = 3, cardsPerSeat = 5, overlap = 0.4 }
       </header>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {rows.map((cards, index) => (
-          <CardRow
-            key={`lab-row-${index}`}
-            cards={cards}
-            overlap={overlap}
-            layoutIdPrefix={`lab-row-${index}`}
-            selectMode="multi"
-            align="center"
-            orientation={index % 2 ? 'top' : 'bottom'}
-          />
-        ))}
+        {rows.map((cards, rowIndex) => {
+          const overlapGap = overlap * 48;
+          const rowDirection = rowIndex % 2 === 0 ? 1 : -1;
+          return (
+            <div
+              key={`lab-row-${rowIndex}`}
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'flex-end',
+                gap: 0,
+                padding: '0.5rem 0'
+              }}
+            >
+              {cards.map((card, cardIndex) => (
+                <SingleCard
+                  key={card.id}
+                  rank={card.rank}
+                  suit={card.suit}
+                  faceUp={card.faceUp}
+                  meta={card.meta}
+                  size="sm"
+                  tiltDeg={((cardIndex - (cards.length - 1) / 2) * 6) * rowDirection}
+                  style={{ marginLeft: cardIndex === 0 ? 0 : -overlapGap }}
+                />
+              ))}
+            </div>
+          );
+        })}
       </div>
 
       <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
