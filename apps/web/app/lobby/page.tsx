@@ -8,6 +8,7 @@ import type { LobbyNotification, LobbyRoom } from '@shared/messages';
 
 import { useHeartbeat } from '../../lib/heartbeat';
 import { ensureUser, loadStoredUser, persistStoredUser, clearStoredUser, type StoredUser } from '../../lib/auth';
+import { generateRandomChineseName } from '../../lib/nickname';
 
 const NICKNAME_STORAGE_KEY = 'nickname';
 
@@ -34,7 +35,7 @@ export default function LobbyPage() {
         const storedNickname =
           storedUser?.nickname ??
           (typeof window !== 'undefined' ? window.localStorage.getItem(NICKNAME_STORAGE_KEY) : null) ??
-          'Guest';
+          generateRandomChineseName();
         const authenticated = await ensureUser(apiBaseUrl, storedNickname);
         persistStoredUser(authenticated);
         if (typeof window !== 'undefined') {

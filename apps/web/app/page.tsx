@@ -58,14 +58,14 @@ export default function Page() {
   }, []);
 
   const persistNickname = useCallback((value: string) => {
-    const safeValue = value.trim() || 'Guest';
+    const safeValue = value.trim() || generateRandomChineseName();
     setNickname(safeValue);
     window.localStorage.setItem(NICKNAME_STORAGE_KEY, safeValue);
   }, []);
 
   const handleEnterLobby = useCallback(async () => {
     if (isAuthenticating) return;
-    const targetNickname = nickname.trim() || 'Guest';
+    const targetNickname = nickname.trim() || generateRandomChineseName();
     persistNickname(targetNickname);
     setAuthError(null);
     setIsAuthenticating(true);

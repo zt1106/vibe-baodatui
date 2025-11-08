@@ -23,21 +23,25 @@ test.describe('Home authentication flow', () => {
     await expect(page.locator('[data-testid="random-nickname-btn"]')).toHaveCount(0);
   });
 
-  test('falls back to Guest when no nickname is provided', async ({ page }) => {
+  test('assigns a random nickname when no nickname is provided', async ({ page }) => {
     await page.goto('/');
 
     await page.getByTestId('nickname-input').fill('   ');
     await page.getByTestId('enter-lobby-btn').click();
 
     await expect(page).toHaveURL(/\/lobby$/);
-    await expect(page.getByTestId('lobby-user-summary')).toContainText('Guest');
+    const loginBadge = page.getByTestId('lobby-user-summary').getByText(/^已登录：/);
+    const loginBadgeText = (await loginBadge.textContent()) ?? '';
+    const assignedNickname = loginBadgeText.replace('已登录：', '').trim();
+    expect(assignedNickname.length).toBeGreaterThan(0);
+    expect(assignedNickname).toMatch(/^[A-Za-z]+ [A-Za-z]+$/);
     await expect(page.getByTestId('lobby-room-card').first()).toBeVisible();
     await expect(page.getByTestId('lobby-connection-indicator')).toBeVisible();
 
     await page.goto('/');
     const homeInput = page.getByTestId('nickname-input');
     await expect(homeInput).toBeDisabled();
-    await expect(homeInput).toHaveValue('Logged in as Guest');
+    await expect(homeInput).toHaveValue(`Logged in as ${assignedNickname}`);
     await expect(page.getByTestId('logout-btn')).toBeVisible();
   });
 

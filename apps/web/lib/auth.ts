@@ -1,3 +1,5 @@
+import { generateRandomChineseName } from './nickname';
+
 export type StoredUser = { id: number; nickname: string };
 
 const USER_STORAGE_KEY = 'auth:user';
@@ -46,7 +48,7 @@ async function parseUserResponse(response: Response): Promise<StoredUser> {
 }
 
 export async function ensureUser(apiBaseUrl: string, nickname: string): Promise<StoredUser> {
-  const sanitized = nickname.trim() || 'Guest';
+  const sanitized = nickname.trim() || generateRandomChineseName();
   const headers = { 'Content-Type': 'application/json' };
   try {
     const registerResponse = await fetch(`${apiBaseUrl}/auth/register`, {
