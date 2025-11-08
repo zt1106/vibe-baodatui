@@ -11,6 +11,8 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "e2e": "pnpm -C apps/web test:e2e"
+    "e2e": "pnpm -C apps/web test:e2e",
+    "sb": "pnpm -C apps/web storybook",
+    "sb:build": "pnpm -C apps/web build-storybook"
   }
 }
