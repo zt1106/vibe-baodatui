@@ -14,8 +14,6 @@ import {
 import type { Card, CardSize } from '@poker/core-cards';
 import { resolveCardCssVars } from '@poker/core-cards';
 
-import '../styles/card.css';
-
 import { flipVariants } from '../motionVariants';
 import { CardBack, type CardBackVariant } from './CardBack';
 import { CardFace, type CardFaceVariant } from './CardFace';
@@ -36,23 +34,19 @@ export interface PlayingCardProps extends Omit<HTMLMotionProps<'div'>, 'children
   dragData?: unknown;
   onLongPress?: () => void;
   renderOverlay?: ReactNode;
-  theme?: 'classic' | 'minimal' | 'neon';
-  shadowStrength?: 'soft' | 'base' | 'deep';
-  borderStyle?: 'double' | 'single' | 'minimal';
-  noiseOpacity?: number;
 }
 
 const ELEVATION_SHADOW: Record<NonNullable<PlayingCardProps['elevation']>, string> = {
-  0: '0 0 0 rgba(0, 0, 0, 0)',
-  1: '0 10px 24px rgba(15, 23, 42, 0.28)',
-  2: '0 16px 36px rgba(15, 23, 42, 0.35)',
-  3: '0 26px 64px rgba(15, 23, 42, 0.45)'
+  0: 'none',
+  1: '0 10px 25px rgba(15, 23, 42, 0.28)',
+  2: '0 16px 40px rgba(15, 23, 42, 0.35)',
+  3: '0 28px 70px rgba(15, 23, 42, 0.45)'
 };
 
 export function PlayingCard({
   card,
   size = 'md',
-  faceVariant,
+  faceVariant = 'classic',
   backVariant = 'red',
   customBackImageUrl,
   selected,
@@ -70,34 +64,26 @@ export function PlayingCard({
   onPointerDown,
   onPointerUp,
   onClick,
-  theme = 'classic',
-  shadowStrength = 'base',
-  borderStyle = 'double',
-  noiseOpacity = 0.18,
   ...rest
 }: PlayingCardProps) {
   const longPressTimer = useRef<number | null>(null);
   const cssVars = useMemo(() => resolveCardCssVars(size), [size]);
   const { transform: inheritedTransform, ...styleRest } = style ?? {};
   const cursor = disabled ? 'not-allowed' : draggable ? 'grab' : onClick ? 'pointer' : 'default';
-  const normalizedNoise = Math.min(Math.max(noiseOpacity, 0), 0.5);
-  const faceState = card.faceUp ? 'front' : 'back';
-  const resolvedFaceVariant = (faceVariant ?? theme) as CardFaceVariant;
 
   const combinedStyle: MotionStyle = {
     ...cssVars,
     width: 'var(--card-w)',
     height: 'var(--card-h)',
     position: 'relative',
-    borderRadius: 'var(--card-radius)',
-    perspective: '1400px',
+    borderRadius: 18,
+    perspective: '1200px',
     boxShadow: ELEVATION_SHADOW[elevation],
     transform: tiltDeg ? `${inheritedTransform ?? ''} rotate(${tiltDeg}deg)`.trim() || undefined : inheritedTransform,
+    outline: selected ? '3px solid rgba(250, 204, 21, 0.9)' : highlighted ? '2px solid rgba(56, 189, 248, 0.7)' : 'none',
     opacity: disabled ? 0.6 : 1,
     cursor,
-    transition: 'box-shadow 0.2s ease',
-    '--card-shadow-current': ELEVATION_SHADOW[elevation],
-    '--card-noise-opacity': `${normalizedNoise}`,
+    transition: 'outline 0.15s ease, box-shadow 0.2s ease',
     ...(styleRest as MotionStyle),
     transformOrigin: 'center center'
   };
@@ -156,18 +142,10 @@ export function PlayingCard({
       data-selected={selected ? 'true' : undefined}
       data-highlighted={highlighted ? 'true' : undefined}
       data-disabled={disabled ? 'true' : undefined}
-      data-face={faceState}
       layout
       layoutId={layoutId ?? card.id}
       draggable={draggable}
-      className={clsx(
-        'v-playing-card',
-        `card--${size}`,
-        `card-theme-${theme}`,
-        shadowStrength ? `card-shadow-${shadowStrength}` : undefined,
-        borderStyle !== 'double' ? `card-border-${borderStyle}` : undefined,
-        className
-      )}
+      className={clsx('v-playing-card', className)}
       style={combinedStyle as MotionStyle}
       role={onClick ? 'button' : undefined}
       aria-pressed={selected ?? undefined}
@@ -177,19 +155,39 @@ export function PlayingCard({
       onPointerLeave={cancelLongPress}
       onClick={handleClick}
       onDragStartCapture={handleDragStart}
-      whileHover={disabled ? undefined : { y: -4, rotateX: 1, rotateY: 0.5 }}
-      whileTap={disabled ? undefined : { y: 0, scale: 0.99 }}
+      whileHover={disabled ? undefined : { y: -4 }}
     >
-      <div className="card__frame">
-        <motion.div className="v-card-3d" variants={flipVariants} animate={card.faceUp ? 'face' : 'back'}>
-          <div className={clsx('card__face', 'card__face--front')}>
-            {card.faceUp && <CardFace card={card} variant={resolvedFaceVariant} />}
-          </div>
-          <div className={clsx('card__face', 'card__face--back')}>
-            <CardBack variant={backVariant} customPatternUrl={customBackImageUrl} />
-          </div>
-        </motion.div>
-      </div>
+      <motion.div
+        className="v-card-3d"
+        variants={flipVariants}
+        animate={card.faceUp ? 'face' : 'back'}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 'inherit',
+          transformStyle: 'preserve-3d'
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backfaceVisibility: 'hidden'
+          }}
+        >
+          <CardFace card={card} variant={faceVariant} />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            transform: 'rotateY(180deg)',
+            backfaceVisibility: 'hidden'
+          }}
+        >
+          <CardBack variant={backVariant} customPatternUrl={customBackImageUrl} />
+        </div>
+      </motion.div>
       {renderOverlay && (
         <div
           style={{
