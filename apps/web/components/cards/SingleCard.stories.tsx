@@ -60,10 +60,3 @@ export const Tilted: Story = {
     elevation: 3
   }
 };
-
-export const Disabled: Story = {
-  args: {
-    disabled: true,
-    faceUp: true
-  }
-};
