@@ -24,8 +24,7 @@ export const LobbyRoomsResponse = z.object({
 
 export const TablePlayer = z.object({
     userId: z.number().int().positive(),
-    nickname: nicknameSchema,
-    chips: z.number().int().min(0)
+    nickname: nicknameSchema
 });
 
 export const TableConfig = z.object({
@@ -63,20 +62,13 @@ export const JoinTable = z.object({
     userId: z.number().int().positive().optional()
 });
 
-export const Bet = z.object({
-    tableId: z.string().min(1),
-    chips: z.number().int().min(0)
-});
-
 export const ServerState = z.object({
     tableId: z.string(),
     seats: z.array(z.object({
         id: z.string(),
         userId: z.number().int().positive(),
-        nickname: nicknameSchema,
-        chips: z.number().int()
-    })),
-    pot: z.number().int(),
+        nickname: nicknameSchema
+    }))
 });
 
 export const Heartbeat = z.object({

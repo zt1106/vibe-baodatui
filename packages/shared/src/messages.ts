@@ -29,8 +29,7 @@ export type LobbyRoomsResponse = z.infer<typeof LobbyRoomsResponse>;
 
 export const TablePlayer = z.object({
   userId: z.number().int().positive(),
-  nickname: nicknameSchema,
-  chips: z.number().int().min(0)
+  nickname: nicknameSchema
 });
 export type TablePlayer = z.infer<typeof TablePlayer>;
 
@@ -77,21 +76,13 @@ export const JoinTable = z.object({
 });
 export type JoinTable = z.infer<typeof JoinTable>;
 
-export const Bet = z.object({
-  tableId: z.string().min(1),
-  chips: z.number().int().min(0)
-});
-export type Bet = z.infer<typeof Bet>;
-
 export const ServerState = z.object({
   tableId: z.string(),
   seats: z.array(z.object({
     id: z.string(),
     userId: z.number().int().positive(),
-    nickname: nicknameSchema,
-    chips: z.number().int()
-  })),
-  pot: z.number().int(),
+    nickname: nicknameSchema
+  }))
 });
 export type ServerState = z.infer<typeof ServerState>;
 

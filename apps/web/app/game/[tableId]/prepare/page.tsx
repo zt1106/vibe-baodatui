@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TablePrepareResponse as TablePrepareResponseSchema } from '@shared/messages';
-import type { TablePrepareResponse } from '@shared/messages';
+import type { ServerState, TablePrepareResponse } from '@shared/messages';
+import { io, Socket } from 'socket.io-client';
 
 import {
   ensureUser,
@@ -20,6 +21,21 @@ type PreparePageProps = {
 };
 
 type AsyncState = 'idle' | 'loading' | 'ready' | 'error';
+
+const DEFAULT_TABLE_CONFIG = {
+  capacity: 6,
+  minimumPlayers: 2
+};
+
+function deriveTableStatus(players: number, capacity: number): TablePrepareResponse['status'] {
+  if (players >= capacity) {
+    return 'full';
+  }
+  if (players > 0) {
+    return 'in-progress';
+  }
+  return 'waiting';
+}
 
 function seatStatusTone(status: TablePrepareResponse['status']) {
   switch (status) {
@@ -45,6 +61,7 @@ export default function PreparePage({ params }: PreparePageProps) {
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [isPrepared, setIsPrepared] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
   const apiBaseUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
@@ -102,7 +119,17 @@ export default function PreparePage({ params }: PreparePageProps) {
           throw new Error('Invalid table payload');
         }
         if (cancelled) return;
-        setPrepareState(parsed.data);
+        setPrepareState(prev => {
+          if (prev && prev.players.length > 0) {
+            const nextPlayers = prev.players;
+            return {
+              ...parsed.data,
+              players: nextPlayers,
+              status: deriveTableStatus(nextPlayers.length, parsed.data.config.capacity)
+            };
+          }
+          return parsed.data;
+        });
         setPrepareStatus('ready');
       } catch (error) {
         if (controller.signal.aborted || cancelled) {
@@ -121,6 +148,69 @@ export default function PreparePage({ params }: PreparePageProps) {
       controller.abort();
     };
   }, [apiBaseUrl, authStatus, tableId, reloadToken]);
+
+  useEffect(() => {
+    if (authStatus !== 'ready' || !user || !tableId) {
+      return;
+    }
+    let active = true;
+    const socket = io(apiBaseUrl, {
+      transports: ['websocket'],
+      withCredentials: true,
+      reconnection: true,
+      reconnectionDelayMax: 2_000
+    });
+    socketRef.current = socket;
+
+    const joinPayload = { tableId, nickname: user.nickname, userId: user.id };
+
+    const requestJoin = () => {
+      socket.emit('joinTable', joinPayload);
+    };
+
+    const handleState = (payload: ServerState) => {
+      if (!active || payload.tableId !== tableId) {
+        return;
+      }
+      setPrepareState(prev => {
+        const config = prev?.config ?? DEFAULT_TABLE_CONFIG;
+        return {
+          tableId: payload.tableId,
+          status: deriveTableStatus(payload.seats.length, config.capacity),
+          players: payload.seats.map(player => ({
+            userId: player.userId,
+            nickname: player.nickname
+          })),
+          config
+        };
+      });
+      setPrepareStatus('ready');
+      setPrepareError(null);
+    };
+
+    socket.on('connect', requestJoin);
+    socket.on('reconnect', requestJoin);
+    socket.on('state', handleState);
+    socket.on('connect_error', error => {
+      if (!active) return;
+      console.error('[web] failed to connect table socket', error);
+    });
+    socket.on('errorMessage', (payload: { message?: string }) => {
+      if (!active) return;
+      console.warn('[web] server rejected joinTable request', payload?.message);
+      setPrepareError(payload?.message ?? '加入房间失败，请稍后再试。');
+    });
+
+    return () => {
+      active = false;
+      socket.off('connect', requestJoin);
+      socket.off('reconnect', requestJoin);
+      socket.off('state', handleState);
+      socket.off('errorMessage');
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [apiBaseUrl, authStatus, tableId, user?.id, user?.nickname]);
 
   const handleManualRefresh = useCallback(() => {
     setReloadToken(token => token + 1);
@@ -325,7 +415,6 @@ export default function PreparePage({ params }: PreparePageProps) {
                     <>
                       <strong style={{ fontSize: '1.05rem' }}>{player.nickname}</strong>
                       <span style={{ fontSize: '0.9rem', opacity: 0.75 }}>ID：{player.userId}</span>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.75 }}>筹码：{player.chips}</span>
                     </>
                   ) : (
                     <span style={{ opacity: 0.5 }}>空位，等待玩家加入…</span>

@@ -5,7 +5,6 @@ import http from 'http';
 import { randomUUID } from 'crypto';
 import { Server } from 'socket.io';
 import {
-  Bet,
   JoinTable,
   ServerState,
   RegisterUserRequest,
@@ -14,7 +13,7 @@ import {
   LoginUserResponse,
   TablePrepareResponse
 } from '@shared/messages';
-import { createTable, joinTable, bet as coreBet, deal } from '@game-core/engine';
+import { createTable, joinTable, deal } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
 import { createHeartbeatPublisher } from './infrastructure/heartbeat';
 import { createLobbyRegistry, deriveLobbyRoomStatus } from './infrastructure/lobbyRegistry';
@@ -113,8 +112,7 @@ function buildPreparePayload(table: ManagedTable) {
       .filter((player): player is NonNullable<typeof player> => Boolean(player))
       .map(player => ({
         userId: player.userId,
-        nickname: player.nickname,
-        chips: player.chips
+        nickname: player.nickname
       })),
     config: {
       capacity: table.config.capacity,
@@ -294,27 +292,6 @@ io.on('connection', (socket) => {
     emitState(tableId);
   });
 
-  socket.on('bet', (payload) => {
-    const parsed = Bet.safeParse(payload);
-    if (!parsed.success) return;
-    const tableId = normalizeTableId(parsed.data.tableId ?? '');
-    const table = tables.get(tableId);
-    if (!table) {
-      socket.emit('errorMessage', { message: 'Unknown table' });
-      return;
-    }
-    if (socketTable.get(socket.id) !== tableId) {
-      socket.emit('errorMessage', { message: 'Player not seated at this table' });
-      return;
-    }
-    try {
-      coreBet(table.state, socket.id, parsed.data.chips);
-      emitState(tableId);
-    } catch (e) {
-      socket.emit('errorMessage', { message: (e as Error).message });
-    }
-  });
-
   socket.on('disconnect', () => {
     socketTable.delete(socket.id);
     // For simplicity, keep player entry; production would handle seats cleanup/timeouts.
@@ -333,10 +310,8 @@ function emitState(tableId: string) {
       .map(player => ({
         id: player.id,
         userId: player.userId,
-        nickname: player.nickname,
-        chips: player.chips
-      })),
-    pot: table.state.pot
+        nickname: player.nickname
+      }))
   };
   io.emit('state', snapshot);
 }
