@@ -9,7 +9,10 @@ const meta = {
     rank: 'A',
     suit: 'S',
     faceUp: true,
-    elevation: 2
+    elevation: 2,
+    contentScale: 1.2,
+    contentOffsetX: -0.5,
+    contentOffsetY: -0.5
   },
   argTypes: {
     rank: {
@@ -19,6 +22,15 @@ const meta = {
     suit: {
       control: { type: 'select' },
       options: ['S', 'H', 'D', 'C']
+    },
+    contentScale: {
+      control: { type: 'range', min: 0.6, max: 1.6, step: 0.05 }
+    },
+    contentOffsetX: {
+      control: { type: 'range', min: -0.5, max: 0.5, step: 0.05 }
+    },
+    contentOffsetY: {
+      control: { type: 'range', min: -0.5, max: 0.5, step: 0.05 }
     }
   },
   tags: ['autodocs']

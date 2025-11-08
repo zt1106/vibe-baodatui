@@ -20,13 +20,40 @@ export function CardFace({ card, variant = 'classic', className, style, ...rest 
   const accent = SUIT_TINT[card.suit] === 'red' ? '#f87171' : palette.foreground;
   const symbol = SUIT_SYMBOLS[card.suit];
 
-  const cornerStyle = {
+  const cornerBaseStyle = {
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
     lineHeight: 1,
-    fontSize: '0.9rem',
     letterSpacing: '0.05em'
+  };
+  const cornerTextStyle = {
+    fontWeight: 700,
+    fontSize: 'var(--v-card-face-corner-size, 0.9rem)'
+  };
+  const cornerSuitStyle = {
+    fontSize: 'var(--v-card-face-corner-size, 0.9rem)'
+  };
+  const centerSymbolStyle = {
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: 'var(--v-card-face-symbol-size, 2.4rem)',
+    fontWeight: 600,
+    opacity: 0.9,
+    color: accent
+  };
+  const topCornerStyle = {
+    ...cornerBaseStyle,
+    alignItems: 'flex-start',
+    marginTop: 'var(--v-card-face-top-offset, 0)',
+    marginLeft: 'var(--v-card-face-left-offset, 0)'
+  };
+  const bottomCornerStyle = {
+    ...cornerBaseStyle,
+    alignItems: 'flex-end',
+    transform: 'rotate(180deg)',
+    marginBottom: 'var(--v-card-face-top-offset, 0)',
+    marginRight: 'var(--v-card-face-left-offset, 0)'
   };
 
   return (
@@ -42,33 +69,23 @@ export function CardFace({ card, variant = 'classic', className, style, ...rest 
         color: accent,
         display: 'grid',
         gridTemplateRows: 'auto 1fr auto',
-        padding: '0.65rem',
+        padding: 'var(--v-card-face-padding, 0.65rem)',
         boxSizing: 'border-box',
         position: 'relative',
         overflow: 'hidden',
         ...style
       }}
     >
-      <div style={{ ...cornerStyle, alignItems: 'flex-start' }}>
-        <span style={{ fontWeight: 700 }}>{card.rank}</span>
-        <span>{symbol}</span>
+      <div style={topCornerStyle}>
+        <span style={cornerTextStyle}>{card.rank}</span>
+        <span style={cornerSuitStyle}>{symbol}</span>
       </div>
-      <div
-        style={{
-          display: 'grid',
-          placeItems: 'center',
-          fontSize: '2.4rem',
-          fontWeight: 600,
-          opacity: 0.9,
-          color: accent
-        }}
-        aria-hidden
-      >
+      <div style={centerSymbolStyle} aria-hidden>
         {symbol}
       </div>
-      <div style={{ ...cornerStyle, alignItems: 'flex-end', transform: 'rotate(180deg)' }}>
-        <span style={{ fontWeight: 700 }}>{card.rank}</span>
-        <span>{symbol}</span>
+      <div style={bottomCornerStyle}>
+        <span style={cornerTextStyle}>{card.rank}</span>
+        <span style={cornerSuitStyle}>{symbol}</span>
       </div>
       {card.meta?.tags && card.meta.tags.length > 0 && (
         <div
