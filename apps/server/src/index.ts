@@ -72,7 +72,6 @@ type ManagedTable = {
   state: ReturnType<typeof createTable>;
   config: {
     capacity: number;
-    minimumPlayers: number;
   };
   host: {
     userId: number;
@@ -83,7 +82,6 @@ type ManagedTable = {
 };
 
 const TABLE_CAPACITY = 6;
-const TABLE_MIN_PLAYERS = 2;
 const tables = new Map<string, ManagedTable>();
 const socketTable = new Map<string, string>();
 const socketUsers = new Map<string, number>();
@@ -115,7 +113,7 @@ function ensureHostAction(socket: Socket, tableId: string) {
 }
 
 function resetTablePhaseIfNeeded(table: ManagedTable) {
-  if (table.state.seats.length < table.config.minimumPlayers) {
+  if (table.state.seats.length < table.config.capacity) {
     table.hasStarted = false;
     setAllPrepared(table, false);
   }
@@ -173,8 +171,7 @@ function buildPreparePayload(table: ManagedTable) {
         prepared: table.prepared.get(player.userId) ?? false
       })),
     config: {
-      capacity: table.config.capacity,
-      minimumPlayers: table.config.minimumPlayers
+      capacity: table.config.capacity
     }
   });
 }
@@ -191,8 +188,7 @@ function createManagedTable(host: { id: number; nickname: string }, id = generat
     id: normalizedId,
     state: createTable(normalizedId, `seed-${normalizedId}`),
     config: {
-      capacity: TABLE_CAPACITY,
-      minimumPlayers: Math.min(TABLE_MIN_PLAYERS, TABLE_CAPACITY)
+      capacity: TABLE_CAPACITY
     },
     host: {
       userId: host.id,
@@ -374,8 +370,8 @@ io.on('connection', (socket) => {
     const tableId = normalizeTableId(parsed.data.tableId ?? '');
     const managed = ensureHostAction(socket, tableId);
     if (!managed) return;
-    if (managed.state.seats.length < managed.config.minimumPlayers) {
-      socket.emit('errorMessage', { message: 'Not enough players to start' });
+    if (managed.state.seats.length !== managed.config.capacity) {
+      socket.emit('errorMessage', { message: '房间未满，无法开始' });
       return;
     }
     managed.hasStarted = true;
@@ -419,11 +415,13 @@ io.on('connection', (socket) => {
     const tableId = normalizeTableId(parsed.data.tableId ?? '');
     const managed = ensureHostAction(socket, tableId);
     if (!managed) return;
-    const boundedMinimum = Math.min(
-      Math.max(parsed.data.minimumPlayers, 1),
-      managed.config.capacity
-    );
-    managed.config.minimumPlayers = boundedMinimum;
+    const requestedCapacity = Math.min(Math.max(parsed.data.capacity, 2), TABLE_CAPACITY);
+    const currentPlayers = managed.state.seats.length;
+    if (requestedCapacity < currentPlayers) {
+      socket.emit('errorMessage', { message: '人数已超过该上限' });
+      return;
+    }
+    managed.config.capacity = requestedCapacity;
     resetTablePhaseIfNeeded(managed);
     updateLobbyFromState(tableId);
     emitState(tableId);

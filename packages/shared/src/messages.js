@@ -33,8 +33,7 @@ export const TableHost = z.object({
 });
 
 export const TableConfig = z.object({
-    capacity: z.number().int().positive(),
-    minimumPlayers: z.number().int().min(0)
+    capacity: z.number().int().positive()
 });
 
 export const TablePrepareResponse = z.object({
@@ -79,7 +78,7 @@ export const TableKickRequest = z.object({
 });
 export const TableConfigUpdateRequest = z.object({
     tableId: z.string().min(1),
-    minimumPlayers: z.number().int().min(1)
+    capacity: z.number().int().min(2)
 });
 
 export const ServerState = z.object({

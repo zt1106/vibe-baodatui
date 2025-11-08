@@ -23,8 +23,7 @@ type PreparePageProps = {
 type AsyncState = 'idle' | 'loading' | 'ready' | 'error';
 
 const DEFAULT_TABLE_CONFIG = {
-  capacity: 6,
-  minimumPlayers: 2
+  capacity: 6
 };
 
 function deriveTableStatus(players: number, capacity: number): TablePrepareResponse['status'] {
@@ -101,7 +100,7 @@ export default function PreparePage({ params }: PreparePageProps) {
       setConfigDraft(null);
       return;
     }
-    setConfigDraft(prepareState.config.minimumPlayers);
+    setConfigDraft(prepareState.config.capacity);
   }, [prepareState]);
 
   useEffect(() => {
@@ -257,28 +256,24 @@ export default function PreparePage({ params }: PreparePageProps) {
     [sendTableEvent, tableId]
   );
 
-  const handleAdjustMinimumPlayers = useCallback(
-    (delta: number, min = 1, max = DEFAULT_TABLE_CONFIG.capacity) => {
+  const handleAdjustCapacity = useCallback(
+    (delta: number, min = 2, max = DEFAULT_TABLE_CONFIG.capacity) => {
       setConfigDraft(current => {
-        const baseline =
-          current ??
-          prepareState?.config.minimumPlayers ??
-          DEFAULT_TABLE_CONFIG.minimumPlayers;
+        const baseline = current ?? prepareState?.config.capacity ?? DEFAULT_TABLE_CONFIG.capacity;
         const next = Math.min(Math.max(baseline + delta, min), max);
         return next;
       });
     },
-    [prepareState?.config.minimumPlayers]
+    [prepareState?.config.capacity]
   );
 
   const handleSaveConfig = useCallback(() => {
     if (configDraft === null) return;
-    sendTableEvent('table:updateConfig', { tableId, minimumPlayers: configDraft });
+    sendTableEvent('table:updateConfig', { tableId, capacity: configDraft });
   }, [configDraft, sendTableEvent, tableId]);
 
   const playerCount = prepareState?.players.length ?? 0;
   const capacity = prepareState?.config.capacity ?? 0;
-  const minimumPlayers = prepareState?.config.minimumPlayers ?? DEFAULT_TABLE_CONFIG.minimumPlayers;
   const resolvedCapacity = capacity || DEFAULT_TABLE_CONFIG.capacity;
   const isHost = Boolean(user && prepareState && prepareState.host.userId === user.id);
   const selfPlayer = useMemo(() => {
@@ -287,12 +282,9 @@ export default function PreparePage({ params }: PreparePageProps) {
   }, [prepareState, user?.id]);
   const isSelfSeated = Boolean(selfPlayer);
   const selfPrepared = Boolean(selfPlayer?.prepared);
-  const canHostStart = isHost && playerCount >= minimumPlayers;
+  const canHostStart = isHost && playerCount === resolvedCapacity;
   const configIsDirty = Boolean(
-    isHost &&
-      prepareState &&
-      configDraft !== null &&
-      configDraft !== prepareState.config.minimumPlayers
+    isHost && prepareState && configDraft !== null && configDraft !== prepareState.config.capacity
   );
   const canTogglePrepared = prepareStatus === 'ready' && isSelfSeated;
   const preparedButtonLabel = !isSelfSeated ? '等待入座' : selfPrepared ? '已准备' : '准备';
@@ -595,11 +587,11 @@ export default function PreparePage({ params }: PreparePageProps) {
                 开始对局
               </button>
               <div style={{ display: 'grid', gap: '0.5rem' }}>
-                <span style={{ fontWeight: 600 }}>最少开局人数</span>
+                <span style={{ fontWeight: 600 }}>最多玩家数</span>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    onClick={() => handleAdjustMinimumPlayers(-1, 1, resolvedCapacity)}
+                    onClick={() => handleAdjustCapacity(-1, 2, DEFAULT_TABLE_CONFIG.capacity)}
                     style={{
                       width: 36,
                       height: 36,
@@ -614,11 +606,11 @@ export default function PreparePage({ params }: PreparePageProps) {
                     −
                   </button>
                   <strong style={{ fontSize: '1.4rem', minWidth: 40, textAlign: 'center' }}>
-                    {configDraft ?? minimumPlayers}
+                    {configDraft ?? resolvedCapacity}
                   </strong>
                   <button
                     type="button"
-                    onClick={() => handleAdjustMinimumPlayers(1, 1, resolvedCapacity)}
+                    onClick={() => handleAdjustCapacity(1, 2, DEFAULT_TABLE_CONFIG.capacity)}
                     style={{
                       width: 36,
                       height: 36,
@@ -672,7 +664,6 @@ export default function PreparePage({ params }: PreparePageProps) {
             </header>
             <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'grid', gap: '0.5rem' }}>
               <li>最多玩家：{capacity || '—'} 名</li>
-              <li>最少开局人数：{prepareState?.config.minimumPlayers ?? '—'} 名</li>
               <li>当前人数：{playerCount} 名</li>
             </ul>
             <button
@@ -698,8 +689,8 @@ export default function PreparePage({ params }: PreparePageProps) {
             <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>
               {isSelfSeated
                 ? selfPrepared
-                  ? '已准备，等待其他玩家。'
-                  : '点击准备后，房主即可开始游戏。'
+                  ? '已准备，等待房主开始对局。'
+                  : '点击准备后，等待房主操作。'
                 : '加入座位后即可准备。'}
             </span>
           </section>
