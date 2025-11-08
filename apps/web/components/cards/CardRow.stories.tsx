@@ -11,8 +11,9 @@ const meta: Meta<typeof CardRow> = {
   args: {
     cards: sampleCards,
     size: 'md',
-    overlap: '35%',
-    angle: 12,
+    overlap: '65%',
+    angle: -25,
+    curveVerticalOffset: 18,
     selectionMode: 'multiple',
     defaultSelectedIds: [sampleCards[2].id]
   },
@@ -30,6 +31,9 @@ const meta: Meta<typeof CardRow> = {
     selectionMode: {
       control: { type: 'radio' },
       options: ['none', 'single', 'multiple']
+    },
+    curveVerticalOffset: {
+      control: { type: 'range', min: 0, max: 48, step: 1 }
     }
   },
   tags: ['autodocs']
@@ -47,6 +51,17 @@ export const Many: Story = {
     size: 'sm',
     overlap: '28%',
     angle: 18,
+    curveVerticalOffset: 32,
     selectionMode: 'none'
+  }
+};
+
+export const One: Story = {
+  args: {
+    cards: createSampleHand(8, 1),
+    size: 'lg',
+    overlap: '0%',
+    angle: 0,
+    selectionMode: 'single'
   }
 };

@@ -54,6 +54,7 @@ export function CardRow({
   size = 'md',
   overlap = '30%',
   angle = 0,
+  curveVerticalOffset = 0,
   selectionMode = 'none',
   selectedIds,
   defaultSelectedIds,
@@ -78,9 +79,10 @@ export function CardRow({
         cardWidth: cardSize.width,
         cardHeight: cardSize.height,
         overlapPx: resolvedOverlap,
-        leftAngleDeg: clampedAngle
+        leftAngleDeg: clampedAngle,
+        curveVerticalOffset
       }),
-    [cards.length, cardSize.width, cardSize.height, resolvedOverlap, clampedAngle]
+    [cards.length, cardSize.width, cardSize.height, resolvedOverlap, clampedAngle, curveVerticalOffset]
   );
 
   const [internalSelection, setInternalSelection] = useState<string[]>(defaultSelectedIds ?? []);
@@ -155,7 +157,10 @@ export function CardRow({
       {cards.map((card, index) => {
         const transform = layout[index] ?? { x: 0, y: 0, rotateDeg: 0, zIndex: index };
         const isSelected = selection.includes(card.id);
-        const transformParts = [`translateX(${transform.x}px)`, `rotate(${transform.rotateDeg}deg)`];
+        const transformParts = [
+          `translate(${transform.x}px, ${transform.y}px)`,
+          `rotate(${transform.rotateDeg}deg)`
+        ];
         if (isSelected) {
           transformParts.push('translateY(-6px)', 'scale(1.04)');
         }

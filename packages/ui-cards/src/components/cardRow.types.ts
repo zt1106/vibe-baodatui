@@ -10,6 +10,7 @@ export interface CardRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'chil
   size?: CardRowSize;
   overlap?: CardRowOverlap;
   angle?: number;
+  curveVerticalOffset?: number;
   selectionMode?: CardRowSelectionMode;
   selectedIds?: string[];
   defaultSelectedIds?: string[];
