@@ -36,6 +36,7 @@ export interface PlayingCardProps extends Omit<HTMLAttributes<HTMLDivElement>, '
   contentScale?: number;
   contentOffsetX?: number;
   contentOffsetY?: number;
+  cornerRadius?: number;
 }
 
 const ELEVATION_SHADOW: Record<NonNullable<PlayingCardProps['elevation']>, string> = {
@@ -63,6 +64,7 @@ export function PlayingCard({
   contentScale = 1.2,
   contentOffsetX = -0.5,
   contentOffsetY = -0.5,
+  cornerRadius,
   className,
   style,
   onPointerDown,
@@ -93,6 +95,7 @@ export function PlayingCard({
     : inheritedFilter;
   const tiltTransform = tiltDeg ? `rotate(${tiltDeg}deg)` : undefined;
   const transformValue = [tiltTransform, inheritedTransform].filter(Boolean).join(' ') || undefined;
+  const resolvedCornerRadius = cornerRadius ?? 6;
 
   const combinedStyle: CSSProperties = {
     ...cssVars,
@@ -103,7 +106,7 @@ export function PlayingCard({
     width: 'var(--card-w)',
     height: 'var(--card-h)',
     position: 'relative',
-    borderRadius: 18,
+    borderRadius: resolvedCornerRadius,
     perspective: '1200px',
     boxShadow: baseShadow,
     transform: transformValue,

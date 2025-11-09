@@ -10,6 +10,7 @@ export interface SingleCardProps extends Omit<PlayingCardProps, 'card'> {
   cardId: CardId;
   faceUp?: boolean;
   meta?: CardMeta;
+  cornerRadius?: number;
 }
 
 export function SingleCard({
@@ -17,6 +18,7 @@ export function SingleCard({
   faceUp = true,
   meta,
   style,
+  cornerRadius,
   ...rest
 }: SingleCardProps) {
   const card = useMemo(() => {
@@ -33,5 +35,5 @@ export function SingleCard({
     };
   }, [cardId, faceUp, meta?.ownerSeat, meta?.selectable, meta?.tags?.join('|')]);
 
-  return <PlayingCard {...rest} style={style} card={card} />;
+  return <PlayingCard {...rest} style={style} card={card} cornerRadius={cornerRadius} />;
 }

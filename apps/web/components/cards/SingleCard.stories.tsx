@@ -13,7 +13,8 @@ const meta: Meta<typeof SingleCard> = {
   args: {
     cardId: createCardId('A', 'S'),
     faceUp: true,
-    elevation: 2
+    elevation: 2,
+    cornerRadius: 6
   },
   argTypes: {
     size: {
@@ -31,6 +32,9 @@ const meta: Meta<typeof SingleCard> = {
     },
     contentOffsetY: {
       control: { type: 'range', min: -0.5, max: 0.5, step: 0.05 }
+    },
+    cornerRadius: {
+      control: { type: 'range', min: 0, max: 40, step: 1 }
     }
   },
   tags: ['autodocs']
