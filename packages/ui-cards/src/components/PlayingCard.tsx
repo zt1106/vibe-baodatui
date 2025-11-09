@@ -1,9 +1,10 @@
 'use client';
 
 import clsx from 'clsx';
-import { motion, type HTMLMotionProps, type MotionStyle, type TransformProperties } from 'framer-motion';
 import {
+  type CSSProperties,
   type DragEvent,
+  type HTMLAttributes,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
@@ -14,11 +15,10 @@ import {
 import type { Card, CardSize } from '@poker/core-cards';
 import { resolveCardCssVars } from '@poker/core-cards';
 
-import { flipVariants } from '../motionVariants';
 import { CardBack, type CardBackVariant } from './CardBack';
 import { CardFace, type CardFaceVariant } from './CardFace';
 
-export interface PlayingCardProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
+export interface PlayingCardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   card: Card;
   size?: CardSize;
   faceVariant?: CardFaceVariant;
@@ -28,7 +28,6 @@ export interface PlayingCardProps extends Omit<HTMLMotionProps<'div'>, 'children
   highlighted?: boolean;
   disabled?: boolean;
   tiltDeg?: number;
-  layoutId?: string;
   elevation?: 0 | 1 | 2 | 3;
   draggable?: boolean;
   dragData?: unknown;
@@ -56,7 +55,6 @@ export function PlayingCard({
   highlighted,
   disabled,
   tiltDeg,
-  layoutId,
   elevation = 1,
   draggable,
   dragData,
@@ -93,8 +91,10 @@ export function PlayingCard({
   const filterValue = selected
     ? [selectedFilter, inheritedFilter].filter(Boolean).join(' ').trim() || undefined
     : inheritedFilter;
+  const tiltTransform = tiltDeg ? `rotate(${tiltDeg}deg)` : undefined;
+  const transformValue = [tiltTransform, inheritedTransform].filter(Boolean).join(' ') || undefined;
 
-  const combinedStyle = {
+  const combinedStyle: CSSProperties = {
     ...cssVars,
     '--v-card-face-corner-size': `${0.9 * contentScale}rem`,
     '--v-card-face-symbol-size': `${2.4 * contentScale}rem`,
@@ -106,20 +106,13 @@ export function PlayingCard({
     borderRadius: 18,
     perspective: '1200px',
     boxShadow: baseShadow,
-    transform: tiltDeg ? `${inheritedTransform ?? ''} rotate(${tiltDeg}deg)`.trim() || undefined : inheritedTransform,
+    transform: transformValue,
     opacity: disabled ? 0.6 : 1,
     cursor,
     filter: filterValue,
-    transition: 'filter 0.15s ease, box-shadow 0.2s ease',
-    ...(styleRest as MotionStyle),
+    transition: 'filter 0.15s ease, box-shadow 0.2s ease, transform 0.15s ease',
+    ...(styleRest as CSSProperties),
     transformOrigin: 'center center'
-  } as MotionStyle;
-  const transformTemplate = (transform?: TransformProperties, generatedTransform?: string) => {
-    const normalizedTransform = typeof transform === 'string' ? transform : undefined;
-    const fragments = [generatedTransform, normalizedTransform].filter(
-      (value): value is string => typeof value === 'string' && value !== 'none'
-    );
-    return fragments.length > 0 ? fragments.join(' ') : 'none';
   };
 
   const cancelLongPress = () => {
@@ -170,17 +163,15 @@ export function PlayingCard({
   };
 
   return (
-    <motion.div
+    <div
       {...rest}
       data-card-id={String(card.id)}
       data-selected={selected ? 'true' : undefined}
       data-highlighted={highlighted ? 'true' : undefined}
       data-disabled={disabled ? 'true' : undefined}
-      layout
-      layoutId={layoutId ?? String(card.id)}
       draggable={draggable}
       className={clsx('v-playing-card', className)}
-      style={combinedStyle as MotionStyle}
+      style={combinedStyle}
       role={onClick ? 'button' : undefined}
       aria-pressed={selected ?? undefined}
       aria-disabled={disabled ?? undefined}
@@ -189,40 +180,20 @@ export function PlayingCard({
       onPointerLeave={cancelLongPress}
       onClick={handleClick}
       onDragStartCapture={handleDragStart}
-      whileHover={disabled ? undefined : { y: -4 }}
-      transformTemplate={transformTemplate}
     >
-      <motion.div
-        className="v-card-3d"
-        variants={flipVariants}
-        animate={card.faceUp ? 'face' : 'back'}
+      <div
         style={{
           position: 'absolute',
           inset: 0,
-          borderRadius: 'inherit',
-          transformStyle: 'preserve-3d'
+          borderRadius: 'inherit'
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backfaceVisibility: 'hidden'
-          }}
-        >
+        {card.faceUp ? (
           <CardFace card={card} variant={faceVariant} />
-        </div>
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            transform: 'rotateY(180deg)',
-            backfaceVisibility: 'hidden'
-          }}
-        >
+        ) : (
           <CardBack variant={backVariant} customPatternUrl={customBackImageUrl} />
-        </div>
-      </motion.div>
+        )}
+      </div>
       {highlightFrame}
       {renderOverlay && (
         <div
@@ -235,6 +206,6 @@ export function PlayingCard({
           {renderOverlay}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

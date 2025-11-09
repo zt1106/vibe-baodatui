@@ -84,7 +84,7 @@ export function CardStack({
               transform: `translate(${visibleLayers * offsetStep}px, ${visibleLayers * offsetStep}px)`
             }}
           >
-            <PlayingCard card={displayedTopCard} size={size} draggable={false} layoutId={`stack-${displayedTopCard.id}`} />
+            <PlayingCard card={displayedTopCard} size={size} draggable={false} />
           </div>
         ) : count > 0 ? (
           <div

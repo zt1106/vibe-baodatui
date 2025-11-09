@@ -54,7 +54,6 @@ Boring, agent-friendly stack for fast prototyping with unit + e2e tests.
 │  └─ ui-cards/             # React card components and variants
 │     └─ src/
 │        ├─ components/
-│        ├─ motionVariants.ts
 │        └─ index.ts
 ├─ docs/                    # Design docs and notes
 ├─ pnpm-workspace.yaml      # Workspace packages map
@@ -69,4 +68,3 @@ Notes
 
 ## Contributor Guide
 See [`AGENTS.md`](AGENTS.md) for repository conventions, key scripts, and review checklists.
-
