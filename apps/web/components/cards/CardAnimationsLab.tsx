@@ -92,16 +92,15 @@ export function CardAnimationsLab({ seats = 3, cardsPerSeat = 5, overlap = 0.4 }
               }}
             >
               {cards.map((card, cardIndex) => (
-                <SingleCard
-                  key={card.id}
-                  rank={card.rank}
-                  suit={card.suit}
-                  faceUp={card.faceUp}
-                  meta={card.meta}
-                  size="sm"
-                  tiltDeg={((cardIndex - (cards.length - 1) / 2) * 6) * rowDirection}
-                  style={{ marginLeft: cardIndex === 0 ? 0 : -overlapGap }}
-                />
+              <SingleCard
+                key={card.id}
+                cardId={card.id}
+                faceUp={card.faceUp}
+                meta={card.meta}
+                size="sm"
+                tiltDeg={((cardIndex - (cards.length - 1) / 2) * 6) * rowDirection}
+                style={{ marginLeft: cardIndex === 0 ? 0 : -overlapGap }}
+              />
               ))}
             </div>
           );

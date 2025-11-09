@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { makeDeck, shuffleDeck } from '@poker/core-cards';
+import { makeDeck, shuffleDeck, type CardId } from '@poker/core-cards';
 import { CardStack } from '@poker/ui-cards';
 import { SingleCard } from './SingleCard';
 
@@ -19,10 +19,10 @@ export function CardShowcase() {
       }
     }));
   }, [seed]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<CardId[]>([]);
   const [lastInteraction, setLastInteraction] = useState<string | null>(null);
 
-  const toggleCard = (cardId: string) => {
+  const toggleCard = (cardId: CardId) => {
     setSelectedIds(prev => {
       const next = prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId];
       setLastInteraction(next.length ? `选中 ${next.length} 张` : '未选择任何卡牌');
@@ -83,8 +83,7 @@ export function CardShowcase() {
             return (
               <SingleCard
                 key={card.id}
-                rank={card.rank}
-                suit={card.suit}
+                cardId={card.id}
                 faceUp={card.faceUp}
                 meta={card.meta}
                 size="md"

@@ -1,4 +1,4 @@
-import type { Card, CardSize } from '@poker/core-cards';
+import type { Card, CardId, CardSize } from '@poker/core-cards';
 import type { CSSProperties, HTMLAttributes } from 'react';
 
 export type CardRowSize = CardSize | { width: number; height?: number };
@@ -12,9 +12,9 @@ export interface CardRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'chil
   angle?: number;
   curveVerticalOffset?: number;
   selectionMode?: CardRowSelectionMode;
-  selectedIds?: string[];
-  defaultSelectedIds?: string[];
-  onSelectionChange?: (ids: string[]) => void;
-  disabledIds?: string[];
+  selectedIds?: CardId[];
+  defaultSelectedIds?: CardId[];
+  onSelectionChange?: (ids: CardId[]) => void;
+  disabledIds?: CardId[];
   onCardClick?: (card: Card) => void;
 }

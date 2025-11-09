@@ -10,7 +10,7 @@ import {
   useState
 } from 'react';
 
-import type { Card, CardSize } from '@poker/core-cards';
+import type { Card, CardId, CardSize } from '@poker/core-cards';
 import { getCardDimensions } from '@poker/core-cards';
 
 import { PlayingCard } from './PlayingCard';
@@ -85,10 +85,10 @@ export function CardRow({
     [cards.length, cardSize.width, cardSize.height, resolvedOverlap, clampedAngle, curveVerticalOffset]
   );
 
-  const [internalSelection, setInternalSelection] = useState<string[]>(defaultSelectedIds ?? []);
+  const [internalSelection, setInternalSelection] = useState<CardId[]>(defaultSelectedIds ?? []);
   const selection = selectedIds ?? internalSelection;
   const setSelection = useCallback(
-    (next: string[]) => {
+    (next: CardId[]) => {
       if (selectedIds === undefined) {
         setInternalSelection(next);
       }
@@ -98,7 +98,7 @@ export function CardRow({
   );
 
   const disabledSet = useMemo(() => new Set(disabledIds), [disabledIds]);
-  const isDisabled = useCallback((id: string) => disabledSet.has(id), [disabledSet]);
+  const isDisabled = useCallback((id: CardId) => disabledSet.has(id), [disabledSet]);
 
   const handleClick = useCallback(
     (card: Card, event: MouseEvent<HTMLDivElement>) => {
@@ -167,7 +167,7 @@ export function CardRow({
         return (
           <div
             key={card.id}
-            data-card-id={card.id}
+            data-card-id={String(card.id)}
             role={selectionMode === 'none' ? 'listitem' : 'option'}
             aria-selected={selectionMode === 'none' ? undefined : isSelected}
             onClick={event => handleClick(card, event)}

@@ -1,13 +1,17 @@
+'use client';
+
 import type { Meta, StoryObj } from '@storybook/react';
+
+import type { CardId } from '@poker/core-cards';
+import { CARDS_PER_PACK, createCardId } from '@poker/core-cards';
 
 import { SingleCard } from './SingleCard';
 
-const meta = {
+const meta: Meta<typeof SingleCard> = {
   title: 'Cards/SingleCard',
   component: SingleCard,
   args: {
-    rank: 'A',
-    suit: 'S',
+    cardId: createCardId('A', 'S'),
     faceUp: true,
     elevation: 2
   },
@@ -16,13 +20,8 @@ const meta = {
       control: { type: 'select' },
       options: ['xs', 'sm', 'md', 'lg']
     },
-    rank: {
-      control: { type: 'select' },
-      options: ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'Joker']
-    },
-    suit: {
-      control: { type: 'select' },
-      options: ['S', 'H', 'D', 'C', 'JB', 'JR']
+    cardId: {
+      control: { type: 'number', min: 0, max: CARDS_PER_PACK - 1, step: 1 }
     },
     contentScale: {
       control: { type: 'range', min: 0.6, max: 1.6, step: 0.05 }
@@ -35,7 +34,7 @@ const meta = {
     }
   },
   tags: ['autodocs']
-} satisfies Meta<typeof SingleCard>;
+};
 
 export default meta;
 

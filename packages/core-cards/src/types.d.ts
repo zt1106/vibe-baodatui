@@ -3,7 +3,7 @@ export type JokerSuit = 'JB' | 'JR';
 export type Suit = StandardSuit | JokerSuit;
 export type SuitSymbol = '♠' | '♥' | '♦' | '♣' | '🃏';
 export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'Joker';
-export type CardId = `${Rank}${Suit}`;
+export type CardId = number;
 export type CardSize = 'xs' | 'sm' | 'md' | 'lg';
 export interface CardMeta {
     ownerSeat?: number;

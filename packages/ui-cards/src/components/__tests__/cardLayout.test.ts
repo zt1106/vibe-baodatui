@@ -10,7 +10,8 @@ describe('computeRowLayout', () => {
         cardWidth: 100,
         cardHeight: 140,
         overlapPx: 20,
-        leftAngleDeg: 10
+        leftAngleDeg: 10,
+        curveVerticalOffset: 0
       })
     ).toEqual([]);
   });

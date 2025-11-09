@@ -2,29 +2,36 @@
 
 import { useMemo } from 'react';
 
-import type { CardMeta, Rank, Suit } from '@poker/core-cards';
-import { makeCard } from '@poker/core-cards';
+import type { CardId, CardMeta } from '@poker/core-cards';
+import { parseCardId } from '@poker/core-cards';
 import { PlayingCard, type PlayingCardProps } from '@poker/ui-cards';
 
 export interface SingleCardProps extends Omit<PlayingCardProps, 'card'> {
-  rank: Rank;
-  suit: Suit;
+  cardId: CardId;
   faceUp?: boolean;
   meta?: CardMeta;
 }
 
 export function SingleCard({
-  rank,
-  suit,
+  cardId,
   faceUp = true,
   meta,
   style,
   ...rest
 }: SingleCardProps) {
-  const card = useMemo(() => ({
-    ...makeCard(rank, suit, faceUp),
-    meta
-  }), [rank, suit, faceUp, meta?.ownerSeat, meta?.selectable, meta?.tags?.join('|')]);
+  const card = useMemo(() => {
+    const parsed = parseCardId(cardId);
+    if (!parsed) {
+      throw new RangeError(`Invalid card id: ${cardId}`);
+    }
+    return {
+      id: cardId,
+      rank: parsed.rank,
+      suit: parsed.suit,
+      faceUp,
+      meta
+    };
+  }, [cardId, faceUp, meta?.ownerSeat, meta?.selectable, meta?.tags?.join('|')]);
 
   return <PlayingCard {...rest} style={style} card={card} />;
 }

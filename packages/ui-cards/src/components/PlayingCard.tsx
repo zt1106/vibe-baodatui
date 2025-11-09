@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { motion, type HTMLMotionProps, type MotionStyle } from 'framer-motion';
+import { motion, type HTMLMotionProps, type MotionStyle, type TransformProperties } from 'framer-motion';
 import {
   type DragEvent,
   type MouseEvent,
@@ -94,7 +94,7 @@ export function PlayingCard({
     ? [selectedFilter, inheritedFilter].filter(Boolean).join(' ').trim() || undefined
     : inheritedFilter;
 
-  const combinedStyle: MotionStyle = {
+  const combinedStyle = {
     ...cssVars,
     '--v-card-face-corner-size': `${0.9 * contentScale}rem`,
     '--v-card-face-symbol-size': `${2.4 * contentScale}rem`,
@@ -113,10 +113,11 @@ export function PlayingCard({
     transition: 'filter 0.15s ease, box-shadow 0.2s ease',
     ...(styleRest as MotionStyle),
     transformOrigin: 'center center'
-  };
-  const transformTemplate = (transform?: string, generatedTransform?: string) => {
-    const fragments = [generatedTransform, transform].filter(
-      value => value && value !== 'none'
+  } as MotionStyle;
+  const transformTemplate = (transform?: TransformProperties, generatedTransform?: string) => {
+    const normalizedTransform = typeof transform === 'string' ? transform : undefined;
+    const fragments = [generatedTransform, normalizedTransform].filter(
+      (value): value is string => typeof value === 'string' && value !== 'none'
     );
     return fragments.length > 0 ? fragments.join(' ') : 'none';
   };
@@ -171,12 +172,12 @@ export function PlayingCard({
   return (
     <motion.div
       {...rest}
-      data-card-id={card.id}
+      data-card-id={String(card.id)}
       data-selected={selected ? 'true' : undefined}
       data-highlighted={highlighted ? 'true' : undefined}
       data-disabled={disabled ? 'true' : undefined}
       layout
-      layoutId={layoutId ?? card.id}
+      layoutId={layoutId ?? String(card.id)}
       draggable={draggable}
       className={clsx('v-playing-card', className)}
       style={combinedStyle as MotionStyle}
