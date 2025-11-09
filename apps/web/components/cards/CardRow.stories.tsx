@@ -1,9 +1,18 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
+import { makeCard } from '@poker/core-cards';
 import { CardRow } from '@poker/ui-cards';
 import { createSampleHand } from './sampleData';
 
 const sampleCards = createSampleHand(2, 6);
+const duplicateRankSuitCards = [0, 1, 2, 3].map(packIndex => ({
+  ...makeCard('A', 'S', { faceUp: true, packIndex }),
+  meta: {
+    ownerSeat: packIndex + 1,
+    selectable: true,
+    tags: packIndex === 0 ? ['Primary'] : undefined
+  }
+}));
 
 const meta: Meta<typeof CardRow> = {
   title: 'Components/CardRow',
@@ -63,5 +72,17 @@ export const One: Story = {
     overlap: '0%',
     angle: 0,
     selectionMode: 'single'
+  }
+};
+
+export const DuplicateRankSuit: Story = {
+  args: {
+    cards: duplicateRankSuitCards,
+    size: 'sm',
+    overlap: '32%',
+    angle: -12,
+    curveVerticalOffset: 18,
+    selectionMode: 'multiple',
+    defaultSelectedIds: [duplicateRankSuitCards[0].id]
   }
 };
