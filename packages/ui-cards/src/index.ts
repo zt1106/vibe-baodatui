@@ -3,4 +3,8 @@ export * from './components/CardFace';
 export * from './components/CardBack';
 export * from './components/CardStack';
 export * from './components/CardRow';
+export * from './components/AnimatedCard';
+export * from './components/CardAnimationProvider';
 export type { CardRowProps, CardRowOverlap, CardRowSize, CardRowSelectionMode } from './components/cardRow.types';
+export type { CardAnimationOptions } from './components/cardAnimation.shared';
+export { CARD_DEFAULT_SPRING } from './components/cardAnimation.shared';

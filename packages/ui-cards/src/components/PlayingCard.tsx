@@ -8,6 +8,7 @@ import {
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
+  forwardRef,
   useMemo,
   useRef
 } from 'react';
@@ -37,6 +38,7 @@ export interface PlayingCardProps extends Omit<HTMLAttributes<HTMLDivElement>, '
   contentOffsetX?: number;
   contentOffsetY?: number;
   cornerRadius?: number;
+  enableFlip?: boolean;
 }
 
 const ELEVATION_SHADOW: Record<NonNullable<PlayingCardProps['elevation']>, string> = {
@@ -46,32 +48,36 @@ const ELEVATION_SHADOW: Record<NonNullable<PlayingCardProps['elevation']>, strin
   3: '0 28px 70px rgba(15, 23, 42, 0.45)'
 };
 
-export function PlayingCard({
-  card,
-  size = 'md',
-  faceVariant = 'classic',
-  backVariant = 'red',
-  customBackImageUrl,
-  selected,
-  highlighted,
-  disabled,
-  tiltDeg,
-  elevation = 1,
-  draggable,
-  dragData,
-  onLongPress,
-  renderOverlay,
-  contentScale = 1.2,
-  contentOffsetX = -0.5,
-  contentOffsetY = -0.5,
-  cornerRadius,
-  className,
-  style,
-  onPointerDown,
-  onPointerUp,
-  onClick,
-  ...rest
-}: PlayingCardProps) {
+export const PlayingCard = forwardRef<HTMLDivElement, PlayingCardProps>(function PlayingCard(
+  {
+    card,
+    size = 'md',
+    faceVariant = 'classic',
+    backVariant = 'red',
+    customBackImageUrl,
+    selected,
+    highlighted,
+    disabled,
+    tiltDeg,
+    elevation = 1,
+    draggable,
+    dragData,
+    onLongPress,
+    renderOverlay,
+    contentScale = 1.2,
+    contentOffsetX = -0.5,
+    contentOffsetY = -0.5,
+    cornerRadius,
+    enableFlip,
+    className,
+    style,
+    onPointerDown,
+    onPointerUp,
+    onClick,
+    ...rest
+  }: PlayingCardProps,
+  ref
+) {
   const longPressTimer = useRef<number | null>(null);
   const cssVars = useMemo(() => resolveCardCssVars(size), [size]);
   const { transform: inheritedTransform, filter: inheritedFilter, ...styleRest } = style ?? {};
@@ -96,6 +102,7 @@ export function PlayingCard({
   const tiltTransform = tiltDeg ? `rotate(${tiltDeg}deg)` : undefined;
   const transformValue = [tiltTransform, inheritedTransform].filter(Boolean).join(' ') || undefined;
   const resolvedCornerRadius = cornerRadius ?? 6;
+  const flipEnabled = Boolean(enableFlip);
 
   const combinedStyle: CSSProperties = {
     ...cssVars,
@@ -165,9 +172,60 @@ export function PlayingCard({
     onClick?.(event);
   };
 
+  const staticContent = (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        borderRadius: 'inherit'
+      }}
+    >
+      {card.faceUp ? (
+        <CardFace card={card} variant={faceVariant} />
+      ) : (
+        <CardBack variant={backVariant} customPatternUrl={customBackImageUrl} />
+      )}
+    </div>
+  );
+  const flipContent = (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        borderRadius: 'inherit',
+        transformStyle: 'preserve-3d',
+        transition: 'transform 460ms cubic-bezier(0.2, 0.8, 0.25, 1)',
+        transform: `rotateY(${card.faceUp ? 0 : 180}deg)`
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 'inherit',
+          backfaceVisibility: 'hidden'
+        }}
+      >
+        <CardFace card={card} variant={faceVariant} />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 'inherit',
+          transform: 'rotateY(180deg)',
+          backfaceVisibility: 'hidden'
+        }}
+      >
+        <CardBack variant={backVariant} customPatternUrl={customBackImageUrl} />
+      </div>
+    </div>
+  );
+
   return (
     <div
       {...rest}
+      ref={ref}
       data-card-id={String(card.id)}
       data-selected={selected ? 'true' : undefined}
       data-highlighted={highlighted ? 'true' : undefined}
@@ -184,19 +242,7 @@ export function PlayingCard({
       onClick={handleClick}
       onDragStartCapture={handleDragStart}
     >
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          borderRadius: 'inherit'
-        }}
-      >
-        {card.faceUp ? (
-          <CardFace card={card} variant={faceVariant} />
-        ) : (
-          <CardBack variant={backVariant} customPatternUrl={customBackImageUrl} />
-        )}
-      </div>
+      {flipEnabled ? flipContent : staticContent}
       {highlightFrame}
       {renderOverlay && (
         <div
@@ -211,4 +257,6 @@ export function PlayingCard({
       )}
     </div>
   );
-}
+});
+
+PlayingCard.displayName = 'PlayingCard';

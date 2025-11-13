@@ -1,13 +1,18 @@
 'use client';
 
 import clsx from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { HTMLAttributes, ReactNode } from 'react';
 
 import type { Card, CardSize } from '@poker/core-cards';
 import { getCardDimensions } from '@poker/core-cards';
 
 import { CardBack, type CardBackVariant } from './CardBack';
+import { AnimatedCard } from './AnimatedCard';
+import { useCardAnimation } from './CardAnimationProvider';
 import { PlayingCard } from './PlayingCard';
+import { resolveCardMetaAnimation } from './cardAnimation.meta';
+import type { CardAnimationOptions } from './cardAnimation.shared';
 
 export interface CardStackProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   count: number;
@@ -19,6 +24,7 @@ export interface CardStackProps extends Omit<HTMLAttributes<HTMLDivElement>, 'ch
   onDraw?: () => void;
   disabled?: boolean;
   accessory?: ReactNode;
+  animation?: CardAnimationOptions;
 }
 
 export function CardStack({
@@ -31,6 +37,7 @@ export function CardStack({
   onDraw,
   disabled,
   accessory,
+  animation,
   className,
   style,
   ...rest
@@ -44,6 +51,19 @@ export function CardStack({
         faceUp: faceUpTop ?? topCard.faceUp
       }
     : undefined;
+  const { getLayoutId, transition: contextTransition, layoutEnabled } = useCardAnimation();
+  const animationSettings = animation ?? {};
+  const animationsEnabled = layoutEnabled && !animationSettings.disabled;
+  const baseTransition = animationSettings.transition ?? contextTransition;
+  const topDirectives = resolveCardMetaAnimation(displayedTopCard);
+  const topCardTransition =
+    topDirectives.bounce && animationsEnabled
+      ? {
+          ...baseTransition,
+          bounce: Math.max(baseTransition.bounce ?? 0.32, 0.32),
+          damping: baseTransition.damping ?? 20
+        }
+      : baseTransition;
 
   return (
     <div
@@ -76,44 +96,80 @@ export function CardStack({
           </div>
         ))}
 
-        {displayedTopCard ? (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              transform: `translate(${visibleLayers * offsetStep}px, ${visibleLayers * offsetStep}px)`
-            }}
-          >
-            <PlayingCard card={displayedTopCard} size={size} draggable={false} />
-          </div>
-        ) : count > 0 ? (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              transform: `translate(${visibleLayers * offsetStep}px, ${visibleLayers * offsetStep}px)`,
-              borderRadius: 18,
-              boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)'
-            }}
-          >
-            <CardBack variant={backVariant} />
-          </div>
-        ) : (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              borderRadius: 18,
-              border: '2px dashed rgba(148, 163, 184, 0.4)',
-              display: 'grid',
-              placeItems: 'center',
-              color: 'rgba(148, 163, 184, 0.7)',
-              fontSize: '0.8rem'
-            }}
-          >
-            Empty stack
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {displayedTopCard ? (
+            <motion.div
+              key={displayedTopCard.id}
+              layout="position"
+              initial={animationsEnabled ? { opacity: 0, y: -18 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              exit={animationsEnabled ? { opacity: 0, y: 22 } : undefined}
+              transition={topCardTransition}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                transform: `translate(${visibleLayers * offsetStep}px, ${visibleLayers * offsetStep}px)`
+              }}
+            >
+              {animationsEnabled ? (
+                <AnimatedCard
+                  card={displayedTopCard}
+                  size={size}
+                  draggable={false}
+                  layoutId={getLayoutId(displayedTopCard.id)}
+                  transition={topCardTransition}
+                  enableFlip={topDirectives.flip}
+                />
+              ) : (
+                <PlayingCard
+                  card={displayedTopCard}
+                  size={size}
+                  draggable={false}
+                  enableFlip={topDirectives.flip}
+                />
+              )}
+            </motion.div>
+          ) : count > 0 ? (
+            <motion.div
+              key="stack-card-back"
+              layout="position"
+              initial={animationsEnabled ? { opacity: 0, y: -10 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              exit={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
+              transition={baseTransition}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                transform: `translate(${visibleLayers * offsetStep}px, ${visibleLayers * offsetStep}px)`,
+                borderRadius: 18,
+                boxShadow: '0 12px 28px rgba(15, 23, 42, 0.35)'
+              }}
+            >
+              <CardBack variant={backVariant} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="stack-empty"
+              layout="position"
+              initial={animationsEnabled ? { opacity: 0 } : false}
+              animate={{ opacity: 1 }}
+              exit={animationsEnabled ? { opacity: 0 } : undefined}
+              transition={baseTransition}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: 18,
+                border: '2px dashed rgba(148, 163, 184, 0.4)',
+                display: 'grid',
+                placeItems: 'center',
+                color: 'rgba(148, 163, 184, 0.7)',
+                fontSize: '0.8rem'
+              }}
+            >
+              Empty stack
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {count > 0 && (
           <span

@@ -1,6 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   type CSSProperties,
   type HTMLAttributes,
@@ -13,7 +14,10 @@ import {
 import type { Card, CardId, CardSize } from '@poker/core-cards';
 import { getCardDimensions } from '@poker/core-cards';
 
+import { AnimatedCard } from './AnimatedCard';
+import { useCardAnimation } from './CardAnimationProvider';
 import { PlayingCard } from './PlayingCard';
+import { resolveCardMetaAnimation } from './cardAnimation.meta';
 import { computeRowLayout } from './cardLayout';
 import type { CardRowProps, CardRowSize } from './cardRow.types';
 
@@ -61,6 +65,7 @@ export function CardRow({
   onSelectionChange,
   disabledIds = [],
   onCardClick,
+  animation,
   className,
   style,
   ...rest
@@ -141,6 +146,10 @@ export function CardRow({
         };
 
   const containerClassName = clsx('v-card-row', className);
+  const { getLayoutId, transition: contextTransition, layoutEnabled } = useCardAnimation();
+  const animationSettings = animation ?? {};
+  const animationsEnabled = layoutEnabled && !animationSettings.disabled;
+  const baseTransition = animationSettings.transition ?? contextTransition;
 
   return (
     <div
@@ -154,51 +163,118 @@ export function CardRow({
       }}
       {...ariaProps}
     >
-      {cards.map((card, index) => {
-        const transform = layout[index] ?? { x: 0, y: 0, rotateDeg: 0, zIndex: index };
-        const isSelected = selection.includes(card.id);
-        const transformParts = [
-          `translate(${transform.x}px, ${transform.y}px)`,
-          `rotate(${transform.rotateDeg}deg)`
-        ];
-        if (isSelected) {
-          transformParts.push('translateY(-6px)', 'scale(1.04)');
-        }
-        return (
-          <div
-            key={card.id}
-            data-card-id={String(card.id)}
-            role={selectionMode === 'none' ? 'listitem' : 'option'}
-            aria-selected={selectionMode === 'none' ? undefined : isSelected}
-            onClick={event => handleClick(card, event)}
-            style={{
-              position: 'absolute',
-              left: 0,
-              bottom: 0,
-              transformOrigin: 'bottom center',
-              transform: transformParts.join(' '),
-              zIndex: transform.zIndex,
-              transition: 'transform 150ms ease, filter 150ms ease',
-              cursor:
-                isDisabled(card.id) || selectionMode === 'none'
-                  ? isDisabled(card.id)
-                    ? 'not-allowed'
-                    : 'default'
-                  : 'pointer',
-              filter: isDisabled(card.id) ? 'grayscale(0.4) opacity(0.65)' : undefined
-            }}
-          >
-            <PlayingCard
-              card={card}
-              size={typeof size === 'string' ? size : 'md'}
-              selected={isSelected}
-              highlighted={isSelected}
-              disabled={isDisabled(card.id)}
-              style={customSizeStyle}
-            />
-          </div>
-        );
-      })}
+      {(animationsEnabled ? (
+        <AnimatePresence mode="popLayout">
+          {cards.map((card, index) => {
+            const transform = layout[index] ?? { x: 0, y: 0, rotateDeg: 0, zIndex: index };
+            const isSelected = selection.includes(card.id);
+            const directives = resolveCardMetaAnimation(card);
+            const cursor =
+              isDisabled(card.id) || selectionMode === 'none'
+                ? isDisabled(card.id)
+                  ? 'not-allowed'
+                  : 'default'
+                : 'pointer';
+            const disabledFilter = isDisabled(card.id) ? 'grayscale(0.4) opacity(0.65)' : undefined;
+            const cardTransition =
+              directives.bounce
+                ? {
+                    ...baseTransition,
+                    bounce: Math.max(baseTransition.bounce ?? 0.32, 0.32),
+                    damping: baseTransition.damping ?? 20
+                  }
+                : baseTransition;
+            return (
+              <motion.div
+                key={card.id}
+                data-card-id={String(card.id)}
+                role={selectionMode === 'none' ? 'listitem' : 'option'}
+                aria-selected={selectionMode === 'none' ? undefined : isSelected}
+                onClick={event => handleClick(card, event)}
+                initial={{ opacity: 0, y: transform.y + 24, scale: 0.92 }}
+                animate={{
+                  opacity: 1,
+                  x: transform.x,
+                  y: transform.y + (isSelected ? -6 : 0),
+                  rotate: transform.rotateDeg,
+                  scale: isSelected ? 1.04 : 1
+                }}
+                exit={{ opacity: 0, y: transform.y - 32, scale: 0.85 }}
+                transition={cardTransition}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  bottom: 0,
+                  zIndex: transform.zIndex,
+                  cursor,
+                  filter: disabledFilter,
+                  transformOrigin: '50% 100%'
+                }}
+              >
+                <AnimatedCard
+                  card={card}
+                  size={typeof size === 'string' ? size : 'md'}
+                  selected={isSelected}
+                  highlighted={isSelected}
+                  disabled={isDisabled(card.id)}
+                  style={customSizeStyle}
+                  layoutId={getLayoutId(card.id)}
+                  transition={cardTransition}
+                  enableFlip={directives.flip}
+                />
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      ) : (
+        cards.map((card, index) => {
+          const transform = layout[index] ?? { x: 0, y: 0, rotateDeg: 0, zIndex: index };
+          const isSelected = selection.includes(card.id);
+          const directives = resolveCardMetaAnimation(card);
+          const transformParts = [
+            `translate(${transform.x}px, ${transform.y}px)`,
+            `rotate(${transform.rotateDeg}deg)`
+          ];
+          if (isSelected) {
+            transformParts.push('translateY(-6px)', 'scale(1.04)');
+          }
+          return (
+            <div
+              key={card.id}
+              data-card-id={String(card.id)}
+              role={selectionMode === 'none' ? 'listitem' : 'option'}
+              aria-selected={selectionMode === 'none' ? undefined : isSelected}
+              onClick={event => handleClick(card, event)}
+              style={{
+                position: 'absolute',
+                left: 0,
+                bottom: 0,
+                transformOrigin: 'bottom center',
+                transform: transformParts.join(' '),
+                zIndex: transform.zIndex,
+                transition: 'transform 150ms ease, filter 150ms ease',
+                cursor:
+                  isDisabled(card.id) || selectionMode === 'none'
+                    ? isDisabled(card.id)
+                      ? 'not-allowed'
+                      : 'default'
+                    : 'pointer',
+                filter: isDisabled(card.id) ? 'grayscale(0.4) opacity(0.65)' : undefined
+              }}
+            >
+              <PlayingCard
+                card={card}
+                size={typeof size === 'string' ? size : 'md'}
+                selected={isSelected}
+                highlighted={isSelected}
+                disabled={isDisabled(card.id)}
+                style={customSizeStyle}
+                enableFlip={directives.flip}
+              />
+            </div>
+          );
+        })
+      ))}
     </div>
   );
 }

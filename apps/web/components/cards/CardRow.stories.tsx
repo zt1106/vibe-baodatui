@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { makeCard } from '@poker/core-cards';
-import { CardRow } from '@poker/ui-cards';
+import { CardAnimationProvider, CardRow } from '@poker/ui-cards';
 import { createSampleHand } from './sampleData';
 
 const sampleCards = createSampleHand(2, 6);
@@ -84,5 +85,77 @@ export const DuplicateRankSuit: Story = {
     curveVerticalOffset: 18,
     selectionMode: 'multiple',
     defaultSelectedIds: [duplicateRankSuitCards[0].id]
+  }
+};
+
+export const AnimatedMetadata: Story = {
+  render: function AnimatedMetadataStory() {
+    const baseCards = useMemo(
+      () =>
+        createSampleHand(42, 6).map((card, index) => {
+          const tags = [
+            ...(card.meta?.tags ?? []),
+            'flip',
+            index % 2 === 0 ? 'bounce' : undefined
+          ].filter((tag): tag is string => Boolean(tag));
+          return {
+            ...card,
+            faceUp: false,
+            meta: {
+              ...card.meta,
+              tags
+            }
+          };
+        }),
+      []
+    );
+    const [cards, setCards] = useState(baseCards);
+    const [revealed, setRevealed] = useState(false);
+
+    const toggleReveal = useCallback(() => {
+      setCards(prev => prev.map(card => ({ ...card, faceUp: !revealed })));
+      setRevealed(prev => !prev);
+    }, [revealed]);
+
+    const rotateCards = useCallback(() => {
+      setCards(prev => {
+        if (prev.length <= 1) {
+          return prev;
+        }
+        const [first, ...rest] = prev;
+        return [...rest, first];
+      });
+    }, []);
+
+    return (
+      <CardAnimationProvider layoutGroupId="storybook-card-animations">
+        <CardRow
+          cards={cards}
+          size="md"
+          overlap="55%"
+          angle={-10}
+          selectionMode="none"
+          curveVerticalOffset={18}
+        />
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            marginTop: 16
+          }}
+        >
+          <button type="button" onClick={toggleReveal}>
+            {revealed ? 'Hide cards' : 'Reveal cards'}
+          </button>
+          <button type="button" onClick={rotateCards}>
+            Move first card to end
+          </button>
+        </div>
+        <p style={{ marginTop: 12, color: '#94a3b8', fontSize: '0.9rem' }}>
+          Cards tagged with <code>flip</code> animate a 3D reveal, while the ones tagged with{' '}
+          <code>bounce</code> ease into new positions with extra spring when the order changes.
+        </p>
+      </CardAnimationProvider>
+    );
   }
 };
