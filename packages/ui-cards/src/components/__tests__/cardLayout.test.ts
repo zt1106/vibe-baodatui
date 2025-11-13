@@ -34,7 +34,7 @@ describe('computeRowLayout', () => {
     const rotateDegrees = layout.map(entry => Number(entry.rotateDeg.toFixed(2)));
     expect(rotateDegrees).toEqual([10, 5, 0, -5, -10]);
     const verticalOffsets = layout.map(entry => Number(entry.y.toFixed(2)));
-    expect(verticalOffsets).toEqual([0, 6, 12, 6, 0]);
+    expect(verticalOffsets).toEqual([0, 9, 12, 9, 0]);
     expect(layout.map(entry => entry.zIndex)).toEqual([0, 1, 2, 3, 4]);
   });
 

@@ -29,11 +29,14 @@ export function computeRowLayout(input: LayoutInput): CardTransform[] {
   const lastIndex = Math.max(1, count - 1);
   const verticalAmplitude = Math.max(0, curveVerticalOffset);
   const direction = leftAngleDeg === 0 ? 0 : Math.sign(leftAngleDeg);
+  const edgeEmphasisPower = 2; // push offsets toward the edges so the center stays flatter
 
   return Array.from({ length: count }, (_, index) => {
     const t = index / lastIndex;
     const rotateDeg = leftAngleDeg * (1 - 2 * t);
-    const offsetFactor = lastIndex === 0 ? 0 : 1 - Math.abs(2 * t - 1);
+    const normalizedDistance = lastIndex === 0 ? 0 : Math.abs(2 * t - 1);
+    const easedCurve = 1 - Math.pow(normalizedDistance, edgeEmphasisPower);
+    const offsetFactor = Math.max(0, Math.min(1, easedCurve));
     const y = offsetFactor * verticalAmplitude * direction;
     return {
       x: index * stepX,
