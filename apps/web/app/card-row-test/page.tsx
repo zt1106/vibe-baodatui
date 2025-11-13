@@ -5,6 +5,7 @@ import { createSampleHand } from '../../components/cards/sampleData';
 
 export default function CardRowTestPage() {
   const cards = createSampleHand(2, 6);
+  const multiSelectCards = createSampleHand(3, 7);
 
   return (
     <CardAnimationProvider layoutGroupId="card-row-test-page">
@@ -40,6 +41,19 @@ export default function CardRowTestPage() {
               angle={-15}
               curveVerticalOffset={14}
               selectionMode="multiple"
+            />
+          </div>
+          <div style={{ padding: 24, borderRadius: 32, background: 'rgba(15, 23, 42, 0.8)' }}>
+            <p style={{ margin: 0, color: '#94a3b8' }}>
+              The grid below uses a flat layout so multiple cards can be clicked without overlapping.
+            </p>
+            <CardRow
+              cards={multiSelectCards}
+              size="md"
+              overlap="0%"
+              angle={0}
+              selectionMode="multiple"
+              data-testid="card-row-multi-select"
             />
           </div>
         </div>

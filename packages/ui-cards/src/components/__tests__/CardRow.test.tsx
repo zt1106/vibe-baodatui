@@ -36,7 +36,7 @@ describe('CardRow', () => {
     expect(options[0].getAttribute('aria-selected')).toBe('false');
   });
 
-  it('allows ctrl/meta multi selection', () => {
+  it('toggles cards in multiple selection mode', () => {
     const cards = createCards();
     const onSelectionChange = vi.fn();
     render(<CardRow cards={cards} selectionMode="multiple" onSelectionChange={onSelectionChange} />);
@@ -45,8 +45,11 @@ describe('CardRow', () => {
     fireEvent.click(options[0]);
     expect(onSelectionChange).toHaveBeenLastCalledWith([cards[0].id]);
 
-    fireEvent.click(options[1], { metaKey: true });
+    fireEvent.click(options[1]);
     expect(onSelectionChange).toHaveBeenLastCalledWith([cards[0].id, cards[1].id]);
+
+    fireEvent.click(options[0]);
+    expect(onSelectionChange).toHaveBeenLastCalledWith([cards[1].id]);
   });
 
   it('ignores clicks on disabled cards', () => {

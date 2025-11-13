@@ -123,12 +123,11 @@ export function CardRow({
         setSelection([card.id]);
         return;
       }
-      const meta = event.metaKey || event.ctrlKey;
-      if (meta) {
-        setSelection(already ? selection.filter(id => id !== card.id) : [...selection, card.id]);
+      if (already) {
+        setSelection(selection.filter(id => id !== card.id));
         return;
       }
-      setSelection(already ? [] : [card.id]);
+      setSelection([...selection, card.id]);
     },
     [isDisabled, onCardClick, selection, selectionMode, setSelection]
   );

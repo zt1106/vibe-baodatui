@@ -22,4 +22,27 @@ test.describe('CardRow selection layout', () => {
     const deltaY = Math.abs((finalBox?.y ?? 0) - (initialBox?.y ?? 0));
     expect(deltaY).toBeLessThan(3);
   });
+
+  test('allows selecting multiple cards by clicking them sequentially', async ({ page }) => {
+    await page.goto('/card-row-test');
+    const multiRow = page.getByTestId('card-row-multi-select');
+    const multiCards = multiRow.getByRole('option');
+    const cardCount = await multiCards.count();
+    expect(cardCount).toBeGreaterThan(1);
+
+    const firstCard = multiCards.first();
+    const lastCard = multiCards.last();
+
+    await page.waitForTimeout(600);
+    await firstCard.click();
+    await expect(firstCard).toHaveAttribute('aria-selected', 'true');
+
+    await lastCard.click();
+    await expect(firstCard).toHaveAttribute('aria-selected', 'true');
+    await expect(lastCard).toHaveAttribute('aria-selected', 'true');
+
+    await lastCard.click();
+    await expect(lastCard).toHaveAttribute('aria-selected', 'false');
+    await expect(firstCard).toHaveAttribute('aria-selected', 'true');
+  });
 });
