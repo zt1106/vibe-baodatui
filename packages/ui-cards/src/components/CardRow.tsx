@@ -190,7 +190,11 @@ export function CardRow({
                 role={selectionMode === 'none' ? 'listitem' : 'option'}
                 aria-selected={selectionMode === 'none' ? undefined : isSelected}
                 onClick={event => handleClick(card, event)}
-                initial={{ opacity: 0, y: transform.y + 24, scale: 0.92 }}
+              initial={{
+                opacity: 0,
+                y: transform.y + (animationSettings.entryYOffset ?? 24),
+                scale: 0.92
+              }}
                 animate={{
                   opacity: 1,
                   x: transform.x,

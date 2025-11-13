@@ -159,3 +159,117 @@ export const AnimatedMetadata: Story = {
     );
   }
 };
+
+export const AddRemoveAnimated: Story = {
+  render: function AddRemoveAnimatedStory() {
+    const deck = useMemo(() => createSampleHand(4, 12), []);
+    const [cards, setCards] = useState(deck.slice(0, 4));
+    const [nextCardIndex, setNextCardIndex] = useState(cards.length);
+    const canAdd = nextCardIndex < deck.length;
+    const canRemove = cards.length > 0;
+    const animation = useMemo(
+      () => ({
+        transition: {
+          type: 'spring',
+          stiffness: 150,
+          damping: 16,
+          mass: 1.2
+        },
+        entryYOffset: -96
+      }),
+      []
+    );
+
+    const handleAddMiddle = useCallback(() => {
+      if (nextCardIndex >= deck.length) {
+        return;
+      }
+      const nextCard = deck[nextCardIndex];
+      setCards(prev => {
+        const insertIndex = Math.floor(prev.length / 2) + 1;
+        return [...prev.slice(0, insertIndex), nextCard, ...prev.slice(insertIndex)];
+      });
+      setNextCardIndex(index => Math.min(deck.length, index + 1));
+    }, [deck, nextCardIndex]);
+
+    const handleRemoveMiddle = useCallback(() => {
+      setCards(prev => {
+        if (prev.length === 0) {
+          return prev;
+        }
+        const removeIndex = Math.floor((prev.length - 1) / 2);
+        return prev.filter((_, idx) => idx !== removeIndex);
+      });
+    }, []);
+
+    const handleAddMultiple = useCallback(() => {
+      if (nextCardIndex >= deck.length) {
+        return;
+      }
+      const available = Math.min(2, deck.length - nextCardIndex);
+      const newCards = deck.slice(nextCardIndex, nextCardIndex + available);
+      if (newCards.length === 0) {
+        return;
+      }
+      setCards(prev => {
+        const insertIndex = Math.floor(prev.length / 2) + 1;
+        return [...prev.slice(0, insertIndex), ...newCards, ...prev.slice(insertIndex)];
+      });
+      setNextCardIndex(index => Math.min(deck.length, index + available));
+    }, [deck, nextCardIndex]);
+
+    const handleRemoveMultiple = useCallback(() => {
+      setCards(prev => {
+        if (prev.length === 0) {
+          return prev;
+        }
+        const removeCount = Math.min(2, prev.length);
+        const removeIndex = Math.floor((prev.length - removeCount) / 2);
+        return prev.filter((_, idx) => idx < removeIndex || idx >= removeIndex + removeCount);
+      });
+    }, []);
+
+    return (
+      <CardAnimationProvider layoutGroupId="storybook-card-row-add-remove">
+        <div
+          style={{
+            borderRadius: 32,
+            padding: 24,
+            background: 'rgba(15, 23, 42, 0.8)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16
+          }}
+        >
+          <h3 style={{ margin: 0 }}>Animated add/remove</h3>
+          <p style={{ margin: 0, color: '#94a3b8' }}>
+            Add or remove a card in the middle and watch how Framer Motion eases each transform with a very noticeable spring.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button type="button" onClick={handleAddMiddle} disabled={!canAdd}>
+              Add card in middle
+            </button>
+            <button type="button" onClick={handleRemoveMiddle} disabled={!canRemove}>
+              Remove card in middle
+            </button>
+            <button type="button" onClick={handleAddMultiple} disabled={!canAdd}>
+              Add two cards
+            </button>
+            <button type="button" onClick={handleRemoveMultiple} disabled={!canRemove}>
+              Remove two cards
+            </button>
+          </div>
+          <CardRow
+            cards={cards}
+            size="md"
+            overlap="40%"
+            angle={-8}
+            curveVerticalOffset={10}
+            selectionMode="none"
+            animation={animation}
+          />
+        </div>
+      </CardAnimationProvider>
+    );
+  }
+};
