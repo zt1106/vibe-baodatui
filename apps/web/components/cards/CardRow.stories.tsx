@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
-import { makeCard } from '@poker/core-cards';
+import { makeCard, type Card } from '@poker/core-cards';
 import { CardAnimationProvider, CardRow } from '@poker/ui-cards';
 import { createSampleHand } from './sampleData';
 
@@ -268,6 +268,111 @@ export const AddRemoveAnimated: Story = {
             selectionMode="none"
             animation={animation}
           />
+        </div>
+      </CardAnimationProvider>
+    );
+  }
+};
+
+export const TransferBetweenRows: Story = {
+  render: function TransferBetweenRowsStory() {
+    const baseDeck = useMemo(() => createSampleHand(5, 20), []);
+    const [rowA, setRowA] = useState(baseDeck.slice(0, 6));
+    const [rowB, setRowB] = useState(baseDeck.slice(6, 12));
+
+    const moveOne = useCallback(
+      (setFrom: Dispatch<SetStateAction<Card[]>>, setTo: Dispatch<SetStateAction<Card[]>>) => {
+        setFrom(prev => {
+          if (prev.length === 0) {
+            return prev;
+          }
+          const moving = prev[prev.length - 1];
+          setTo(target => [...target, moving]);
+          return prev.slice(0, -1);
+        });
+      },
+      []
+    );
+
+    const moveMultiple = useCallback(
+      (setFrom: Dispatch<SetStateAction<Card[]>>, setTo: Dispatch<SetStateAction<Card[]>>) => {
+        setFrom(prev => {
+          if (prev.length === 0) {
+            return prev;
+          }
+          const count = Math.min(2, prev.length);
+          const moving = prev.slice(prev.length - count);
+          setTo(target => [...target, ...moving]);
+          return prev.slice(0, prev.length - count);
+        });
+      },
+      []
+    );
+
+    const slowStableAnimation = useMemo(
+      () => ({
+        transition: {
+          type: 'tween',
+          duration: 0.45,
+          ease: 'easeInOut'
+        },
+        entryYOffset: 0
+      }),
+      []
+    );
+
+    return (
+      <CardAnimationProvider layoutGroupId="storybook-card-row-transfer">
+        <div
+          style={{
+            borderRadius: 32,
+            padding: 24,
+            background: 'rgba(15, 23, 42, 0.8)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 20
+          }}
+        >
+          <h3 style={{ margin: 0 }}>Move cards between rows</h3>
+          <p style={{ margin: 0, color: '#94a3b8' }}>
+            Transfer cards between the two rows to see how shared layout animations keep each card gliding to its new container.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => moveOne(setRowA, setRowB)} disabled={rowA.length === 0}>
+              Move one → B
+            </button>
+            <button type="button" onClick={() => moveOne(setRowB, setRowA)} disabled={rowB.length === 0}>
+              Move one → A
+            </button>
+            <button type="button" onClick={() => moveMultiple(setRowA, setRowB)} disabled={rowA.length < 2}>
+              Move two → B
+            </button>
+            <button type="button" onClick={() => moveMultiple(setRowB, setRowA)} disabled={rowB.length < 2}>
+              Move two → A
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <p style={{ margin: '0 0 8px', color: '#94a3b8' }}>Row A</p>
+              <CardRow
+                cards={rowA}
+                size="md"
+                overlap="30%"
+                selectionMode="none"
+                animation={slowStableAnimation}
+              />
+            </div>
+            <div>
+              <p style={{ margin: '0 0 8px', color: '#94a3b8' }}>Row B</p>
+              <CardRow
+                cards={rowB}
+                size="md"
+                overlap="30%"
+                selectionMode="none"
+                animation={slowStableAnimation}
+              />
+            </div>
+          </div>
         </div>
       </CardAnimationProvider>
     );
