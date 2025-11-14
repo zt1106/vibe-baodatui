@@ -4,7 +4,8 @@ import clsx from 'clsx';
 import type { CSSProperties } from 'react';
 
 import type { Card } from '@poker/core-cards';
-import { CardRow, type CardRowProps } from './CardRow';
+import { CardRow } from './CardRow';
+import type { CardRowProps } from './cardRow.types';
 
 export interface MultiCardRowProps extends Omit<CardRowProps, 'cards'> {
   rows: Card[][];

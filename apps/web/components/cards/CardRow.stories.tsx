@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
 import { makeCard, type Card } from '@poker/core-cards';
-import { CardAnimationProvider, CardRow } from '@poker/ui-cards';
+import { CardAnimationProvider, CardRow, type CardAnimationOptions } from '@poker/ui-cards';
 import { createSampleHand } from './sampleData';
 
 const sampleCards = createSampleHand(2, 6);
@@ -167,7 +167,7 @@ export const AddRemoveAnimated: Story = {
     const [nextCardIndex, setNextCardIndex] = useState(cards.length);
     const canAdd = nextCardIndex < deck.length;
     const canRemove = cards.length > 0;
-    const animation = useMemo(
+    const animation = useMemo<CardAnimationOptions>(
       () => ({
         transition: {
           type: 'spring',
@@ -309,7 +309,7 @@ export const TransferBetweenRows: Story = {
       []
     );
 
-    const slowStableAnimation = useMemo(
+    const slowStableAnimation = useMemo<CardAnimationOptions>(
       () => ({
         transition: {
           type: 'tween',

@@ -12,7 +12,7 @@ const variedRows = [
 const defaultSelectedIds = [
   baseRows[0]?.[0]?.id,
   baseRows[1]?.[1]?.id
-].filter(Boolean) as string[];
+].filter(Boolean).map(id => String(id)) as string[];
 
 const meta: Meta<typeof MultiCardRow> = {
   title: 'Components/MultiCardRow',

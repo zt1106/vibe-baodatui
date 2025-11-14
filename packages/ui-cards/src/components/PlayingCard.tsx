@@ -19,6 +19,10 @@ import { resolveCardCssVars } from '@poker/core-cards';
 import { CardBack, type CardBackVariant } from './CardBack';
 import { CardFace, type CardFaceVariant } from './CardFace';
 
+type CardStyleProperties = CSSProperties & {
+  [customVar: `--${string}`]: string | undefined;
+};
+
 export interface PlayingCardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   card: Card;
   size?: CardSize;
@@ -104,7 +108,7 @@ export const PlayingCard = forwardRef<HTMLDivElement, PlayingCardProps>(function
   const resolvedCornerRadius = cornerRadius ?? 6;
   const flipEnabled = Boolean(enableFlip);
 
-  const combinedStyle: CSSProperties = {
+  const combinedStyle: CardStyleProperties = {
     ...cssVars,
     '--v-card-face-corner-size': `${0.9 * contentScale}rem`,
     '--v-card-face-symbol-size': `${2.4 * contentScale}rem`,
