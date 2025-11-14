@@ -27,9 +27,11 @@ export function PokerTableBackground({
   };
 
   return (
-    <div className={rootClass} style={rootStyle}>
-      <div className={styles.tableSurface}>
-        {children && <div className={styles.children}>{children}</div>}
+    <div className={styles.centering}>
+      <div className={rootClass} style={rootStyle}>
+        <div className={styles.tableSurface}>
+          {children && <div className={styles.children}>{children}</div>}
+        </div>
       </div>
     </div>
   );
