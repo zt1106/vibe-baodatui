@@ -44,7 +44,11 @@ export function MultiCardRow({
       {rows.map((cards, rowIndex) => (
         <div
           key={`multi-row-${rowIndex}`}
-          style={{ marginTop: rowIndex === 0 ? 0 : -rowOverlap }}
+          style={{
+            marginTop: rowIndex === 0 ? 0 : -rowOverlap,
+            position: 'relative',
+            zIndex: rowIndex
+          }}
         >
           <CardRow {...rowProps} cards={cards} className={rowClassName} />
         </div>
