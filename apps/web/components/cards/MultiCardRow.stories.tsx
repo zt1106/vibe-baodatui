@@ -1,9 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { MultiCardRow } from '@poker/ui-cards';
-import { createSampleRows } from './sampleData';
+import { createSampleHand, createSampleRows } from './sampleData';
 
 const baseRows = createSampleRows({ rows: 3, cardsPerRow: 6, seed: 2 });
+const variedRows = [
+  createSampleHand(7, 8),
+  createSampleHand(8, 5),
+  createSampleHand(9, 3)
+];
 const defaultSelectedIds = [
   baseRows[0]?.[0]?.id,
   baseRows[1]?.[1]?.id
@@ -61,5 +66,12 @@ export const SelectableRows: Story = {
   args: {
     selectionMode: 'multiple',
     defaultSelectedIds
+  }
+};
+
+export const VaryingCounts: Story = {
+  args: {
+    rows: variedRows,
+    selectionMode: 'multiple'
   }
 };
