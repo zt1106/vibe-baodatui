@@ -198,9 +198,9 @@ export function CardRow({
                 animate={{
                   opacity: 1,
                   x: transform.x,
-                  y: transform.y + (isSelected ? -6 : 0),
+                  y: transform.y,
                   rotate: transform.rotateDeg,
-                  scale: isSelected ? 1.04 : 1
+                  scale: 1
                 }}
                 exit={{ opacity: 0, y: transform.y - 32, scale: 0.85 }}
                 transition={cardTransition}
@@ -214,17 +214,16 @@ export function CardRow({
                   transformOrigin: '50% 100%'
                 }}
               >
-                <AnimatedCard
-                  card={card}
-                  size={typeof size === 'string' ? size : 'md'}
-                  selected={isSelected}
-                  highlighted={isSelected}
-                  disabled={isDisabled(card.id)}
-                  style={customSizeStyle}
-                  layoutId={getLayoutId(card.id)}
-                  transition={cardTransition}
-                  enableFlip={directives.flip}
-                />
+                  <AnimatedCard
+                    card={card}
+                    size={typeof size === 'string' ? size : 'md'}
+                    selected={isSelected}
+                    disabled={isDisabled(card.id)}
+                    style={customSizeStyle}
+                    layoutId={getLayoutId(card.id)}
+                    transition={cardTransition}
+                    enableFlip={directives.flip}
+                  />
               </motion.div>
             );
           })}
@@ -234,13 +233,6 @@ export function CardRow({
           const transform = layout[index] ?? { x: 0, y: 0, rotateDeg: 0, zIndex: index };
           const isSelected = selection.includes(card.id);
           const directives = resolveCardMetaAnimation(card);
-          const transformParts = [
-            `translate(${transform.x}px, ${transform.y}px)`,
-            `rotate(${transform.rotateDeg}deg)`
-          ];
-          if (isSelected) {
-            transformParts.push('translateY(-6px)', 'scale(1.04)');
-          }
           return (
             <div
               key={card.id}
@@ -253,7 +245,10 @@ export function CardRow({
                 left: 0,
                 bottom: 0,
                 transformOrigin: 'bottom center',
-                transform: transformParts.join(' '),
+                transform: [
+                  `translate(${transform.x}px, ${transform.y}px)`,
+                  `rotate(${transform.rotateDeg}deg)`
+                ].join(' '),
                 zIndex: transform.zIndex,
                 transition: 'transform 150ms ease, filter 150ms ease',
                 cursor:
@@ -269,7 +264,6 @@ export function CardRow({
                 card={card}
                 size={typeof size === 'string' ? size : 'md'}
                 selected={isSelected}
-                highlighted={isSelected}
                 disabled={isDisabled(card.id)}
                 style={customSizeStyle}
                 enableFlip={directives.flip}
