@@ -88,7 +88,18 @@ const flopToRiver = [
 const meta: Meta<typeof GameTable> = {
   title: 'Table/GameTable',
   component: GameTable,
-  tags: ['autodocs']
+  tags: ['autodocs'],
+  args: {
+    sceneWidth: '80%',
+    sceneAlign: 'center'
+  },
+  argTypes: {
+    sceneWidth: { control: 'text' },
+    sceneAlign: {
+      control: { type: 'radio' },
+      options: ['flex-start', 'center', 'flex-end']
+    }
+  }
 };
 
 export default meta;
@@ -97,20 +108,16 @@ type Story = StoryObj<typeof meta>;
 
 export const FullTable: Story = {
   args: {
-    tableName: '展示牌桌',
     players: sixPlayerTable,
     communityCards: flopToRiver,
     dealerSeatId: 'seat-3',
-    potValue: 3820
   }
 };
 
 export const FourPlayers: Story = {
   args: {
-    tableName: '四人桌',
     players: fourPlayerTable,
     communityCards: flopToRiver.slice(0, 3),
     dealerSeatId: 'seat-2',
-    potValue: 1440
   }
 };

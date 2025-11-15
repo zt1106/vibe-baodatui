@@ -94,11 +94,9 @@ export default function PlayPage({ params }: PlayPageProps) {
 
   return (
     <GameTable
-      tableName={`牌桌 ${tableId}`}
       players={seats}
       communityCards={communityCards}
       dealerSeatId="seat-3"
-      potValue={3820}
     />
   );
 }

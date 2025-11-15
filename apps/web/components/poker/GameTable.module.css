@@ -11,13 +11,6 @@
   color: #e2e8f0;
 }
 
-.tableName {
-  font-size: 0.95rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #94a3b8;
-}
-
 .tableScene {
   width: 100%;
   display: flex;
@@ -85,33 +78,6 @@
   letter-spacing: 0.08em;
   color: rgba(226, 232, 240, 0.7);
   font-size: 0.85rem;
-}
-
-.potBadge {
-  position: absolute;
-  left: 50%;
-  top: 60%;
-  transform: translate(-50%, -50%) rotateX(var(--table-tilt-deg, 22deg));
-  padding: 8px 18px;
-  border-radius: 999px;
-  background: rgba(2, 44, 21, 0.75);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  color: #f1f5f9;
-  text-align: center;
-  z-index: 2;
-  min-width: 120px;
-}
-
-.potLabel {
-  display: block;
-  font-size: 0.75rem;
-  letter-spacing: 0.2em;
-  color: rgba(148, 163, 184, 0.85);
-}
-
-.potValue {
-  font-size: 1.35rem;
-  font-weight: 700;
 }
 
 .emptyState {

@@ -22,8 +22,8 @@ export type GameTableProps = {
   players: GameTableSeat[];
   communityCards?: Card[];
   dealerSeatId?: string;
-  potValue?: number;
-  tableName?: string;
+  sceneWidth?: string;
+  sceneAlign?: 'flex-start' | 'center' | 'flex-end';
 };
 
 type Dimensions = { width: number; height: number };
@@ -41,8 +41,8 @@ export function GameTable({
   players,
   communityCards = [],
   dealerSeatId,
-  potValue,
-  tableName
+  sceneWidth,
+  sceneAlign
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
@@ -50,23 +50,41 @@ export function GameTable({
   useEffect(() => {
     const element = tableRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(entries => {
-      const entry = entries[0];
-      if (!entry) return;
-      const { width, height } = entry.contentRect;
-      setDimensions(prev =>
-        prev.width === width && prev.height === height ? prev : { width, height }
-      );
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
+
+    const setFromRect = (rect: Pick<DOMRectReadOnly, 'width' | 'height'>) => {
+      const { width, height } = rect;
+      setDimensions(prev => (prev.width === width && prev.height === height ? prev : { width, height }));
+    };
+
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      setFromRect(rect);
+    };
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(entries => {
+        const entry = entries[0];
+        if (!entry) return;
+        setFromRect(entry.contentRect);
+      });
+      observer.observe(element);
+      return () => observer.disconnect();
+    }
+
+    measure();
+    const handleResize = () => {
+      measure();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   const tableDiameter = Math.min(dimensions.width, dimensions.height);
   const measurementBasis = tableDiameter > 0 ? tableDiameter : 520;
   const innerRadius = tableDiameter / 2;
   const avatarSize = Math.round(Math.min(Math.max(measurementBasis * 0.12, 64), 104));
-  const handCardWidth = Math.round(Math.min(Math.max(measurementBasis * 0.16, 84), 136));
   const communityCardWidth = Math.round(Math.min(Math.max(measurementBasis * 0.14, 96), 150));
 
   const seatPositions = useMemo(() => {
@@ -92,16 +110,27 @@ export function GameTable({
     });
   }, [dimensions.height, dimensions.width, innerRadius, players]);
 
-  const formattedPot = potValue == null ? '--' : potValue.toLocaleString();
   const tableStyle = useMemo(
     () => ({ '--table-tilt-deg': `${TABLE_TILT_DEG}deg` } as CSSProperties),
     []
   );
 
+  const sceneStyle = useMemo(
+    () => ({
+      width: sceneWidth ?? '100%',
+      justifyContent:
+        sceneAlign === 'flex-start'
+          ? 'flex-start'
+          : sceneAlign === 'flex-end'
+          ? 'flex-end'
+          : 'center'
+    }),
+    [sceneAlign, sceneWidth]
+  );
+
   return (
     <section className={styles.tableStage}>
-      {tableName && <p className={styles.tableName}>{tableName}</p>}
-      <div className={styles.tableScene}>
+      <div className={styles.tableScene} style={sceneStyle}>
         <div ref={tableRef} className={styles.tableRing} style={tableStyle}>
           <div className={styles.tableSurface} aria-hidden="true">
             <div className={styles.tableInset} />
@@ -111,17 +140,15 @@ export function GameTable({
             {communityCards.length > 0 ? (
               <CardRow
                 cards={communityCards}
-                size={{ width: communityCardWidth }}
-                overlap="38%"
+                size="md"
+                overlap="65%"
                 angle={0}
+                curveVerticalOffset={18}
+                selectionMode="none"
               />
             ) : (
               <span className={styles.communityPlaceholder}>等待发公共牌…</span>
             )}
-          </div>
-          <div className={styles.potBadge}>
-            <span className={styles.potLabel}>底池</span>
-            <strong className={styles.potValue}>{formattedPot}</strong>
           </div>
           {seatPositions.length === 0 && (
             <div className={styles.emptyState}>等待玩家坐下…</div>
@@ -138,9 +165,11 @@ export function GameTable({
                 {seat.player.cards && seat.player.cards.length > 0 ? (
                   <CardRow
                     cards={seat.player.cards}
-                    size={{ width: handCardWidth }}
-                    overlap="64%"
+                    size="md"
+                    overlap="65%"
                     angle={0}
+                    curveVerticalOffset={18}
+                    selectionMode="none"
                   />
                 ) : (
                   <span className={styles.cardPlaceholder}>未发牌</span>
