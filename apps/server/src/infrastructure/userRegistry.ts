@@ -72,6 +72,15 @@ export function createUserRegistry() {
     return record ? clone(record) : undefined;
   }
 
+  function updateAvatar(userId: number, avatar: string): UserRecord | undefined {
+    const record = usersById.get(userId);
+    if (!record) {
+      return undefined;
+    }
+    record.avatar = avatar;
+    return clone(record);
+  }
+
   function all(): UserRecord[] {
     return Array.from(usersById.values()).map(clone);
   }
@@ -81,6 +90,7 @@ export function createUserRegistry() {
     login,
     findById,
     findByNickname,
+    updateAvatar,
     all
   };
 }

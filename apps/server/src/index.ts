@@ -16,7 +16,8 @@ import {
   TableStartRequest,
   TableKickRequest,
   TableConfigUpdateRequest,
-  TablePreparedRequest
+  TablePreparedRequest,
+  UpdateAvatarRequest
 } from '@shared/messages';
 import { createTable, joinTable, deal } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
@@ -50,7 +51,7 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Credentials', 'true');
   }
   res.header('Access-Control-Allow-Headers', 'Content-Type');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
   if (req.method === 'OPTIONS') {
     res.sendStatus(204);
     return;
@@ -252,6 +253,21 @@ app.post('/auth/login', (req, res) => {
     console.error('[server] failed to login user', error);
     res.status(500).json({ error: 'Failed to login user' });
   }
+});
+
+
+app.patch('/auth/avatar', (req, res) => {
+  const parsed = UpdateAvatarRequest.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request payload' });
+    return;
+  }
+  const user = users.updateAvatar(parsed.data.userId, parsed.data.avatar);
+  if (!user) {
+    res.status(404).json({ error: 'Unknown user' });
+    return;
+  }
+  res.json(RegisterUserResponse.parse({ user }));
 });
 
 

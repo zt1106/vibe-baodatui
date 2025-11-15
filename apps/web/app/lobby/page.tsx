@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { LobbyRoomsResponse, TablePrepareResponse as TablePrepareResponseSchema } from '@shared/messages';
+import { AVATAR_FILENAMES } from '@shared/avatars';
+import {
+  LobbyRoomsResponse,
+  RegisterUserResponse as RegisterUserResponseSchema,
+  TablePrepareResponse as TablePrepareResponseSchema
+} from '@shared/messages';
 import type { LobbyNotification, LobbyRoom, TablePrepareResponse } from '@shared/messages';
 
 import { useHeartbeat } from '../../lib/heartbeat';
@@ -23,6 +28,10 @@ export default function LobbyPage() {
   const [error, setError] = useState<string | null>(null);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [roomActionError, setRoomActionError] = useState<string | null>(null);
+  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const [avatarSelection, setAvatarSelection] = useState<string | null>(null);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  const [avatarUpdateError, setAvatarUpdateError] = useState<string | null>(null);
   const apiBaseUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
     return base.replace(/\/$/, '');
@@ -158,6 +167,51 @@ export default function LobbyPage() {
     }
   }, [apiBaseUrl, isCreatingRoom, router, user]);
 
+  const handleOpenAvatarDialog = useCallback(() => {
+    if (!user) return;
+    setAvatarSelection(user.avatar);
+    setAvatarUpdateError(null);
+    setIsAvatarDialogOpen(true);
+  }, [user]);
+
+  const handleCloseAvatarDialog = useCallback(() => {
+    setAvatarSelection(null);
+    setAvatarUpdateError(null);
+    setIsAvatarDialogOpen(false);
+  }, []);
+
+  const handleConfirmAvatar = useCallback(async () => {
+    if (!user || !avatarSelection) {
+      return;
+    }
+    setAvatarUpdateError(null);
+    setIsUpdatingAvatar(true);
+    try {
+      const response = await fetch(`${apiBaseUrl}/auth/avatar`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, avatar: avatarSelection })
+      });
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      const payload = await response.json();
+      const parsed = RegisterUserResponseSchema.safeParse(payload);
+      if (!parsed.success) {
+        throw new Error('Invalid avatar response');
+      }
+      persistStoredUser(parsed.data.user);
+      setUser(parsed.data.user);
+      setIsAvatarDialogOpen(false);
+    } catch (err) {
+      console.error('[web] failed to update avatar', err);
+      setAvatarUpdateError('更换头像失败，请稍后再试。');
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  }, [apiBaseUrl, avatarSelection, user, persistStoredUser]);
+
   const handleEnterGame = useCallback((roomId: string) => {
     router.push(`/game/${encodeURIComponent(roomId)}/prepare`);
   }, [router]);
@@ -263,14 +317,22 @@ export default function LobbyPage() {
           {authStatus === 'loading' && <span>正在登录…</span>}
           {authStatus === 'ready' && user && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div
+              <button
+                type="button"
+                onClick={handleOpenAvatarDialog}
                 style={{
                   width: 44,
                   height: 44,
                   borderRadius: '50%',
                   overflow: 'hidden',
                   border: '2px solid rgba(148, 163, 184, 0.4)',
-                  boxShadow: '0 8px 20px rgba(15, 23, 42, 0.55)'
+                  boxShadow: '0 8px 20px rgba(15, 23, 42, 0.55)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  cursor: 'pointer',
+                  background: 'transparent'
                 }}
               >
                 <img
@@ -281,7 +343,7 @@ export default function LobbyPage() {
                   loading="lazy"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
-              </div>
+              </button>
               <div style={{ display: 'grid', gap: '0.15rem' }}>
                 <span style={{ fontWeight: 600 }}>已登录：{user.nickname}</span>
                 <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>用户编号：{user.id}</span>
@@ -503,6 +565,151 @@ export default function LobbyPage() {
           </span>
         )}
       </footer>
+      {isAvatarDialogOpen && (
+        <div
+          role="presentation"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(2, 6, 23, 0.82)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 500
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="选择头像"
+            style={{
+              width: 'min(520px, 90vw)',
+              maxHeight: '90vh',
+              background: '#0b1221',
+              borderRadius: 24,
+              padding: '1.25rem 1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              boxShadow: '0 32px 80px rgba(2, 6, 23, 0.9)'
+            }}
+          >
+            <header
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <h3 style={{ margin: 0 }}>更换头像</h3>
+              <button
+                type="button"
+                onClick={handleCloseAvatarDialog}
+                aria-label="关闭头像选择"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  border: '1px solid rgba(148, 163, 184, 0.4)',
+                  background: 'transparent',
+                  color: '#e2e8f0',
+                  cursor: 'pointer'
+                }}
+              >
+                ×
+              </button>
+            </header>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
+                gap: '0.5rem',
+                overflowY: 'auto',
+                maxHeight: '60vh'
+              }}
+            >
+              {AVATAR_FILENAMES.map(filename => {
+                const isSelected = avatarSelection === filename;
+                return (
+                  <button
+                    key={filename}
+                    type="button"
+                    onClick={() => setAvatarSelection(filename)}
+                    aria-pressed={isSelected}
+                    style={{
+                      borderRadius: 12,
+                      padding: 0,
+                      border: isSelected ? '2px solid #38bdf8' : '2px solid transparent',
+                      background: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(15, 23, 42, 0.4)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: isSelected ? '0 12px 24px rgba(59, 130, 246, 0.3)' : '0 10px 24px rgba(0, 0, 0, 0.4)'
+                    }}
+                  >
+                    <img
+                      src={`/avatars/${filename}`}
+                      alt=""
+                      width={70}
+                      height={70}
+                      loading="lazy"
+                      style={{ width: 70, height: 70, objectFit: 'cover' }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            {avatarUpdateError && (
+              <span style={{ color: '#fca5a5', fontSize: '0.9rem' }}>{avatarUpdateError}</span>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={handleCloseAvatarDialog}
+                disabled={isUpdatingAvatar}
+                style={{
+                  padding: '0.6rem 1.1rem',
+                  borderRadius: 999,
+                  border: '1px solid rgba(148, 163, 184, 0.5)',
+                  background: 'transparent',
+                  color: '#e2e8f0',
+                  cursor: isUpdatingAvatar ? 'not-allowed' : 'pointer'
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAvatar}
+                disabled={
+                  isUpdatingAvatar ||
+                  !user ||
+                  !avatarSelection ||
+                  avatarSelection === user.avatar
+                }
+                style={{
+                  padding: '0.6rem 1.3rem',
+                  borderRadius: 999,
+                  border: 'none',
+                  background:
+                    isUpdatingAvatar || !avatarSelection || avatarSelection === user?.avatar
+                      ? 'rgba(148, 163, 184, 0.35)'
+                      : 'linear-gradient(135deg, #38bdf8, #6366f1)',
+                  color: isUpdatingAvatar ? '#94a3b8' : '#0f172a',
+                  fontWeight: 600,
+                  cursor:
+                    isUpdatingAvatar || !user || !avatarSelection || avatarSelection === user.avatar
+                      ? 'not-allowed'
+                      : 'pointer'
+                }}
+              >
+                {isUpdatingAvatar ? '更新中…' : '确定'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -1,8 +1,9 @@
 
 import { z } from 'zod';
+import { AVATAR_FILENAMES } from './avatars';
 
 const nicknameSchema = z.string().trim().min(1).max(32);
-const avatarSchema = z.string().trim().min(1);
+const avatarSchema = z.enum(AVATAR_FILENAMES);
 
 export const LobbyRoomStatus = z.enum(['waiting', 'in-progress', 'full']);
 export type LobbyRoomStatus = z.infer<typeof LobbyRoomStatus>;
@@ -73,6 +74,15 @@ export const RegisterUserResponse = z.object({
   user: UserPayload
 });
 export type RegisterUserResponse = z.infer<typeof RegisterUserResponse>;
+
+export const UpdateAvatarRequest = z.object({
+  userId: z.number().int().positive(),
+  avatar: avatarSchema
+});
+export type UpdateAvatarRequest = z.infer<typeof UpdateAvatarRequest>;
+
+export const UpdateAvatarResponse = RegisterUserResponse;
+export type UpdateAvatarResponse = z.infer<typeof UpdateAvatarResponse>;
 
 export const LoginUserRequest = RegisterUserRequest;
 export type LoginUserRequest = z.infer<typeof LoginUserRequest>;

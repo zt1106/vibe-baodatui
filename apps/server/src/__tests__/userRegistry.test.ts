@@ -31,4 +31,14 @@ describe('createUserRegistry', () => {
     expect(login.nickname).toBe('Bob');
     expect(() => registry.login('Charlie')).toThrow(UserNotFoundError);
   });
+
+  it('allows updating a user avatar', () => {
+    const registry = createUserRegistry();
+    const alice = registry.register('Alice');
+    const updated = registry.updateAvatar(alice.id, 'memo_12.png');
+    expect(updated).toBeDefined();
+    expect(updated?.avatar).toBe('memo_12.png');
+    const reloaded = registry.login('alice');
+    expect(reloaded.avatar).toBe('memo_12.png');
+  });
 });
