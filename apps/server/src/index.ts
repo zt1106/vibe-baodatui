@@ -190,6 +190,33 @@ function buildPreparePayload(table: ManagedTable) {
   });
 }
 
+function cleanupPlayerSocket(socketId: string) {
+  // Keep the lobby and prepare state fresh whenever a socket leaves a table.
+  const tableId = socketTable.get(socketId);
+  const userId = socketUsers.get(socketId);
+  socketTable.delete(socketId);
+  socketUsers.delete(socketId);
+  if (!tableId) {
+    return;
+  }
+  const managed = tables.get(tableId);
+  if (!managed) {
+    return;
+  }
+  const seatIndex = managed.state.seats.indexOf(socketId);
+  if (seatIndex === -1) {
+    return;
+  }
+  managed.state.seats.splice(seatIndex, 1);
+  delete managed.state.players[socketId];
+  if (typeof userId === 'number') {
+    managed.prepared.delete(userId);
+  }
+  resetTablePhaseIfNeeded(managed);
+  updateLobbyFromState(tableId);
+  emitState(tableId);
+}
+
 function createManagedTable(host: { id: number; nickname: string }, id = generateTableId()): ManagedTable {
   const normalizedId = normalizeTableId(id);
   if (!normalizedId) {
@@ -504,9 +531,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    socketTable.delete(socket.id);
-    socketUsers.delete(socket.id);
-    // For simplicity, keep player entry; production would handle seats cleanup/timeouts.
+    cleanupPlayerSocket(socket.id);
     heartbeat.publish();
   });
 });
