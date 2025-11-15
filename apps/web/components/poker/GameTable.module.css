@@ -1,0 +1,181 @@
+.tableStage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px 16px 48px;
+  background: radial-gradient(circle at 50% 20%, rgba(15, 23, 42, 0.85), rgba(2, 6, 23, 0.95)),
+    #020617;
+  color: #e2e8f0;
+}
+
+.tableName {
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.tableScene {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  perspective: 1200px;
+}
+
+.tableRing {
+  position: relative;
+  width: min(92vw, 880px);
+  aspect-ratio: 1 / 1;
+  max-width: 880px;
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 30px 45px rgba(0, 0, 0, 0.5));
+}
+
+.tableSurface {
+  position: absolute;
+  inset: 0;
+  border-radius: 22%;
+  background: radial-gradient(circle at 50% 30%, #1c8f45, #07502a 62%, #022012 100%);
+  border: 14px solid #1f2937;
+  box-shadow:
+    inset 0 0 50px rgba(0, 0, 0, 0.45),
+    inset 0 0 140px rgba(2, 6, 23, 0.4);
+  transform: rotateX(var(--table-tilt-deg, 22deg));
+  transform-origin: center center;
+  z-index: 1;
+}
+
+.tableInset {
+  position: absolute;
+  inset: 5%;
+  border-radius: 18%;
+  border: 2px solid rgba(226, 232, 240, 0.08);
+}
+
+.centerGlow {
+  position: absolute;
+  width: 46%;
+  height: 46%;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotateX(var(--table-tilt-deg, 22deg));
+  background: radial-gradient(circle, rgba(74, 222, 128, 0.18), rgba(4, 53, 23, 0));
+  filter: blur(18px);
+  z-index: 1;
+}
+
+.communityRow {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%) rotateX(var(--table-tilt-deg, 22deg));
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: 12px 18px;
+  border-radius: 28px;
+}
+
+.communityPlaceholder {
+  letter-spacing: 0.08em;
+  color: rgba(226, 232, 240, 0.7);
+  font-size: 0.85rem;
+}
+
+.potBadge {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  transform: translate(-50%, -50%) rotateX(var(--table-tilt-deg, 22deg));
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(2, 44, 21, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #f1f5f9;
+  text-align: center;
+  z-index: 2;
+  min-width: 120px;
+}
+
+.potLabel {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.potValue {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.emptyState {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.9rem;
+  color: rgba(226, 232, 240, 0.4);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.cardArea {
+  position: absolute;
+  transform: translate(-50%, -50%) rotateX(var(--table-tilt-deg, 22deg));
+  padding: 8px 10px 6px;
+  border-radius: 18px;
+  background: rgba(2, 30, 15, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow:
+    0 6px 12px rgba(0, 0, 0, 0.45),
+    inset 0 0 35px rgba(74, 222, 128, 0.08);
+  z-index: 2;
+  min-width: 160px;
+}
+
+.cardPlaceholder {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: rgba(226, 232, 240, 0.7);
+  background: rgba(30, 41, 59, 0.4);
+}
+
+.avatarWrapper {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+.tableAvatar {
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.55);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.dealerButton {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #030712;
+  background: linear-gradient(135deg, #fde047, #f97316);
+  border: 2px solid #0f172a;
+  transform: translate(-50%, -50%) rotateX(var(--table-tilt-deg, 22deg));
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.55);
+  z-index: 3;
+}
