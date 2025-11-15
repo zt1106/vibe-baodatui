@@ -2,6 +2,7 @@
 import { z } from 'zod';
 
 const nicknameSchema = z.string().trim().min(1).max(32);
+const avatarSchema = z.string().trim().min(1);
 
 export const LobbyRoomStatus = z.enum(['waiting', 'in-progress', 'full']);
 export type LobbyRoomStatus = z.infer<typeof LobbyRoomStatus>;
@@ -30,13 +31,15 @@ export type LobbyRoomsResponse = z.infer<typeof LobbyRoomsResponse>;
 export const TablePlayer = z.object({
   userId: z.number().int().positive(),
   nickname: nicknameSchema,
+  avatar: avatarSchema,
   prepared: z.boolean()
 });
 export type TablePlayer = z.infer<typeof TablePlayer>;
 
 export const TableHost = z.object({
   userId: z.number().int().positive(),
-  nickname: nicknameSchema
+  nickname: nicknameSchema,
+  avatar: avatarSchema
 });
 export type TableHost = z.infer<typeof TableHost>;
 
@@ -56,7 +59,8 @@ export type TablePrepareResponse = z.infer<typeof TablePrepareResponse>;
 
 export const UserPayload = z.object({
   id: z.number().int().positive(),
-  nickname: nicknameSchema
+  nickname: nicknameSchema,
+  avatar: avatarSchema
 });
 export type UserPayload = z.infer<typeof UserPayload>;
 
@@ -110,12 +114,15 @@ export const ServerState = z.object({
   status: LobbyRoomStatus,
   host: TableHost,
   config: TableConfig,
-  seats: z.array(z.object({
-    id: z.string(),
-    userId: z.number().int().positive(),
-    nickname: nicknameSchema,
-    prepared: z.boolean()
-  }))
+  seats: z.array(
+    z.object({
+      id: z.string(),
+      userId: z.number().int().positive(),
+      nickname: nicknameSchema,
+      avatar: avatarSchema,
+      prepared: z.boolean()
+    })
+  )
 });
 export type ServerState = z.infer<typeof ServerState>;
 

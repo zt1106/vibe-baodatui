@@ -1,6 +1,6 @@
 import { generateRandomChineseName } from './nickname';
 
-export type StoredUser = { id: number; nickname: string };
+export type StoredUser = { id: number; nickname: string; avatar: string };
 
 const USER_STORAGE_KEY = 'auth:user';
 
@@ -13,7 +13,11 @@ function parseStoredUser(raw: string | null): StoredUser | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as StoredUser;
-    if (typeof parsed?.id === 'number' && typeof parsed?.nickname === 'string') {
+    if (
+      typeof parsed?.id === 'number' &&
+      typeof parsed?.nickname === 'string' &&
+      typeof parsed?.avatar === 'string'
+    ) {
       return parsed;
     }
   } catch {
@@ -40,8 +44,15 @@ export function clearStoredUser() {
 }
 
 async function parseUserResponse(response: Response): Promise<StoredUser> {
-  const data = (await response.json()) as { user: { id: number; nickname: string } };
-  if (!data?.user || typeof data.user.id !== 'number' || typeof data.user.nickname !== 'string') {
+  const data = (await response.json()) as {
+    user: { id: number; nickname: string; avatar: string };
+  };
+  if (
+    !data?.user ||
+    typeof data.user.id !== 'number' ||
+    typeof data.user.nickname !== 'string' ||
+    typeof data.user.avatar !== 'string'
+  ) {
     throw new Error('Malformed user payload');
   }
   return data.user;

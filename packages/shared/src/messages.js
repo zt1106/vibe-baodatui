@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const nicknameSchema = z.string().trim().min(1).max(32);
+const avatarSchema = z.string().trim().min(1);
 
 export const LobbyRoomStatus = z.enum(['waiting', 'in-progress', 'full']);
 
@@ -25,11 +26,13 @@ export const LobbyRoomsResponse = z.object({
 export const TablePlayer = z.object({
     userId: z.number().int().positive(),
     nickname: nicknameSchema,
+    avatar: avatarSchema,
     prepared: z.boolean()
 });
 export const TableHost = z.object({
     userId: z.number().int().positive(),
-    nickname: nicknameSchema
+    nickname: nicknameSchema,
+    avatar: avatarSchema
 });
 
 export const TableConfig = z.object({
@@ -46,7 +49,8 @@ export const TablePrepareResponse = z.object({
 
 export const UserPayload = z.object({
     id: z.number().int().positive(),
-    nickname: nicknameSchema
+    nickname: nicknameSchema,
+    avatar: avatarSchema
 });
 
 export const RegisterUserRequest = z.object({
@@ -90,6 +94,7 @@ export const ServerState = z.object({
         id: z.string(),
         userId: z.number().int().positive(),
         nickname: nicknameSchema,
+        avatar: avatarSchema,
         prepared: z.boolean()
     }))
 });

@@ -135,7 +135,8 @@ export default function LobbyPage() {
         body: JSON.stringify({
           host: {
             userId: user.id,
-            nickname: user.nickname
+            nickname: user.nickname,
+            avatar: user.avatar
           }
         })
       });
@@ -261,10 +262,31 @@ export default function LobbyPage() {
         <div style={{ display: 'grid', gap: '0.35rem', minWidth: 0 }}>
           {authStatus === 'loading' && <span>正在登录…</span>}
           {authStatus === 'ready' && user && (
-            <>
-              <span style={{ fontWeight: 600 }}>已登录：{user.nickname}</span>
-              <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>用户编号：{user.id}</span>
-            </>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  border: '2px solid rgba(148, 163, 184, 0.4)',
+                  boxShadow: '0 8px 20px rgba(15, 23, 42, 0.55)'
+                }}
+              >
+                <img
+                  src={`/avatars/${user.avatar}`}
+                  alt={`${user.nickname} 头像`}
+                  width={44}
+                  height={44}
+                  loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+              <div style={{ display: 'grid', gap: '0.15rem' }}>
+                <span style={{ fontWeight: 600 }}>已登录：{user.nickname}</span>
+                <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>用户编号：{user.id}</span>
+              </div>
+            </div>
           )}
           {authStatus === 'error' && error && (
             <span style={{ color: '#fca5a5' }}>{error}</span>

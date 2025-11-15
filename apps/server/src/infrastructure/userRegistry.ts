@@ -1,6 +1,9 @@
+import { pickRandomAvatar } from '../../../../packages/shared/src/avatars';
+
 export interface UserRecord {
   id: number;
   nickname: string;
+  avatar: string;
   createdAt: Date;
 }
 
@@ -41,6 +44,7 @@ export function createUserRegistry() {
     const record: UserRecord = {
       id: nextId++,
       nickname: trimmed,
+      avatar: pickRandomAvatar(),
       createdAt: new Date()
     };
 

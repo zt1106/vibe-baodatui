@@ -186,6 +186,7 @@ export default function PreparePage({ params }: PreparePageProps) {
         players: payload.seats.map(player => ({
           userId: player.userId,
           nickname: player.nickname,
+          avatar: player.avatar,
           prepared: player.prepared
         })),
         config: payload.config
@@ -360,9 +361,29 @@ export default function PreparePage({ params }: PreparePageProps) {
             </span>
           )}
           {prepareState?.host && (
-            <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>
-              房主：{prepareState.host.nickname}（ID {prepareState.host.userId}）
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  border: '1px solid rgba(148, 163, 184, 0.45)'
+                }}
+              >
+                <img
+                  src={`/avatars/${prepareState.host.avatar}`}
+                  alt={`${prepareState.host.nickname} 头像`}
+                  width={32}
+                  height={32}
+                  loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+              <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>
+                房主：{prepareState.host.nickname}（ID {prepareState.host.userId}）
+              </span>
+            </div>
           )}
           {authStatus === 'loading' && <span style={{ opacity: 0.7 }}>正在验证用户身份…</span>}
           {authStatus === 'error' && authError && (
@@ -488,8 +509,35 @@ export default function PreparePage({ params }: PreparePageProps) {
                   <span style={{ fontSize: '0.85rem', opacity: 0.75 }}>座位 {seatNumber}</span>
                   {player ? (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                        <strong style={{ fontSize: '1.05rem' }}>{player.nickname}</strong>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <div
+                            style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: 12,
+                              overflow: 'hidden',
+                              border: '1px solid rgba(148, 163, 184, 0.45)'
+                            }}
+                          >
+                            <img
+                              src={`/avatars/${player.avatar}`}
+                              alt={`${player.nickname} 头像`}
+                              width={34}
+                              height={34}
+                              loading="lazy"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          </div>
+                          <strong style={{ fontSize: '1.05rem' }}>{player.nickname}</strong>
+                        </div>
                         {prepareState?.host.userId === player.userId && (
                           <span
                             style={{

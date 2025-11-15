@@ -20,6 +20,7 @@ import {
 } from '@shared/messages';
 import { createTable, joinTable, deal } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
+import { DEFAULT_AVATAR } from '../../../packages/shared/src/avatars';
 import { createHeartbeatPublisher } from './infrastructure/heartbeat';
 import { createLobbyRegistry, deriveLobbyRoomStatus } from './infrastructure/lobbyRegistry';
 import {
@@ -66,6 +67,12 @@ const heartbeat = createHeartbeatPublisher(io);
 const stopHeartbeat = heartbeat.start();
 const users = createUserRegistry();
 const lobby = createLobbyRegistry();
+const USER_AVATAR_FALLBACK = DEFAULT_AVATAR ?? '1F332.png';
+
+function resolveUserAvatar(userId: number) {
+  const record = users.findById(userId);
+  return record?.avatar ?? USER_AVATAR_FALLBACK;
+}
 
 type ManagedTable = {
   id: string;
@@ -161,13 +168,18 @@ function buildPreparePayload(table: ManagedTable) {
   return TablePrepareResponse.parse({
     tableId: table.id,
     status,
-    host: table.host,
+    host: {
+      userId: table.host.userId,
+      nickname: table.host.nickname,
+      avatar: resolveUserAvatar(table.host.userId)
+    },
     players: table.state.seats
       .map(playerId => table.state.players[playerId])
       .filter((player): player is NonNullable<typeof player> => Boolean(player))
       .map(player => ({
         userId: player.userId,
         nickname: player.nickname,
+        avatar: resolveUserAvatar(player.userId),
         prepared: table.prepared.get(player.userId) ?? false
       })),
     config: {
@@ -465,7 +477,11 @@ function emitState(tableId: string) {
   const snapshot: ServerState = {
     tableId: table.id,
     status,
-    host: table.host,
+    host: {
+      userId: table.host.userId,
+      nickname: table.host.nickname,
+      avatar: resolveUserAvatar(table.host.userId)
+    },
     config: table.config,
     seats: table.state.seats
       .map(id => table.state.players[id])
@@ -474,6 +490,7 @@ function emitState(tableId: string) {
         id: player.id,
         userId: player.userId,
         nickname: player.nickname,
+        avatar: resolveUserAvatar(player.userId),
         prepared: table.prepared.get(player.userId) ?? false
       }))
   };
