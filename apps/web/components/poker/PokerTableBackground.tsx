@@ -27,9 +27,9 @@ export function PokerTableBackground({
   };
 
   return (
-    <div className={styles.centering}>
-      <div className={rootClass} style={rootStyle}>
-        <div className={styles.tableSurface}>
+    <div className={styles.centering} data-testid="poker-table-centering">
+      <div className={rootClass} style={rootStyle} data-testid="poker-table-root">
+        <div className={styles.tableSurface} data-testid="poker-table-surface">
           {children && <div className={styles.children}>{children}</div>}
         </div>
       </div>

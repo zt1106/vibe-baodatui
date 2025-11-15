@@ -5,20 +5,25 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { PokerTableBackground } from './PokerTableBackground';
 
 const backdropStyle = {
-  minHeight: '100vh',
+  position: 'fixed' as const,
+  inset: 0,
+  margin: 0,
+  padding: 0,
   background: 'radial-gradient(circle at top, rgba(16, 185, 129, 0.12), transparent 45%), #020617',
-  padding: '3rem',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center'
 };
 
 const backgroundDecorator: Meta<typeof PokerTableBackground>['decorators'] = [
-  Story => (
-    <div style={backdropStyle}>
-      <Story />
-    </div>
-  )
+  (Story, context) => {
+    const alignItems = context.parameters?.backdropAlign ?? 'center';
+    return (
+      <div style={{ ...backdropStyle, alignItems }}>
+        <Story />
+      </div>
+    );
+  }
 ];
 
 const meta: Meta<typeof PokerTableBackground> = {
@@ -40,10 +45,11 @@ export const Classic: Story = {};
 
 export const ScreenFit: Story = {
   args: {
-    width: '80vw',
-    height: '80vh'
+    width: '100vw',
+    height: '100vh'
   },
   parameters: {
-    layout: 'fullscreen'
+    layout: 'fullscreen',
+    backdropAlign: 'flex-start'
   }
 };
