@@ -15,7 +15,7 @@ const defaultSelectedIds = [
 ].filter(Boolean).map(id => String(id)) as string[];
 
 const meta: Meta<typeof MultiCardRow> = {
-  title: 'Components/MultiCardRow',
+  title: 'Cards/MultiCardRow',
   component: MultiCardRow,
   args: {
     rows: baseRows,

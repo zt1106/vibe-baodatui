@@ -27,7 +27,7 @@ const backgroundDecorator: Meta<typeof PokerTableBackground>['decorators'] = [
 ];
 
 const meta: Meta<typeof PokerTableBackground> = {
-  title: 'Poker/TableBackground',
+  title: 'Others/TableBackground',
   component: PokerTableBackground,
   decorators: backgroundDecorator,
   args: {

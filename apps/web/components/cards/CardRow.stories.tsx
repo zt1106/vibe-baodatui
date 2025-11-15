@@ -16,7 +16,7 @@ const duplicateRankSuitCards = [0, 1, 2, 3].map(packIndex => ({
 }));
 
 const meta: Meta<typeof CardRow> = {
-  title: 'Components/CardRow',
+  title: 'Cards/CardRow',
   component: CardRow,
   args: {
     cards: sampleCards,
