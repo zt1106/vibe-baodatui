@@ -69,6 +69,13 @@ export const UpdateAvatarRequest = z.object({
 
 export const UpdateAvatarResponse = RegisterUserResponse;
 
+export const UpdateNicknameRequest = z.object({
+    userId: z.number().int().positive(),
+    nickname: nicknameSchema
+});
+
+export const UpdateNicknameResponse = RegisterUserResponse;
+
 export const LoginUserRequest = RegisterUserRequest;
 
 export const LoginUserResponse = RegisterUserResponse;

@@ -17,7 +17,8 @@ import {
   TableKickRequest,
   TableConfigUpdateRequest,
   TablePreparedRequest,
-  UpdateAvatarRequest
+  UpdateAvatarRequest,
+  UpdateNicknameRequest
 } from '@shared/messages';
 import { createTable, joinTable, deal } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
@@ -268,6 +269,30 @@ app.patch('/auth/avatar', (req, res) => {
     return;
   }
   res.json(RegisterUserResponse.parse({ user }));
+});
+
+
+app.patch('/auth/nickname', (req, res) => {
+  const parsed = UpdateNicknameRequest.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request payload' });
+    return;
+  }
+  try {
+    const user = users.updateNickname(parsed.data.userId, parsed.data.nickname);
+    if (!user) {
+      res.status(404).json({ error: 'Unknown user' });
+      return;
+    }
+    res.json(RegisterUserResponse.parse({ user }));
+  } catch (error) {
+    if (error instanceof DuplicateNicknameError) {
+      res.status(409).json({ error: 'Nickname already registered' });
+      return;
+    }
+    console.error('[server] failed to update nickname', error);
+    res.status(500).json({ error: 'Failed to update nickname' });
+  }
 });
 
 

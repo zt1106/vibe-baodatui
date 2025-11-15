@@ -84,6 +84,15 @@ export type UpdateAvatarRequest = z.infer<typeof UpdateAvatarRequest>;
 export const UpdateAvatarResponse = RegisterUserResponse;
 export type UpdateAvatarResponse = z.infer<typeof UpdateAvatarResponse>;
 
+export const UpdateNicknameRequest = z.object({
+  userId: z.number().int().positive(),
+  nickname: nicknameSchema
+});
+export type UpdateNicknameRequest = z.infer<typeof UpdateNicknameRequest>;
+
+export const UpdateNicknameResponse = RegisterUserResponse;
+export type UpdateNicknameResponse = z.infer<typeof UpdateNicknameResponse>;
+
 export const LoginUserRequest = RegisterUserRequest;
 export type LoginUserRequest = z.infer<typeof LoginUserRequest>;
 

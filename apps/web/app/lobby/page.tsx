@@ -7,7 +7,8 @@ import { AVATAR_FILENAMES } from '@shared/avatars';
 import {
   LobbyRoomsResponse,
   RegisterUserResponse as RegisterUserResponseSchema,
-  TablePrepareResponse as TablePrepareResponseSchema
+  TablePrepareResponse as TablePrepareResponseSchema,
+  UpdateNicknameResponse as UpdateNicknameResponseSchema
 } from '@shared/messages';
 import type { LobbyNotification, LobbyRoom, TablePrepareResponse } from '@shared/messages';
 
@@ -32,6 +33,10 @@ export default function LobbyPage() {
   const [avatarSelection, setAvatarSelection] = useState<string | null>(null);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [avatarUpdateError, setAvatarUpdateError] = useState<string | null>(null);
+  const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameDialogError, setNameDialogError] = useState<string | null>(null);
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
   const apiBaseUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
     return base.replace(/\/$/, '');
@@ -212,6 +217,62 @@ export default function LobbyPage() {
     }
   }, [apiBaseUrl, avatarSelection, user, persistStoredUser]);
 
+  const handleOpenNameDialog = useCallback(() => {
+    if (!user) return;
+    setNameDraft(user.nickname);
+    setNameDialogError(null);
+    setIsNameDialogOpen(true);
+  }, [user]);
+
+  const handleCloseNameDialog = useCallback(() => {
+    setNameDraft('');
+    setNameDialogError(null);
+    setIsNameDialogOpen(false);
+  }, []);
+
+  const handleConfirmName = useCallback(async () => {
+    if (!user) return;
+    const trimmed = nameDraft.trim();
+    if (!trimmed) {
+      setNameDialogError('昵称不能为空。');
+      return;
+    }
+    if (trimmed === user.nickname) {
+      setNameDialogError('请输入不同的昵称。');
+      return;
+    }
+    setNameDialogError(null);
+    setIsUpdatingName(true);
+    try {
+      const response = await fetch(`${apiBaseUrl}/auth/nickname`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, nickname: trimmed })
+      });
+      if (!response.ok) {
+        if (response.status === 409) {
+          setNameDialogError('该昵称已被占用。');
+          return;
+        }
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      const payload = await response.json();
+      const parsed = UpdateNicknameResponseSchema.safeParse(payload);
+      if (!parsed.success) {
+        throw new Error('Invalid nickname response');
+      }
+      persistStoredUser(parsed.data.user);
+      setUser(parsed.data.user);
+      setIsNameDialogOpen(false);
+    } catch (err) {
+      console.error('[web] failed to update nickname', err);
+      setNameDialogError('更换昵称失败，请稍后再试。');
+    } finally {
+      setIsUpdatingName(false);
+    }
+  }, [apiBaseUrl, nameDraft, persistStoredUser, user]);
+
   const handleEnterGame = useCallback((roomId: string) => {
     router.push(`/game/${encodeURIComponent(roomId)}/prepare`);
   }, [router]);
@@ -235,6 +296,9 @@ export default function LobbyPage() {
     return '#f87171';
   })();
   const showEmptyState = roomsStatus === 'ready' && rooms.length === 0;
+  const trimmedName = nameDraft.trim();
+  const isNameSubmitDisabled =
+    isUpdatingName || !trimmedName || Boolean(user && trimmedName === user.nickname);
 
   return (
     <main
@@ -345,7 +409,31 @@ export default function LobbyPage() {
                 />
               </button>
               <div style={{ display: 'grid', gap: '0.15rem' }}>
-                <span style={{ fontWeight: 600 }}>已登录：{user.nickname}</span>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span style={{ fontWeight: 600 }}>已登录：{user.nickname}</span>
+                  <button
+                    type="button"
+                    onClick={handleOpenNameDialog}
+                    aria-label="更改昵称"
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      border: '1px solid rgba(148, 163, 184, 0.5)',
+                      background: 'rgba(15, 23, 42, 0.6)',
+                      color: '#e2e8f0',
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span aria-hidden="true" style={{ lineHeight: 1 }}>
+                      ✏️
+                    </span>
+                  </button>
+                </div>
                 <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>用户编号：{user.id}</span>
               </div>
             </div>
@@ -705,6 +793,117 @@ export default function LobbyPage() {
                 }}
               >
                 {isUpdatingAvatar ? '更新中…' : '确定'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isNameDialogOpen && (
+        <div
+          role="presentation"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(2, 6, 23, 0.82)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 500
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="更改昵称"
+            style={{
+              width: 'min(420px, 90vw)',
+              background: '#0b1221',
+              borderRadius: 24,
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              boxShadow: '0 32px 80px rgba(2, 6, 23, 0.9)'
+            }}
+          >
+            <header
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <h3 style={{ margin: 0 }}>更改昵称</h3>
+              <button
+                type="button"
+                onClick={handleCloseNameDialog}
+                aria-label="关闭昵称对话框"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  border: '1px solid rgba(148, 163, 184, 0.4)',
+                  background: 'transparent',
+                  color: '#e2e8f0',
+                  cursor: 'pointer'
+                }}
+              >
+                ×
+              </button>
+            </header>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <span style={{ fontWeight: 600 }}>昵称</span>
+              <input
+                value={nameDraft}
+                onChange={event => setNameDraft(event.target.value)}
+                maxLength={32}
+                autoFocus
+                style={{
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: 12,
+                  border: '1px solid rgba(148, 163, 184, 0.5)',
+                  background: 'rgba(15, 23, 42, 0.6)',
+                  color: '#e2e8f0',
+                  fontSize: '1rem'
+                }}
+              />
+            </label>
+            {nameDialogError && (
+              <span style={{ color: '#fca5a5', fontSize: '0.9rem' }}>{nameDialogError}</span>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={handleCloseNameDialog}
+                disabled={isUpdatingName}
+                style={{
+                  padding: '0.6rem 1.1rem',
+                  borderRadius: 999,
+                  border: '1px solid rgba(148, 163, 184, 0.5)',
+                  background: 'transparent',
+                  color: '#e2e8f0',
+                  cursor: isUpdatingName ? 'not-allowed' : 'pointer'
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmName}
+                disabled={isNameSubmitDisabled}
+                style={{
+                  padding: '0.6rem 1.3rem',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: isNameSubmitDisabled
+                    ? 'rgba(148, 163, 184, 0.35)'
+                    : 'linear-gradient(135deg, #38bdf8, #6366f1)',
+                  color: isNameSubmitDisabled ? '#94a3b8' : '#0f172a',
+                  fontWeight: 600,
+                  cursor: isNameSubmitDisabled ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isUpdatingName ? '保存中…' : '保存'}
               </button>
             </div>
           </div>

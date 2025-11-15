@@ -81,6 +81,24 @@ export function createUserRegistry() {
     return clone(record);
   }
 
+  function updateNickname(userId: number, nickname: string): UserRecord | undefined {
+    const record = usersById.get(userId);
+    if (!record) {
+      return undefined;
+    }
+    const trimmed = nickname.trim();
+    const normalized = normalizeNickname(trimmed);
+    const existing = usersByNickname.get(normalized);
+    if (existing && existing.id !== userId) {
+      throw new DuplicateNicknameError(trimmed);
+    }
+    const previousKey = normalizeNickname(record.nickname);
+    usersByNickname.delete(previousKey);
+    record.nickname = trimmed;
+    usersByNickname.set(normalized, record);
+    return clone(record);
+  }
+
   function all(): UserRecord[] {
     return Array.from(usersById.values()).map(clone);
   }
@@ -91,6 +109,7 @@ export function createUserRegistry() {
     findById,
     findByNickname,
     updateAvatar,
+    updateNickname,
     all
   };
 }
