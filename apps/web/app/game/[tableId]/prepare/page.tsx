@@ -26,6 +26,8 @@ const DEFAULT_TABLE_CONFIG = {
   capacity: 6
 };
 
+const PREPARE_PAGE_REFRESH_EVENT = 'prepare-page-refresh';
+
 function deriveTableStatus(players: number, capacity: number): TablePrepareResponse['status'] {
   if (players >= capacity) {
     return 'full';
@@ -228,13 +230,20 @@ export default function PreparePage({ params }: PreparePageProps) {
     };
   }, [apiBaseUrl, authStatus, tableId, router, user?.id, user?.nickname]);
 
-  const handleManualRefresh = useCallback(() => {
-    setReloadToken(token => token + 1);
-  }, []);
-
   const handleLeaveRoom = useCallback(() => {
     router.push('/lobby');
   }, [router]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleExternalRefresh = () => {
+      setReloadToken(token => token + 1);
+    };
+    window.addEventListener(PREPARE_PAGE_REFRESH_EVENT, handleExternalRefresh);
+    return () => {
+      window.removeEventListener(PREPARE_PAGE_REFRESH_EVENT, handleExternalRefresh);
+    };
+  }, []);
 
   const sendTableEvent = useCallback((event: string, payload: Record<string, unknown>) => {
     const socket = socketRef.current;
@@ -391,22 +400,6 @@ export default function PreparePage({ params }: PreparePageProps) {
           )}
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={handleManualRefresh}
-            disabled={prepareStatus === 'loading'}
-            style={{
-              padding: '0.75rem 1.25rem',
-              borderRadius: 999,
-              border: '1px solid rgba(96, 165, 250, 0.5)',
-              background: 'rgba(59, 130, 246, 0.2)',
-              color: '#bfdbfe',
-              fontWeight: 600,
-              cursor: prepareStatus === 'loading' ? 'wait' : 'pointer'
-            }}
-          >
-            刷新
-          </button>
           <button
             type="button"
             onClick={handleLeaveRoom}

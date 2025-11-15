@@ -13,7 +13,7 @@ import {
 import type { LobbyNotification, LobbyRoom, TablePrepareResponse } from '@shared/messages';
 
 import { useHeartbeat } from '../../lib/heartbeat';
-import { ensureUser, loadStoredUser, persistStoredUser, clearStoredUser, type StoredUser } from '../../lib/auth';
+import { ensureUser, loadStoredUser, persistStoredUser, type StoredUser } from '../../lib/auth';
 import { generateRandomChineseName } from '../../lib/nickname';
 
 const NICKNAME_STORAGE_KEY = 'nickname';
@@ -120,16 +120,6 @@ export default function LobbyPage() {
   const handleBackHome = useCallback(() => {
     router.push('/');
   }, [router]);
-
-  const handleLogout = useCallback(() => {
-    clearStoredUser();
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(NICKNAME_STORAGE_KEY);
-    }
-    setUser(null);
-    setAuthStatus('error');
-    setError('已登出，请返回首页重新登录。');
-  }, []);
 
   const handleCreateRoom = useCallback(async () => {
     if (isCreatingRoom) {
@@ -362,20 +352,6 @@ export default function LobbyPage() {
           >
             {isCreatingRoom ? '创建中…' : '创建房间'}
           </button>
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: '0.75rem 1.25rem',
-              borderRadius: 999,
-              border: '1px solid rgba(248, 113, 113, 0.45)',
-              background: 'rgba(248, 113, 113, 0.08)',
-              color: '#fda4af',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            登出
-          </button>
         </div>
         <div style={{ display: 'grid', gap: '0.35rem', minWidth: 0 }}>
           {authStatus === 'loading' && <span>正在登录…</span>}
@@ -560,7 +536,8 @@ export default function LobbyPage() {
                             ? '#4ade80'
                             : room.status === 'in-progress'
                             ? '#facc15'
-                            : '#fca5a5'
+                            : '#fca5a5',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       {renderRoomStatus(room.status)}

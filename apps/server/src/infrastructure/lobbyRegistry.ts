@@ -14,11 +14,11 @@ type LobbyRoomRecord = LobbyRoom;
 type LobbyNotificationRecord = LobbyNotification;
 
 export function deriveLobbyRoomStatus(players: number, capacity: number): LobbyRoomStatus {
+  if (players === 0) {
+    return 'waiting';
+  }
   if (players >= capacity) {
     return 'full';
-  }
-  if (players > 0) {
-    return 'in-progress';
   }
   return 'waiting';
 }
