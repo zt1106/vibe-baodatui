@@ -207,14 +207,36 @@ function cleanupPlayerSocket(socketId: string) {
   if (seatIndex === -1) {
     return;
   }
+  const departingUserId = managed.state.players[socketId]?.userId ?? userId;
   managed.state.seats.splice(seatIndex, 1);
   delete managed.state.players[socketId];
   if (typeof userId === 'number') {
     managed.prepared.delete(userId);
   }
+  if (managed.state.seats.length === 0) {
+    tables.delete(tableId);
+    lobby.removeRoom(tableId);
+    return;
+  }
+  promoteNewHostIfNeeded(managed, departingUserId);
   resetTablePhaseIfNeeded(managed);
   updateLobbyFromState(tableId);
   emitState(tableId);
+}
+
+function promoteNewHostIfNeeded(table: ManagedTable, departingUserId?: number) {
+  if (table.state.seats.length === 0) {
+    return;
+  }
+  if (departingUserId == null || table.host.userId !== departingUserId) {
+    return;
+  }
+  const nextSeatId = table.state.seats[0];
+  const nextPlayer = table.state.players[nextSeatId];
+  if (!nextPlayer) {
+    return;
+  }
+  table.host = { userId: nextPlayer.userId, nickname: nextPlayer.nickname };
 }
 
 function createManagedTable(host: { id: number; nickname: string }, id = generateTableId()): ManagedTable {
