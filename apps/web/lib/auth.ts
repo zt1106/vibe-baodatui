@@ -61,29 +61,44 @@ async function parseUserResponse(response: Response): Promise<StoredUser> {
 export async function ensureUser(apiBaseUrl: string, nickname: string): Promise<StoredUser> {
   const sanitized = nickname.trim() || generateRandomChineseName();
   const headers = { 'Content-Type': 'application/json' };
+  const body = JSON.stringify({ nickname: sanitized });
+
   try {
-    const registerResponse = await fetch(`${apiBaseUrl}/auth/register`, {
-      method: 'POST',
-      headers,
-      credentials: 'include',
-      body: JSON.stringify({ nickname: sanitized })
-    });
-    if (registerResponse.ok) {
-      return parseUserResponse(registerResponse);
-    }
-    if (registerResponse.status !== 409) {
-      throw new Error(`Failed to register nickname (status ${registerResponse.status})`);
-    }
     const loginResponse = await fetch(`${apiBaseUrl}/auth/login`, {
       method: 'POST',
       headers,
       credentials: 'include',
-      body: JSON.stringify({ nickname: sanitized })
+      body
     });
-    if (!loginResponse.ok) {
+    if (loginResponse.ok) {
+      return parseUserResponse(loginResponse);
+    }
+    if (loginResponse.status !== 404) {
       throw new Error(`Failed to login nickname (status ${loginResponse.status})`);
     }
-    return parseUserResponse(loginResponse);
+
+    const registerResponse = await fetch(`${apiBaseUrl}/auth/register`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body
+    });
+    if (registerResponse.ok) {
+      return parseUserResponse(registerResponse);
+    }
+    if (registerResponse.status === 409) {
+      const fallbackLoginResponse = await fetch(`${apiBaseUrl}/auth/login`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body
+      });
+      if (!fallbackLoginResponse.ok) {
+        throw new Error(`Failed to login nickname (status ${fallbackLoginResponse.status})`);
+      }
+      return parseUserResponse(fallbackLoginResponse);
+    }
+    throw new Error(`Failed to register nickname (status ${registerResponse.status})`);
   } catch (error) {
     throw error instanceof Error ? error : new Error('Unknown authentication error');
   }
