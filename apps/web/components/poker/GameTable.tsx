@@ -30,6 +30,7 @@ export type GameTableProps = {
 type Dimensions = { width: number; height: number };
 
 const TABLE_TILT_DEG = 24;
+const MAX_TABLE_PLAYERS = 8;
 
 export function GameTable({
   players,
@@ -96,15 +97,17 @@ export function GameTable({
   const dealerRadiusX = (avatarRadiusX + cardRadiusX) / 2;
   const dealerRadiusY = (avatarRadiusY + cardRadiusY) / 2;
 
+  const visiblePlayers = useMemo(() => players.slice(0, MAX_TABLE_PLAYERS), [players]);
+
   const seatPositions = useMemo(() => {
-    if (players.length === 0) {
+    if (visiblePlayers.length === 0) {
       return [];
     }
     const centerX = effectiveWidth / 2;
     const centerY = effectiveHeight / 2;
-    const step = (Math.PI * 2) / players.length;
+    const step = (Math.PI * 2) / visiblePlayers.length;
     const startAngle = -Math.PI / 2; // place first player at the top edge
-    return players.map((player, index) => {
+    return visiblePlayers.map((player, index) => {
       const angle = startAngle + index * step;
       const cosAngle = Math.cos(angle);
       const sinAngle = Math.sin(angle);
@@ -134,7 +137,7 @@ export function GameTable({
     dealerRadiusY,
     effectiveHeight,
     effectiveWidth,
-    players
+    visiblePlayers
   ]);
 
   const tableStyle = useMemo(

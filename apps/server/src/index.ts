@@ -90,7 +90,7 @@ type ManagedTable = {
   prepared: Map<number, boolean>;
 };
 
-const TABLE_CAPACITY = 6;
+const TABLE_CAPACITY = 8;
 const tables = new Map<string, ManagedTable>();
 const socketTable = new Map<string, string>();
 const socketUsers = new Map<string, number>();

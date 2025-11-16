@@ -23,7 +23,7 @@ type PreparePageProps = {
 type AsyncState = 'idle' | 'loading' | 'ready' | 'error';
 
 const DEFAULT_TABLE_CONFIG = {
-  capacity: 6
+  capacity: 8
 };
 
 const PREPARE_PAGE_REFRESH_EVENT = 'prepare-page-refresh';

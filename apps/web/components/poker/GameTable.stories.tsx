@@ -6,7 +6,7 @@ import { makeCard } from '@poker/core-cards';
 
 import { GameTable, type GameTableSeat } from './GameTable';
 
-const sixPlayerTable: GameTableSeat[] = [
+const playerStubs: GameTableSeat[] = [
   {
     id: 'seat-1',
     nickname: '楚河',
@@ -72,10 +72,30 @@ const sixPlayerTable: GameTableSeat[] = [
       makeCard('K', 'D', { faceUp: false }),
       makeCard('2', 'D', { faceUp: false })
     ]
+  },
+  {
+    id: 'seat-7',
+    nickname: '青衣',
+    avatar: '1F430.png',
+    status: '观望',
+    stack: 2980,
+    cards: [
+      makeCard('4', 'H', { faceUp: false }),
+      makeCard('8', 'D', { faceUp: false })
+    ]
+  },
+  {
+    id: 'seat-8',
+    nickname: '夜行',
+    avatar: '1F436.png',
+    status: '包牌',
+    stack: 5140,
+    cards: [
+      makeCard('6', 'S', { faceUp: true }),
+      makeCard('6', 'D', { faceUp: true })
+    ]
   }
 ];
-
-const fourPlayerTable: GameTableSeat[] = sixPlayerTable.slice(0, 4);
 
 const flopToRiver = [
   makeCard('10', 'S', { faceUp: true }),
@@ -85,16 +105,24 @@ const flopToRiver = [
   makeCard('3', 'H', { faceUp: true })
 ];
 
-const meta: Meta<typeof GameTable> = {
+type TableStoryArgs = {
+  playerCount: number;
+};
+
+const meta: Meta<typeof GameTable, TableStoryArgs> = {
   title: 'Table/GameTable',
   component: GameTable,
   tags: ['autodocs'],
   args: {
+    playerCount: 8,
     sceneWidth: '80%',
     sceneHeight: '520px',
     sceneAlign: 'center'
   },
   argTypes: {
+    playerCount: {
+      control: { type: 'number', min: 3, max: 8, step: 1 }
+    },
     sceneWidth: { control: 'text' },
     sceneHeight: { control: 'text' },
     sceneAlign: {
@@ -110,16 +138,12 @@ type Story = StoryObj<typeof meta>;
 
 export const FullTable: Story = {
   args: {
-    players: sixPlayerTable,
     communityCards: flopToRiver,
     dealerSeatId: 'seat-3',
-  }
-};
-
-export const FourPlayers: Story = {
-  args: {
-    players: fourPlayerTable,
-    communityCards: flopToRiver.slice(0, 3),
-    dealerSeatId: 'seat-2',
-  }
+    sceneWidth: '80vw',
+    sceneHeight: '80vh'
+  },
+  render: ({ playerCount, ...storyArgs }) => (
+    <GameTable players={playerStubs.slice(0, playerCount)} {...storyArgs} />
+  )
 };

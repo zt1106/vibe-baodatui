@@ -5,7 +5,7 @@ import * as tsMessages from '../messages';
 import * as jsMessages from '../messages.js';
 
 const samplePayload = {
-  rooms: [{ id: 'demo', status: 'waiting', players: 1, capacity: 6 }],
+  rooms: [{ id: 'demo', status: 'waiting', players: 1, capacity: 8 }],
   notifications: [{ id: 'notice', message: 'ok', tone: 'info' }]
 };
 
