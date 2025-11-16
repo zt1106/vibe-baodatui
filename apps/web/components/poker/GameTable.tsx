@@ -159,7 +159,7 @@ export function GameTable({
   );
 
   return (
-    <section className={styles.tableStage}>
+    <section className={styles.tableStage} data-testid="game-table-stage">
       <div className={styles.tableScene} style={sceneStyle}>
         <div ref={tableRef} className={styles.tableRing} style={tableStyle}>
           <div className={styles.tableSurface} aria-hidden="true">
