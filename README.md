@@ -1,70 +1,57 @@
-
 # Poker Monorepo (TypeScript + Next.js + Express + Socket.IO)
 
 Boring, agent-friendly stack for fast prototyping with unit + e2e tests.
 
-## Project Structure
+## Workspace layout
 
 ```
 .
+├─ AGENTS.md               # Repository conventions + Playwright workflow
+├─ table-ui-plan.md        # UI layout insights and ongoing experiments
 ├─ apps/
-│  ├─ web/                  # Next.js client
-│  │  ├─ app/               # Route groups, layouts, pages
-│  │  │  ├─ lobby/          # Lobby route
-│  │  │  ├─ game/           # Game route
-│  │  │  ├─ components/     # App-scoped components
-│  │  │  └─ lib/            # App-scoped utilities
-│  │  ├─ components/        # Shared UI components (e.g., cards)
-│  │  ├─ tests/e2e/         # Playwright specs
-│  │  ├─ public/            # Static assets
-│  │  ├─ .storybook/        # Storybook config (component dev)
+│  ├─ web/
+│  │  ├─ app/
+│  │  ├─ components/
+│  │  ├─ lib/
+│  │  ├─ public/
+│  │  ├─ tests/
+│  │  │  └─ e2e/           # Playwright specs
+│  │  ├─ test-results/     # Playwright artifacts
 │  │  ├─ next.config.mjs
-│  │  └─ playwright.config.ts
-│  └─ server/               # Express + Socket.IO API
+│  │  ├─ vitest.config.ts
+│  │  ├─ playwright.config.ts
+│  │  ├─ tsconfig.json
+│  │  └─ package.json
+│  └─ server/
 │     ├─ src/
-│     │  ├─ infrastructure/ # Transport/adapters
-│     │  ├─ __tests__/      # Vitest unit tests
-│     │  └─ index.ts        # App entrypoint (HTTP + sockets)
+│     │  ├─ infrastructure/
+│     │  ├─ __tests__/
+│     │  └─ index.ts
 │     ├─ prisma/
-│     │  └─ schema.prisma   # Database schema
-│     ├─ .env.example       # Required envs; copy to .env
-│     └─ backend-architecture.md
+│     │  └─ schema.prisma
+│     ├─ .env.example
+│     ├─ AGENTS.md         # Server-specific instructions
+│     ├─ backend-architecture.md
+│     ├─ dist/             # Compiled output
+│     ├─ package.json
+│     └─ tsconfig.json
 ├─ packages/
-│  ├─ game-core/            # Pure game rules/state (no I/O)
-│  │  └─ src/
-│  │     ├─ engine.ts
-│  │     ├─ cards.ts
-│  │     ├─ shuffle.ts
-│  │     └─ __tests__/
-│  ├─ shared/               # Zod contracts + env loader
-│  │  └─ src/
-│  │     ├─ messages.ts
-│  │     ├─ env.ts
-│  │     ├─ index.ts
-│  │     └─ __tests__/
-│  ├─ test-utils/           # Vitest factories and helpers
-│  │  └─ src/
-│  │     └─ index.ts
-│  ├─ core-cards/           # Card ids, layout, sizing primitives
-│  │  └─ src/
-│  │     ├─ ids.ts
-│  │     ├─ layout.ts
-│  │     ├─ sizes.ts
-│  │     └─ types.ts
-│  └─ ui-cards/             # React card components and variants
-│     └─ src/
-│        ├─ components/
-│        └─ index.ts
-├─ docs/                    # Design docs and notes
-├─ pnpm-workspace.yaml      # Workspace packages map
-├─ tsconfig.base.json       # Shared TS project refs
-└─ package.json             # Root scripts
+│  ├─ core-cards/           # Card IDs, layout, and sizing primitives
+│  ├─ game-core/            # Pure game rules + state
+│  ├─ shared/               # Zod contracts & env loader
+│  ├─ test-utils/           # Vitest helpers and factories
+│  └─ ui-cards/             # React card variants and components
+├─ pnpm-workspace.yaml
+├─ tsconfig.base.json
+├─ package.json
+└─ pnpm-lock.yaml
 ```
 
 Notes
-- Run root scripts with `pnpm` (workspace managed by `pnpm-workspace.yaml`).
-- Unit/Vitest suites live in `__tests__` folders; Playwright e2e specs are under `apps/web/tests/e2e`.
-- Shared types/contracts and env parsing come from `packages/shared`.
+- Run workspace scripts with `pnpm` from the repository root (`pnpm dev`, `pnpm test`, `pnpm build`, etc.).
+- Unit and Vitest suites belong in `__tests__` folders (typically under `apps/server/src` or packages); Playwright specs live in `apps/web/tests/e2e`, with artifacts under `apps/web/test-results`.
+- Copy `apps/server/.env.example` to `.env` before launching the backend so Prisma has a valid `DATABASE_URL`.
+- `table-ui-plan.md` captures Storybook/Playwright experiments that inform future UI decisions; update it whenever you catalog a new observation.
 
 ## Contributor Guide
-See [`AGENTS.md`](AGENTS.md) for repository conventions, review checklists, and the Playwright workflow that explains how to inspect Storybook/iframe layouts.
+See [`AGENTS.md`](AGENTS.md) for repository conventions, review checklists, and the Playwright + Storybook workflow that explains how to inspect the iframe-based UI.
