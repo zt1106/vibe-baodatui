@@ -106,7 +106,8 @@ export function GameTable({
     const centerX = effectiveWidth / 2;
     const centerY = effectiveHeight / 2;
     const step = (Math.PI * 2) / visiblePlayers.length;
-    const startAngle = -Math.PI / 2; // place first player at the top edge
+    const rotationOffset = visiblePlayers.length % 2 === 1 ? step / 2 : 0;
+    const startAngle = -Math.PI / 2 + rotationOffset; // place first player at the top edge
     return visiblePlayers.map((player, index) => {
       const angle = startAngle + index * step;
       const cosAngle = Math.cos(angle);
