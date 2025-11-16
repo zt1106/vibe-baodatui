@@ -5,8 +5,9 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { makeCard } from '@poker/core-cards';
 
 import { GameTable, type GameTableSeat } from './GameTable';
+import { PLAYER_AVATAR_STORY_URL } from './playerAvatarDefaults';
 
-const playerStubs: GameTableSeat[] = [
+const basePlayerStubs: GameTableSeat[] = [
   {
     id: 'seat-1',
     nickname: '楚河',
@@ -96,6 +97,11 @@ const playerStubs: GameTableSeat[] = [
     ]
   }
 ];
+
+const playerStubs = basePlayerStubs.map(player => ({
+  ...player,
+  avatarUrl: PLAYER_AVATAR_STORY_URL
+}));
 
 const flopToRiver = [
   makeCard('10', 'S', { faceUp: true }),

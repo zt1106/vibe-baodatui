@@ -6,6 +6,7 @@ import type { Card } from '@poker/core-cards';
 import { CardRow } from '@poker/ui-cards';
 
 import { PlayerAvatar } from './PlayerAvatar';
+import { PLAYER_AVATAR_SIZE } from './playerAvatarDefaults';
 
 import styles from './GameTable.module.css';
 
@@ -13,6 +14,7 @@ export type GameTableSeat = {
   id: string;
   nickname: string;
   avatar: string;
+  avatarUrl?: string;
   status?: string;
   stack?: number;
   cards?: Card[];
@@ -82,7 +84,7 @@ export function GameTable({
   const effectiveHeight = dimensions.height || fallbackSize;
   const minDimension = Math.min(effectiveWidth, effectiveHeight);
   const measurementBasis = minDimension > 0 ? minDimension : fallbackSize;
-  const avatarSize = Math.round(Math.min(Math.max(measurementBasis * 0.12, 64), 104));
+  const avatarSize = PLAYER_AVATAR_SIZE;
   const communityCardWidth = Math.round(Math.min(Math.max(measurementBasis * 0.14, 96), 150));
 
   const ellipsePadding = Math.max(Math.min(minDimension * 0.08, 120), 36);
@@ -218,11 +220,9 @@ export function GameTable({
               >
                 <PlayerAvatar
                   playerName={seat.player.nickname}
-                  avatarUrl={`/avatars/${seat.player.avatar}`}
+                  avatarUrl={seat.player.avatarUrl ?? `/avatars/${seat.player.avatar}`}
                   status={seat.player.status}
                   size={avatarSize}
-                  score={seat.player.stack}
-                  scoreLabel="筹码"
                   className={styles.tableAvatar}
                 />
               </div>

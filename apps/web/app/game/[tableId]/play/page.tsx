@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { makeCard } from '@poker/core-cards';
 
 import { GameTable, type GameTableSeat } from '../../../../components/poker/GameTable';
+import { PLAYER_AVATAR_STORY_URL } from '../../../../components/poker/playerAvatarDefaults';
 
 type PlayPageProps = {
   params: { tableId: string };
@@ -15,6 +16,7 @@ const MOCK_SEATS: GameTableSeat[] = [
     id: 'seat-1',
     nickname: '楚河',
     avatar: '1F42D.png',
+    avatarUrl: PLAYER_AVATAR_STORY_URL,
     status: '思考中',
     stack: 4820,
     cards: [
@@ -26,6 +28,7 @@ const MOCK_SEATS: GameTableSeat[] = [
     id: 'seat-2',
     nickname: '小白',
     avatar: '1F431.png',
+    avatarUrl: PLAYER_AVATAR_STORY_URL,
     status: '跟注',
     stack: 3180,
     cards: [
@@ -37,6 +40,7 @@ const MOCK_SEATS: GameTableSeat[] = [
     id: 'seat-3',
     nickname: '阿瑶',
     avatar: '1F43C.png',
+    avatarUrl: PLAYER_AVATAR_STORY_URL,
     status: '等待行动',
     stack: 5520,
     cards: [
@@ -48,6 +52,7 @@ const MOCK_SEATS: GameTableSeat[] = [
     id: 'seat-4',
     nickname: '北风',
     avatar: '1F981.png',
+    avatarUrl: PLAYER_AVATAR_STORY_URL,
     status: '弃牌',
     stack: 2490,
     cards: [
@@ -59,6 +64,7 @@ const MOCK_SEATS: GameTableSeat[] = [
     id: 'seat-5',
     nickname: '酒馆老板',
     avatar: '1F43B.png',
+    avatarUrl: PLAYER_AVATAR_STORY_URL,
     status: '加注',
     stack: 6100,
     cards: [
@@ -70,6 +76,7 @@ const MOCK_SEATS: GameTableSeat[] = [
     id: 'seat-6',
     nickname: '南城',
     avatar: '1F42E.png',
+    avatarUrl: PLAYER_AVATAR_STORY_URL,
     status: '跟注',
     stack: 3320,
     cards: [

@@ -3,6 +3,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { PlayerAvatar } from './PlayerAvatar';
+import { PLAYER_AVATAR_STORY_URL, PLAYER_AVATAR_SIZE } from './playerAvatarDefaults';
 
 const meta: Meta<typeof PlayerAvatar> = {
   title: 'Table/PlayerAvatar',
@@ -17,8 +18,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     playerName: 'Bao Dat',
-    avatarUrl: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400&q=80',
+    avatarUrl: PLAYER_AVATAR_STORY_URL,
     status: 'Waiting',
-    statusTone: 'warning'
+    statusTone: 'warning',
+    size: PLAYER_AVATAR_SIZE
   }
 };
