@@ -63,8 +63,8 @@ Boring, agent-friendly stack for fast prototyping with unit + e2e tests.
 
 Notes
 - Run root scripts with `pnpm` (workspace managed by `pnpm-workspace.yaml`).
-- Unit tests live in `__tests__` folders; Playwright specs in `apps/web/tests/e2e`.
+- Unit/Vitest suites live in `__tests__` folders; Playwright e2e specs are under `apps/web/tests/e2e`.
 - Shared types/contracts and env parsing come from `packages/shared`.
 
 ## Contributor Guide
-See [`AGENTS.md`](AGENTS.md) for repository conventions, key scripts, and review checklists.
+See [`AGENTS.md`](AGENTS.md) for repository conventions, review checklists, and the Playwright workflow that explains how to inspect Storybook/iframe layouts.
