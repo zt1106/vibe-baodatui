@@ -22,18 +22,3 @@ export const Default: Story = {
     statusTone: 'warning'
   }
 };
-
-export const TeamLead: Story = {
-  args: {
-    playerName: 'Mira Chen',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=80',
-    status: 'On a streak',
-    statusTone: 'success',
-    score: 18450,
-    teamName: 'Emerald Squad',
-    infoRows: [
-      { label: 'Round', value: 'Quarterfinals' },
-      { label: 'Chips', value: '24,900' }
-    ]
-  }
-};
