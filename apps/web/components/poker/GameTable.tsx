@@ -87,15 +87,19 @@ export function GameTable({
   const avatarSize = PLAYER_AVATAR_SIZE;
   const communityCardWidth = Math.round(Math.min(Math.max(measurementBasis * 0.14, 96), 150));
 
-  const ellipsePadding = Math.max(Math.min(minDimension * 0.08, 120), 36);
-  const ellipseRadiusX = Math.max((effectiveWidth - ellipsePadding) / 2, 0);
-  const ellipseRadiusY = Math.max((effectiveHeight - ellipsePadding) / 2, 0);
-  const avatarOffset = Math.max(Math.min(minDimension * 0.05, 72), 36);
-  const cardInset = Math.max(Math.min(minDimension * 0.12, 120), 56);
-  const avatarRadiusX = ellipseRadiusX + avatarOffset;
-  const avatarRadiusY = ellipseRadiusY + avatarOffset;
-  const cardRadiusX = Math.max(ellipseRadiusX - cardInset, 0);
-  const cardRadiusY = Math.max(ellipseRadiusY - cardInset, 0);
+  const ellipsePaddingX = Math.max(Math.min(effectiveWidth * 0.08, 120), 36);
+  const ellipsePaddingY = Math.max(Math.min(effectiveHeight * 0.08, 120), 36);
+  const ellipseBaseX = Math.max((effectiveWidth - ellipsePaddingX) / 2, 0);
+  const ellipseBaseY = Math.max((effectiveHeight - ellipsePaddingY) / 2, 0);
+  const outerEllipseScale = 1.05;
+  const ellipseRadiusX = ellipseBaseX * outerEllipseScale;
+  const ellipseRadiusY = ellipseBaseY * outerEllipseScale;
+  const avatarScale = 1.08;
+  const cardScale = 0.75;
+  const avatarRadiusX = ellipseRadiusX * avatarScale;
+  const avatarRadiusY = ellipseRadiusY * avatarScale;
+  const cardRadiusX = ellipseRadiusX * cardScale;
+  const cardRadiusY = ellipseRadiusY * cardScale;
   const dealerRadiusX = (avatarRadiusX + cardRadiusX) / 2;
   const dealerRadiusY = (avatarRadiusY + cardRadiusY) / 2;
 
@@ -142,6 +146,19 @@ export function GameTable({
     effectiveWidth,
     visiblePlayers
   ]);
+
+  const suppressedSeatId = useMemo(() => {
+    if (seatPositions.length === 0) {
+      return null;
+    }
+    let bottomSeat = seatPositions[0];
+    for (const seat of seatPositions) {
+      if (seat.avatar.y > bottomSeat.avatar.y) {
+        bottomSeat = seat;
+      }
+    }
+    return bottomSeat.player.id;
+  }, [seatPositions]);
 
   const tableStyle = useMemo(
     () => ({ '--table-tilt-deg': `${TABLE_TILT_DEG}deg` } as CSSProperties),
@@ -218,26 +235,15 @@ export function GameTable({
                   top: `${seat.avatar.y}px`
                 }}
               >
-                <PlayerAvatar
-                  playerName={seat.player.nickname}
-                  avatarUrl={seat.player.avatarUrl ?? `/avatars/${seat.player.avatar}`}
-                  status={seat.player.status}
-                  size={avatarSize}
-                  className={styles.tableAvatar}
-                />
+                {seat.player.id !== suppressedSeatId && (
+                  <PlayerAvatar
+                    playerName={seat.player.nickname}
+                    avatarUrl={seat.player.avatarUrl ?? `/avatars/${seat.player.avatar}`}
+                    size={avatarSize}
+                    className={styles.tableAvatar}
+                  />
+                )}
               </div>
-              {dealerSeatId === seat.player.id && (
-                <div
-                  className={styles.dealerButton}
-                  style={{
-                    left: `${seat.dealer.x}px`,
-                    top: `${seat.dealer.y}px`
-                  }}
-                  aria-label="庄家按钮"
-                >
-                  D
-                </div>
-              )}
             </Fragment>
           ))}
         </div>
