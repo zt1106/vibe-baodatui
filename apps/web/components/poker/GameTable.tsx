@@ -23,6 +23,7 @@ export type GameTableProps = {
   communityCards?: Card[];
   dealerSeatId?: string;
   sceneWidth?: string;
+  sceneHeight?: string;
   sceneAlign?: 'flex-start' | 'center' | 'flex-end';
 };
 
@@ -30,18 +31,12 @@ type Dimensions = { width: number; height: number };
 
 const TABLE_TILT_DEG = 24;
 
-function polarToCartesian(cx: number, cy: number, radius: number, angle: number) {
-  return {
-    x: cx + Math.cos(angle) * radius,
-    y: cy + Math.sin(angle) * radius
-  };
-}
-
 export function GameTable({
   players,
   communityCards = [],
   dealerSeatId,
   sceneWidth,
+  sceneHeight,
   sceneAlign
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
@@ -81,51 +76,86 @@ export function GameTable({
     };
   }, []);
 
-  const tableDiameter = Math.min(dimensions.width, dimensions.height);
-  const measurementBasis = tableDiameter > 0 ? tableDiameter : 520;
-  const innerRadius = tableDiameter / 2;
+  const fallbackSize = 520;
+  const effectiveWidth = dimensions.width || fallbackSize;
+  const effectiveHeight = dimensions.height || fallbackSize;
+  const minDimension = Math.min(effectiveWidth, effectiveHeight);
+  const measurementBasis = minDimension > 0 ? minDimension : fallbackSize;
   const avatarSize = Math.round(Math.min(Math.max(measurementBasis * 0.12, 64), 104));
   const communityCardWidth = Math.round(Math.min(Math.max(measurementBasis * 0.14, 96), 150));
 
+  const ellipsePadding = Math.max(Math.min(minDimension * 0.08, 120), 36);
+  const ellipseRadiusX = Math.max((effectiveWidth - ellipsePadding) / 2, 0);
+  const ellipseRadiusY = Math.max((effectiveHeight - ellipsePadding) / 2, 0);
+  const avatarOffset = Math.max(Math.min(minDimension * 0.05, 72), 36);
+  const cardInset = Math.max(Math.min(minDimension * 0.12, 120), 56);
+  const avatarRadiusX = ellipseRadiusX + avatarOffset;
+  const avatarRadiusY = ellipseRadiusY + avatarOffset;
+  const cardRadiusX = Math.max(ellipseRadiusX - cardInset, 0);
+  const cardRadiusY = Math.max(ellipseRadiusY - cardInset, 0);
+  const dealerRadiusX = (avatarRadiusX + cardRadiusX) / 2;
+  const dealerRadiusY = (avatarRadiusY + cardRadiusY) / 2;
+
   const seatPositions = useMemo(() => {
-    if (!innerRadius || players.length === 0) {
+    if (players.length === 0) {
       return [];
     }
-    const centerX = dimensions.width / 2;
-    const centerY = dimensions.height / 2;
+    const centerX = effectiveWidth / 2;
+    const centerY = effectiveHeight / 2;
     const step = (Math.PI * 2) / players.length;
     const startAngle = -Math.PI / 2; // place first player at the top edge
-    const avatarRadius = innerRadius + Math.min(innerRadius * 0.22, 110);
-    const cardRadius = innerRadius - Math.min(innerRadius * 0.25, 90);
-    const dealerRadius = (avatarRadius + cardRadius) / 2;
     return players.map((player, index) => {
       const angle = startAngle + index * step;
+      const cosAngle = Math.cos(angle);
+      const sinAngle = Math.sin(angle);
       return {
         player,
         angle,
-        avatar: polarToCartesian(centerX, centerY, avatarRadius, angle),
-        cards: polarToCartesian(centerX, centerY, cardRadius, angle),
-        dealer: polarToCartesian(centerX, centerY, dealerRadius, angle)
+        avatar: {
+          x: centerX + cosAngle * avatarRadiusX,
+          y: centerY + sinAngle * avatarRadiusY
+        },
+        cards: {
+          x: centerX + cosAngle * cardRadiusX,
+          y: centerY + sinAngle * cardRadiusY
+        },
+        dealer: {
+          x: centerX + cosAngle * dealerRadiusX,
+          y: centerY + sinAngle * dealerRadiusY
+        }
       };
     });
-  }, [dimensions.height, dimensions.width, innerRadius, players]);
+  }, [
+    avatarRadiusX,
+    avatarRadiusY,
+    cardRadiusX,
+    cardRadiusY,
+    dealerRadiusX,
+    dealerRadiusY,
+    effectiveHeight,
+    effectiveWidth,
+    players
+  ]);
 
   const tableStyle = useMemo(
     () => ({ '--table-tilt-deg': `${TABLE_TILT_DEG}deg` } as CSSProperties),
     []
   );
 
+  const resolvedSceneHeight = sceneHeight ?? 'min(80vh, 640px)';
   const sceneStyle = useMemo(
     () => ({
-      width: sceneWidth ?? '100%',
+      width: sceneWidth ?? 'min(92vw, 1040px)',
+      height: resolvedSceneHeight,
       justifyContent:
         sceneAlign === 'flex-start'
           ? 'flex-start'
           : sceneAlign === 'flex-end'
           ? 'flex-end'
-          : 'center'
+          : 'center',
+      alignItems: 'center'
     }),
-    [sceneAlign, sceneWidth]
+    [resolvedSceneHeight, sceneAlign, sceneWidth]
   );
 
   return (

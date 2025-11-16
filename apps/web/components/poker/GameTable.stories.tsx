@@ -91,10 +91,12 @@ const meta: Meta<typeof GameTable> = {
   tags: ['autodocs'],
   args: {
     sceneWidth: '80%',
+    sceneHeight: '520px',
     sceneAlign: 'center'
   },
   argTypes: {
     sceneWidth: { control: 'text' },
+    sceneHeight: { control: 'text' },
     sceneAlign: {
       control: { type: 'radio' },
       options: ['flex-start', 'center', 'flex-end']
