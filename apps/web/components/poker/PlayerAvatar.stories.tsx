@@ -19,8 +19,6 @@ export const Default: Story = {
   args: {
     playerName: 'Bao Dat',
     avatarUrl: PLAYER_AVATAR_STORY_URL,
-    status: 'Waiting',
-    statusTone: 'warning',
     size: PLAYER_AVATAR_SIZE
   }
 };

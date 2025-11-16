@@ -5,7 +5,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { makeCard } from '@poker/core-cards';
 
 import { GameTable, type GameTableSeat } from './GameTable';
-import { PLAYER_AVATAR_STORY_URL } from './playerAvatarDefaults';
+import { LOCAL_PLAYER_AVATAR_URLS } from './playerAvatarDefaults';
 
 const basePlayerStubs: GameTableSeat[] = [
   {
@@ -98,9 +98,12 @@ const basePlayerStubs: GameTableSeat[] = [
   }
 ];
 
+const pickRandomAvatar = () =>
+  LOCAL_PLAYER_AVATAR_URLS[Math.floor(Math.random() * LOCAL_PLAYER_AVATAR_URLS.length)];
+
 const playerStubs = basePlayerStubs.map(player => ({
   ...player,
-  avatarUrl: PLAYER_AVATAR_STORY_URL
+  avatarUrl: pickRandomAvatar()
 }));
 
 const flopToRiver = [
