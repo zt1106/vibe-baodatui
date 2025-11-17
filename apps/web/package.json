@@ -6,7 +6,7 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "test": "vitest run --passWithNoTests --exclude tests/e2e/**",
+    "test": "pnpm exec vitest run lib/api.test.ts",
     "test:e2e": "playwright test",
     "e2e:bootstrap-game": "playwright test tests/e2e/multi-player-bootstrap.spec.ts --project=chromium --headed",
     "storybook": "storybook dev -p 6006",

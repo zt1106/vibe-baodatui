@@ -2,6 +2,8 @@ import { generateRandomChineseName } from './nickname';
 
 export type StoredUser = { id: number; nickname: string; avatar: string };
 
+export const NICKNAME_STORAGE_KEY = 'nickname';
+
 const USER_STORAGE_KEY = 'auth:user';
 
 function readStorage(): Storage | null {

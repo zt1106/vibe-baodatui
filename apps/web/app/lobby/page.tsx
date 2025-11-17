@@ -13,18 +13,20 @@ import {
 import type { LobbyNotification, LobbyRoom, TablePrepareResponse } from '@shared/messages';
 
 import { useHeartbeat } from '../../lib/heartbeat';
-import { ensureUser, loadStoredUser, persistStoredUser, type StoredUser } from '../../lib/auth';
+import { ensureUser, loadStoredUser, persistStoredUser, NICKNAME_STORAGE_KEY, type StoredUser } from '../../lib/auth';
+import { getApiBaseUrl, fetchJson } from '../../lib/api';
+import type { AsyncStatus } from '../../lib/types';
 import { generateRandomChineseName } from '../../lib/nickname';
 
-const NICKNAME_STORAGE_KEY = 'nickname';
+const apiBaseUrl = getApiBaseUrl();
 
 export default function LobbyPage() {
   const router = useRouter();
   const heartbeat = useHeartbeat();
   const [user, setUser] = useState<StoredUser | null>(null);
-  const [authStatus, setAuthStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [authStatus, setAuthStatus] = useState<AsyncStatus>('idle');
   const [rooms, setRooms] = useState<LobbyRoom[]>([]);
-  const [roomsStatus, setRoomsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [roomsStatus, setRoomsStatus] = useState<AsyncStatus>('idle');
   const [notifications, setNotifications] = useState<LobbyNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -37,10 +39,7 @@ export default function LobbyPage() {
   const [nameDraft, setNameDraft] = useState('');
   const [nameDialogError, setNameDialogError] = useState<string | null>(null);
   const [isUpdatingName, setIsUpdatingName] = useState(false);
-  const apiBaseUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
-    return base.replace(/\/$/, '');
-  }, []);
+  // derive once per module; env never changes at runtime
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -80,14 +79,10 @@ export default function LobbyPage() {
     const loadRooms = async () => {
       setRoomsStatus('loading');
       try {
-        const response = await fetch(`${apiBaseUrl}/lobby/rooms`, {
+        const payload = await fetchJson<unknown>(`${apiBaseUrl}/lobby/rooms`, {
           signal: controller.signal,
           credentials: 'include'
         });
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-        const payload = await response.json();
         const parsed = LobbyRoomsResponse.safeParse(payload);
         if (!parsed.success) {
           throw new Error('Invalid lobby response');
@@ -132,7 +127,7 @@ export default function LobbyPage() {
     setRoomActionError(null);
     setIsCreatingRoom(true);
     try {
-      const response = await fetch(`${apiBaseUrl}/tables`, {
+      const payload = await fetchJson<unknown>(`${apiBaseUrl}/tables`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -144,10 +139,6 @@ export default function LobbyPage() {
           }
         })
       });
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
-      }
-      const payload = await response.json();
       const parsed = TablePrepareResponseSchema.safeParse(payload);
       if (!parsed.success) {
         throw new Error('Invalid table payload');
@@ -182,16 +173,12 @@ export default function LobbyPage() {
     setAvatarUpdateError(null);
     setIsUpdatingAvatar(true);
     try {
-      const response = await fetch(`${apiBaseUrl}/auth/avatar`, {
+      const payload = await fetchJson<unknown>(`${apiBaseUrl}/auth/avatar`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, avatar: avatarSelection })
       });
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
-      }
-      const payload = await response.json();
       const parsed = RegisterUserResponseSchema.safeParse(payload);
       if (!parsed.success) {
         throw new Error('Invalid avatar response');

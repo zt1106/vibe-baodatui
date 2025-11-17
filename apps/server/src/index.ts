@@ -25,7 +25,7 @@ import {
 } from '@shared/messages';
 import { createTable, joinTable, clearHands, resetDeck, drawCard } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
-import { DEFAULT_AVATAR } from '../../../packages/shared/src/avatars';
+import { DEFAULT_AVATAR } from '@shared/avatars';
 import { createHeartbeatPublisher } from './infrastructure/heartbeat';
 import { createLobbyRegistry, deriveLobbyRoomStatus } from './infrastructure/lobbyRegistry';
 import {

@@ -10,8 +10,11 @@ import {
   ensureUser,
   loadStoredUser,
   persistStoredUser,
+  NICKNAME_STORAGE_KEY,
   type StoredUser
 } from '../../../../lib/auth';
+import { getApiBaseUrl, fetchJson } from '../../../../lib/api';
+import type { AsyncStatus } from '../../../../lib/types';
 import {
   acquireTableSocket,
   clearTableSocketJoin,
@@ -22,13 +25,13 @@ import {
 } from '../../../../lib/tableSocket';
 import { generateRandomChineseName } from '../../../../lib/nickname';
 
-const NICKNAME_STORAGE_KEY = 'nickname';
+const apiBaseUrl = getApiBaseUrl();
 
 type PreparePageProps = {
   params: { tableId: string };
 };
 
-type AsyncState = 'idle' | 'loading' | 'ready' | 'error';
+type AsyncState = AsyncStatus;
 
 const DEFAULT_TABLE_CONFIG = {
   capacity: 8
@@ -76,10 +79,7 @@ export default function PreparePage({ params }: PreparePageProps) {
   const cleanupReleasedRef = useRef(false);
   const navigatedToPlayRef = useRef(false);
 
-  const apiBaseUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
-    return base.replace(/\/$/, '');
-  }, []);
+  // static per module
 
   useEffect(() => {
     preserveSocketForPlayRef.current = false;
@@ -133,15 +133,14 @@ export default function PreparePage({ params }: PreparePageProps) {
       setPrepareStatus('loading');
       setPrepareError(null);
       try {
-        const response = await fetch(`${apiBaseUrl}/tables/${encodeURIComponent(tableId)}/prepare`, {
-          method: 'GET',
-          credentials: 'include',
-          signal: controller.signal
-        });
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-        const payload = await response.json();
+        const payload = await fetchJson<unknown>(
+          `${apiBaseUrl}/tables/${encodeURIComponent(tableId)}/prepare`,
+          {
+            method: 'GET',
+            credentials: 'include',
+            signal: controller.signal
+          }
+        );
         const parsed = TablePrepareResponseSchema.safeParse(payload);
         if (!parsed.success) {
           throw new Error('Invalid table payload');
