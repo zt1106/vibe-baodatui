@@ -1,9 +1,9 @@
-import { pickRandomAvatar } from '../../../../packages/shared/src/avatars';
+import { pickRandomAvatar, type AvatarFilename } from '@shared/avatars';
 
 export interface UserRecord {
   id: number;
   nickname: string;
-  avatar: string;
+  avatar: AvatarFilename;
   createdAt: Date;
 }
 
@@ -72,7 +72,7 @@ export function createUserRegistry() {
     return record ? clone(record) : undefined;
   }
 
-  function updateAvatar(userId: number, avatar: string): UserRecord | undefined {
+  function updateAvatar(userId: number, avatar: AvatarFilename): UserRecord | undefined {
     const record = usersById.get(userId);
     if (!record) {
       return undefined;

@@ -18,7 +18,7 @@ const SOCKET_OPTIONS = {
   withCredentials: true,
   reconnection: true,
   reconnectionDelayMax: 2_000
-} as const;
+};
 
 function cloneHand(cards: Card[]) {
   return cards.map(card => ({ ...card }));

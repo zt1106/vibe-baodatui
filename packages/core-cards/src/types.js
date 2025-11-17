@@ -4,17 +4,22 @@ export const SUIT_SYMBOLS = {
     S: '♠',
     H: '♥',
     D: '♦',
-    C: '♣'
+    C: '♣',
+    JB: '🃏',
+    JR: '🃏'
 };
 export const SYMBOL_TO_SUIT = {
     '♠': 'S',
     '♥': 'H',
     '♦': 'D',
-    '♣': 'C'
+    '♣': 'C',
+    '🃏': 'JB'
 };
 export const SUIT_TINT = {
     S: 'black',
     C: 'black',
     H: 'red',
-    D: 'red'
+    D: 'red',
+    JB: 'black',
+    JR: 'red'
 };

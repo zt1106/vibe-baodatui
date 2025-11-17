@@ -32,10 +32,9 @@ type AsyncState = 'idle' | 'loading' | 'ready' | 'error';
 
 const NICKNAME_STORAGE_KEY = 'nickname';
 const SUIT_DISPLAY_ORDER: Array<'S' | 'H' | 'D' | 'C'> = ['S', 'H', 'D', 'C'];
-const RANK_ORDER = RANKS.reduce<Record<Rank, number>>((acc, rank, index) => {
-  acc[rank] = index;
-  return acc;
-}, {});
+const RANK_ORDER: Record<Rank, number> = Object.fromEntries(
+  RANKS.map((rank, index) => [rank, index])
+) as Record<Rank, number>;
 
 function groupHandBySuit(cards: Card[]) {
   const suits: Record<'S' | 'H' | 'D' | 'C' | 'J', Card[]> = {

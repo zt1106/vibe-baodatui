@@ -25,7 +25,7 @@ import {
 } from '@shared/messages';
 import { createTable, joinTable, clearHands, resetDeck, drawCard } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
-import { DEFAULT_AVATAR } from '@shared/avatars';
+import { DEFAULT_AVATAR, type AvatarFilename } from '@shared/avatars';
 import { createHeartbeatPublisher } from './infrastructure/heartbeat';
 import { createLobbyRegistry, deriveLobbyRoomStatus } from './infrastructure/lobbyRegistry';
 import {
@@ -72,9 +72,9 @@ const heartbeat = createHeartbeatPublisher(io);
 const stopHeartbeat = heartbeat.start();
 const users = createUserRegistry();
 const lobby = createLobbyRegistry();
-const USER_AVATAR_FALLBACK = DEFAULT_AVATAR ?? '1F332.png';
+const USER_AVATAR_FALLBACK: AvatarFilename = DEFAULT_AVATAR;
 
-function resolveUserAvatar(userId: number) {
+function resolveUserAvatar(userId: number): AvatarFilename {
   const record = users.findById(userId);
   return record?.avatar ?? USER_AVATAR_FALLBACK;
 }
