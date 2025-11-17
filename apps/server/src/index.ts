@@ -18,9 +18,12 @@ import {
   TableConfigUpdateRequest,
   TablePreparedRequest,
   UpdateAvatarRequest,
-  UpdateNicknameRequest
+  UpdateNicknameRequest,
+  GameSnapshot,
+  GameDealCardEvent,
+  GamePhase
 } from '@shared/messages';
-import { createTable, joinTable, deal } from '@game-core/engine';
+import { createTable, joinTable, clearHands, resetDeck, drawCard } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
 import { DEFAULT_AVATAR } from '../../../packages/shared/src/avatars';
 import { createHeartbeatPublisher } from './infrastructure/heartbeat';
@@ -88,12 +91,18 @@ type ManagedTable = {
   };
   hasStarted: boolean;
   prepared: Map<number, boolean>;
+  gamePhase: GamePhase;
+  dealingState: {
+    timer: NodeJS.Timeout | null;
+    seatIndex: number;
+  } | null;
 };
 
 const TABLE_CAPACITY = 8;
 const tables = new Map<string, ManagedTable>();
 const socketTable = new Map<string, string>();
 const socketUsers = new Map<string, number>();
+const DEAL_DELAY_MS = 220;
 
 const generateTableId = () => {
   let id = '';
@@ -124,7 +133,12 @@ function ensureHostAction(socket: Socket, tableId: string) {
 function resetTablePhaseIfNeeded(table: ManagedTable) {
   if (table.state.seats.length < table.config.capacity) {
     table.hasStarted = false;
+    table.gamePhase = 'idle';
+    stopDealing(table);
+    clearHands(table.state);
+    resetDeck(table.state);
     setAllPrepared(table, false);
+    emitGameSnapshot(table);
   }
 }
 
@@ -135,6 +149,105 @@ function setAllPrepared(table: ManagedTable, prepared: boolean) {
       table.prepared.set(player.userId, prepared);
     }
   }
+}
+
+function allPlayersPrepared(table: ManagedTable) {
+  for (const seatId of table.state.seats) {
+    const player = table.state.players[seatId];
+    if (!player) continue;
+    if (!table.prepared.get(player.userId)) {
+      return false;
+    }
+  }
+  return table.state.seats.length > 0;
+}
+
+function stopDealing(table: ManagedTable) {
+  const timer = table.dealingState?.timer;
+  if (timer) {
+    clearTimeout(timer);
+  }
+  table.dealingState = null;
+}
+
+function buildGameSnapshot(table: ManagedTable, lastDealtSeatId?: string): GameSnapshot {
+  return {
+    tableId: table.id,
+    phase: table.gamePhase,
+    deckCount: table.state.deck.length,
+    lastDealtSeatId,
+    seats: table.state.seats
+      .map(seatId => {
+        const player = table.state.players[seatId];
+        if (!player) return null;
+        return {
+          seatId,
+          userId: player.userId,
+          nickname: player.nickname,
+          avatar: resolveUserAvatar(player.userId),
+          handCount: player.hand.length,
+          isHost: table.host.userId === player.userId
+        };
+      })
+      .filter((seat): seat is NonNullable<typeof seat> => Boolean(seat))
+  };
+}
+
+function emitGameSnapshot(table: ManagedTable, lastDealtSeatId?: string) {
+  const snapshot = buildGameSnapshot(table, lastDealtSeatId);
+  io.to(table.id).emit('game:snapshot', snapshot);
+}
+
+function finishDealing(table: ManagedTable) {
+  stopDealing(table);
+  table.gamePhase = 'complete';
+  emitGameSnapshot(table);
+}
+
+function startDealing(table: ManagedTable) {
+  if (table.state.seats.length === 0) {
+    return;
+  }
+  stopDealing(table);
+  table.gamePhase = 'dealing';
+  table.dealingState = { timer: null, seatIndex: 0 };
+  emitGameSnapshot(table);
+  const tick = () => {
+    if (!table.dealingState) {
+      return;
+    }
+    const seats = table.state.seats;
+    if (seats.length === 0) {
+      table.gamePhase = 'idle';
+      stopDealing(table);
+      emitGameSnapshot(table);
+      return;
+    }
+    if (table.state.deck.length === 0) {
+      finishDealing(table);
+      return;
+    }
+    const currentIndex = table.dealingState.seatIndex % seats.length;
+    const seatId = seats[currentIndex];
+    const card = drawCard(table.state, seatId);
+    if (!card) {
+      table.dealingState.seatIndex = (currentIndex + 1) % seats.length;
+      table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
+      return;
+    }
+    card.faceUp = true;
+    const payload: GameDealCardEvent = {
+      tableId: table.id,
+      seatId,
+      card
+    };
+    io.to(seatId).emit('game:deal', payload);
+    emitState(table.id);
+    emitGameSnapshot(table, seatId);
+    table.dealingState.seatIndex = (currentIndex + 1) % seats.length;
+    table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
+  };
+  table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
 }
 
 function getTableStatus(managed: ManagedTable) {
@@ -214,6 +327,7 @@ function cleanupPlayerSocket(socketId: string) {
     managed.prepared.delete(userId);
   }
   if (managed.state.seats.length === 0) {
+    stopDealing(managed);
     tables.delete(tableId);
     lobby.removeRoom(tableId);
     return;
@@ -258,7 +372,9 @@ function createManagedTable(host: { id: number; nickname: string }, id = generat
       nickname: host.nickname
     },
     hasStarted: false,
-    prepared: new Map()
+    prepared: new Map(),
+    gamePhase: 'idle',
+    dealingState: null
   };
   tables.set(normalizedId, managed);
   updateLobbyFromState(normalizedId);
@@ -411,6 +527,10 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (table.hasStarted) {
+      socket.emit('errorMessage', { message: '牌局已开始，暂无法加入' });
+      return;
+    }
     if (table.state.seats.length >= table.config.capacity) {
       socket.emit('errorMessage', { message: 'Table is full' });
       return;
@@ -458,12 +578,13 @@ io.on('connection', (socket) => {
     }
 
     joinTable(table.state, socket.id, user.nickname, user.id);
-    deal(table.state, 2); // auto-deal for demo
+    socket.join(tableId);
     socketTable.set(socket.id, tableId);
     socketUsers.set(socket.id, user.id);
     table.prepared.set(user.id, false);
     updateLobbyFromState(tableId);
     emitState(tableId);
+    emitGameSnapshot(table);
   });
 
   socket.on('table:start', (payload) => {
@@ -472,15 +593,27 @@ io.on('connection', (socket) => {
     const tableId = normalizeTableId(parsed.data.tableId ?? '');
     const managed = ensureHostAction(socket, tableId);
     if (!managed) return;
+    if (managed.hasStarted) {
+      socket.emit('errorMessage', { message: '牌局已经开始' });
+      return;
+    }
     if (managed.state.seats.length !== managed.config.capacity) {
       socket.emit('errorMessage', { message: '房间未满，无法开始' });
       return;
     }
+    if (!allPlayersPrepared(managed)) {
+      socket.emit('errorMessage', { message: '仍有玩家未准备' });
+      return;
+    }
     managed.hasStarted = true;
-    deal(managed.state, 2);
+    managed.gamePhase = 'dealing';
+    const dealSeed = `deal-${managed.id}-${Date.now()}`;
+    resetDeck(managed.state, { seed: dealSeed });
+    clearHands(managed.state);
     setAllPrepared(managed, false);
     updateLobbyFromState(tableId);
     emitState(tableId);
+    startDealing(managed);
   });
 
   socket.on('table:kick', (payload) => {
@@ -509,6 +642,7 @@ io.on('connection', (socket) => {
     resetTablePhaseIfNeeded(managed);
     updateLobbyFromState(tableId);
     emitState(tableId);
+    emitGameSnapshot(managed);
   });
 
   socket.on('table:updateConfig', (payload) => {
@@ -527,6 +661,7 @@ io.on('connection', (socket) => {
     resetTablePhaseIfNeeded(managed);
     updateLobbyFromState(tableId);
     emitState(tableId);
+    emitGameSnapshot(managed);
   });
 
   socket.on('table:setPrepared', (payload) => {
@@ -536,6 +671,10 @@ io.on('connection', (socket) => {
     const managed = tables.get(tableId);
     if (!managed) {
       socket.emit('errorMessage', { message: 'Unknown table' });
+      return;
+    }
+    if (managed.hasStarted) {
+      socket.emit('errorMessage', { message: '牌局已开始，无法切换准备状态' });
       return;
     }
     const userId = socketUsers.get(socket.id);
@@ -550,6 +689,7 @@ io.on('connection', (socket) => {
     }
     managed.prepared.set(userId, parsed.data.prepared);
     emitState(tableId);
+    emitGameSnapshot(managed);
   });
 
   socket.on('disconnect', () => {
@@ -571,17 +711,18 @@ function emitState(tableId: string) {
       avatar: resolveUserAvatar(table.host.userId)
     },
     config: table.config,
-    seats: table.state.seats
-      .map(id => table.state.players[id])
-      .filter((player): player is NonNullable<typeof player> => Boolean(player))
-      .map(player => ({
-        id: player.id,
-        userId: player.userId,
-        nickname: player.nickname,
-        avatar: resolveUserAvatar(player.userId),
-        prepared: table.prepared.get(player.userId) ?? false
-      }))
-  };
+  seats: table.state.seats
+    .map(id => table.state.players[id])
+    .filter((player): player is NonNullable<typeof player> => Boolean(player))
+    .map(player => ({
+      id: player.id,
+      userId: player.userId,
+      nickname: player.nickname,
+      avatar: resolveUserAvatar(player.userId),
+      prepared: table.prepared.get(player.userId) ?? false,
+      handCount: player.hand.length
+    }))
+};
   io.emit('state', snapshot);
 }
 

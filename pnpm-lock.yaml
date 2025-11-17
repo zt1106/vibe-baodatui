@@ -135,6 +135,9 @@ importers:
 
   packages/game-core:
     dependencies:
+      '@poker/core-cards':
+        specifier: workspace:*
+        version: link:../core-cards
       seedrandom:
         specifier: ^3.0.5
         version: 3.0.5

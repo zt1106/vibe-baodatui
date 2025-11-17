@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TablePrepareResponse as TablePrepareResponseSchema } from '@shared/messages';
 import type { ServerState, TablePrepareResponse } from '@shared/messages';
-import { io, Socket } from 'socket.io-client';
+import { type Socket } from 'socket.io-client';
 
 import {
   ensureUser,
@@ -12,6 +12,14 @@ import {
   persistStoredUser,
   type StoredUser
 } from '../../../../lib/auth';
+import {
+  acquireTableSocket,
+  clearTableSocketJoin,
+  isTableSocketJoined,
+  markTableSocketJoined,
+  releaseTableSocket,
+  resetSharedHand
+} from '../../../../lib/tableSocket';
 import { generateRandomChineseName } from '../../../../lib/nickname';
 
 const NICKNAME_STORAGE_KEY = 'nickname';
@@ -63,11 +71,22 @@ export default function PreparePage({ params }: PreparePageProps) {
   const [reloadToken, setReloadToken] = useState(0);
   const [configDraft, setConfigDraft] = useState<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const preserveSocketForPlayRef = useRef(false);
+  const manualReleaseRef = useRef(false);
+  const cleanupReleasedRef = useRef(false);
+  const navigatedToPlayRef = useRef(false);
 
   const apiBaseUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
     return base.replace(/\/$/, '');
   }, []);
+
+  useEffect(() => {
+    preserveSocketForPlayRef.current = false;
+    manualReleaseRef.current = false;
+    cleanupReleasedRef.current = false;
+    navigatedToPlayRef.current = false;
+  }, [tableId]);
 
   useEffect(() => {
     if (!tableId) return;
@@ -163,18 +182,28 @@ export default function PreparePage({ params }: PreparePageProps) {
       return;
     }
     let active = true;
-    const socket = io(apiBaseUrl, {
-      transports: ['websocket'],
-      withCredentials: true,
-      reconnection: true,
-      reconnectionDelayMax: 2_000
-    });
+    manualReleaseRef.current = false;
+    cleanupReleasedRef.current = false;
+    const socket = acquireTableSocket(apiBaseUrl, tableId);
     socketRef.current = socket;
 
     const joinPayload = { tableId, nickname: user.nickname, userId: user.id };
 
     const requestJoin = () => {
-      socket.emit('joinTable', joinPayload);
+      if (!isTableSocketJoined(tableId)) {
+        socket.emit('joinTable', joinPayload);
+      }
+    };
+
+    const handleConnect = () => {
+      if (!active) return;
+      requestJoin();
+    };
+
+    const handleReconnect = () => {
+      if (!active) return;
+      clearTableSocketJoin(tableId);
+      requestJoin();
     };
 
     const handleState = (payload: ServerState) => {
@@ -193,46 +222,67 @@ export default function PreparePage({ params }: PreparePageProps) {
         })),
         config: payload.config
       });
+      if (payload.seats.some(player => player.userId === user.id)) {
+        markTableSocketJoined(tableId);
+      }
       setPrepareStatus('ready');
       setPrepareError(null);
     };
 
-    socket.on('connect', requestJoin);
-    socket.on('reconnect', requestJoin);
-    socket.on('state', handleState);
-    socket.on('connect_error', error => {
+    const handleConnectError = (error: Error) => {
       if (!active) return;
       console.error('[web] failed to connect table socket', error);
-    });
-    socket.on('errorMessage', (payload: { message?: string }) => {
+    };
+
+    const handleServerError = (payload: { message?: string }) => {
       if (!active) return;
       console.warn('[web] server rejected joinTable request', payload?.message);
       setPrepareError(payload?.message ?? '加入房间失败，请稍后再试。');
-    });
+    };
 
-    socket.on('kicked', (payload: { tableId?: string }) => {
+    const handleKicked = (payload: { tableId?: string }) => {
       if (!active) return;
       if (payload?.tableId !== tableId) return;
       setPrepareError('你已被房主移出房间。');
       setPrepareStatus('error');
       setTimeout(() => router.push('/lobby'), 1200);
-    });
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('reconnect', handleReconnect);
+    socket.on('state', handleState);
+    socket.on('connect_error', handleConnectError);
+    socket.on('errorMessage', handleServerError);
+    socket.on('kicked', handleKicked);
+    requestJoin();
 
     return () => {
       active = false;
-      socket.off('connect', requestJoin);
-      socket.off('reconnect', requestJoin);
+      socket.off('connect', handleConnect);
+      socket.off('reconnect', handleReconnect);
       socket.off('state', handleState);
-      socket.off('errorMessage');
-      socket.off('kicked');
-      socket.disconnect();
-      socketRef.current = null;
+      socket.off('connect_error', handleConnectError);
+      socket.off('errorMessage', handleServerError);
+      socket.off('kicked', handleKicked);
+      if (!preserveSocketForPlayRef.current && !manualReleaseRef.current && !cleanupReleasedRef.current) {
+        releaseTableSocket(socket);
+        clearTableSocketJoin(tableId);
+        cleanupReleasedRef.current = true;
+        socketRef.current = null;
+      }
     };
   }, [apiBaseUrl, authStatus, tableId, router, user?.id, user?.nickname]);
 
   const handleLeaveRoom = useCallback(() => {
+    manualReleaseRef.current = true;
+    const socket = socketRef.current;
+    if (socket) {
+      releaseTableSocket(socket);
+      clearTableSocketJoin(tableId);
+      socketRef.current = null;
+    }
     router.push('/lobby');
-  }, [router]);
+  }, [router, tableId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -244,6 +294,17 @@ export default function PreparePage({ params }: PreparePageProps) {
       window.removeEventListener(PREPARE_PAGE_REFRESH_EVENT, handleExternalRefresh);
     };
   }, []);
+
+  useEffect(() => {
+    if (!tableId || !prepareState || !user) return;
+    if (prepareState.status !== 'in-progress') return;
+    const isSeated = prepareState.players.some(player => player.userId === user.id);
+    if (!isSeated || navigatedToPlayRef.current) return;
+    navigatedToPlayRef.current = true;
+    preserveSocketForPlayRef.current = true;
+    resetSharedHand();
+    router.push(`/game/${encodeURIComponent(tableId)}/play`);
+  }, [prepareState, router, tableId, user?.id]);
 
   const sendTableEvent = useCallback((event: string, payload: Record<string, unknown>) => {
     const socket = socketRef.current;
@@ -292,7 +353,8 @@ export default function PreparePage({ params }: PreparePageProps) {
   }, [prepareState, user?.id]);
   const isSelfSeated = Boolean(selfPlayer);
   const selfPrepared = Boolean(selfPlayer?.prepared);
-  const canHostStart = isHost && playerCount === resolvedCapacity;
+  const everyonePrepared = prepareState?.players.every(player => player.prepared) ?? false;
+  const canHostStart = isHost && playerCount === resolvedCapacity && everyonePrepared;
   const configIsDirty = Boolean(
     isHost && prepareState && configDraft !== null && configDraft !== prepareState.config.capacity
   );

@@ -1,20 +1,41 @@
 import { makeDeck } from './cards';
 import { shuffle } from './shuffle';
 export function createTable(id, seed) {
-    const deck = shuffle(makeDeck(), seed);
+    const deck = shuffle(makeDeck({ packs: 2 }), seed);
     return { id, seed, deck, players: {}, seats: [] };
 }
 export function joinTable(state, playerId, nickname, userId) {
     if (state.players[playerId])
-        return state; // idempotent
+        return state;
     state.players[playerId] = { id: playerId, userId, nickname, hand: [], hasFolded: false };
     state.seats.push(playerId);
     return state;
 }
-export function deal(state, countPerPlayer = 2) {
+export function clearHands(state) {
     for (const pid of state.seats) {
         state.players[pid].hand = [];
     }
+    return state;
+}
+export function resetDeck(state, options = {}) {
+    const packs = options.packs ?? 2;
+    const seed = options.seed ?? state.seed;
+    state.seed = seed;
+    state.deck = shuffle(makeDeck({ packs }), seed);
+    return state;
+}
+export function drawCard(state, seatId) {
+    const card = state.deck.pop();
+    if (!card)
+        return null;
+    const player = state.players[seatId];
+    if (!player)
+        return null;
+    player.hand.push(card);
+    return card;
+}
+export function deal(state, countPerPlayer = 2) {
+    clearHands(state);
     for (let i = 0; i < countPerPlayer; i++) {
         for (const pid of state.seats) {
             const card = state.deck.pop();

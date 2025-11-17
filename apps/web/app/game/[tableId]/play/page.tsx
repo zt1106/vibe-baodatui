@@ -1,109 +1,348 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-import { makeCard } from '@poker/core-cards';
-
+import type { Card, Rank } from '@poker/core-cards';
+import { RANKS } from '@poker/core-cards';
+import { CardAnimationProvider, MultiCardRow } from '@poker/ui-cards';
+import type { GameSnapshot, ServerState } from '@shared/messages';
 import { GameTable, type GameTableSeat } from '../../../../components/poker/GameTable';
-import { PLAYER_AVATAR_STORY_URL } from '../../../../components/poker/playerAvatarDefaults';
+import { type Socket } from 'socket.io-client';
+import {
+  acquireTableSocket,
+  clearTableSocketJoin,
+  isTableSocketJoined,
+  markTableSocketJoined,
+  releaseTableSocket,
+  subscribeToHandUpdates
+} from '../../../../lib/tableSocket';
+import {
+  ensureUser,
+  loadStoredUser,
+  persistStoredUser,
+  type StoredUser
+} from '../../../../lib/auth';
 
 type PlayPageProps = {
   params: { tableId: string };
 };
 
-const MOCK_SEATS: GameTableSeat[] = [
-  {
-    id: 'seat-1',
-    nickname: '楚河',
-    avatar: '1F42D.png',
-    avatarUrl: PLAYER_AVATAR_STORY_URL,
-    status: '思考中',
-    stack: 4820,
-    cards: [
-      makeCard('A', 'S', { faceUp: true }),
-      makeCard('K', 'S', { faceUp: true })
-    ]
-  },
-  {
-    id: 'seat-2',
-    nickname: '小白',
-    avatar: '1F431.png',
-    avatarUrl: PLAYER_AVATAR_STORY_URL,
-    status: '跟注',
-    stack: 3180,
-    cards: [
-      makeCard('9', 'H', { faceUp: false }),
-      makeCard('9', 'C', { faceUp: false })
-    ]
-  },
-  {
-    id: 'seat-3',
-    nickname: '阿瑶',
-    avatar: '1F43C.png',
-    avatarUrl: PLAYER_AVATAR_STORY_URL,
-    status: '等待行动',
-    stack: 5520,
-    cards: [
-      makeCard('Q', 'D', { faceUp: true }),
-      makeCard('J', 'D', { faceUp: true })
-    ]
-  },
-  {
-    id: 'seat-4',
-    nickname: '北风',
-    avatar: '1F981.png',
-    avatarUrl: PLAYER_AVATAR_STORY_URL,
-    status: '弃牌',
-    stack: 2490,
-    cards: [
-      makeCard('8', 'C', { faceUp: false }),
-      makeCard('7', 'C', { faceUp: false })
-    ]
-  },
-  {
-    id: 'seat-5',
-    nickname: '酒馆老板',
-    avatar: '1F43B.png',
-    avatarUrl: PLAYER_AVATAR_STORY_URL,
-    status: '加注',
-    stack: 6100,
-    cards: [
-      makeCard('A', 'H', { faceUp: true }),
-      makeCard('5', 'H', { faceUp: true })
-    ]
-  },
-  {
-    id: 'seat-6',
-    nickname: '南城',
-    avatar: '1F42E.png',
-    avatarUrl: PLAYER_AVATAR_STORY_URL,
-    status: '跟注',
-    stack: 3320,
-    cards: [
-      makeCard('K', 'D', { faceUp: false }),
-      makeCard('2', 'D', { faceUp: false })
-    ]
-  }
-];
+type AsyncState = 'idle' | 'loading' | 'ready' | 'error';
 
-const MOCK_COMMUNITY_CARDS = [
-  makeCard('10', 'S', { faceUp: true }),
-  makeCard('J', 'C', { faceUp: true }),
-  makeCard('Q', 'C', { faceUp: true }),
-  makeCard('2', 'S', { faceUp: true }),
-  makeCard('3', 'H', { faceUp: true })
-];
+const NICKNAME_STORAGE_KEY = 'nickname';
+const SUIT_DISPLAY_ORDER: Array<'S' | 'H' | 'D' | 'C'> = ['S', 'H', 'D', 'C'];
+const RANK_ORDER = RANKS.reduce<Record<Rank, number>>((acc, rank, index) => {
+  acc[rank] = index;
+  return acc;
+}, {});
+
+function groupHandBySuit(cards: Card[]) {
+  const suits: Record<'S' | 'H' | 'D' | 'C' | 'J', Card[]> = {
+    S: [],
+    H: [],
+    D: [],
+    C: [],
+    J: []
+  };
+  for (const card of cards) {
+    if (card.rank === 'Joker' || card.suit === 'JB' || card.suit === 'JR') {
+      suits.J.push(card);
+      continue;
+    }
+    if (suits[card.suit as 'S' | 'H' | 'D' | 'C']) {
+      suits[card.suit as 'S' | 'H' | 'D' | 'C'].push(card);
+    }
+  }
+  const sortRow = (row: Card[]) =>
+    row.slice().sort((a, b) => {
+      const aOrder = RANK_ORDER[a.rank] ?? 0;
+      const bOrder = RANK_ORDER[b.rank] ?? 0;
+      return aOrder - bOrder;
+    });
+  const rows: Card[][] = [];
+  for (const suit of SUIT_DISPLAY_ORDER) {
+    if (suits[suit].length > 0) {
+      rows.push(sortRow(suits[suit]));
+    }
+  }
+  if (suits.J.length > 0) {
+    rows.push(sortRow(suits.J));
+  }
+  return rows;
+}
+
+function rotateSeats(players: GameTableSeat[], selfSeatId: string | null) {
+  if (!selfSeatId || players.length === 0) {
+    return players;
+  }
+  const currentIndex = players.findIndex(player => player.id === selfSeatId);
+  if (currentIndex === -1) {
+    return players;
+  }
+  const targetIndex = Math.floor(players.length / 2);
+  const offset = (targetIndex - currentIndex + players.length) % players.length;
+  return players.map((_, index) => players[(index - offset + players.length) % players.length]);
+}
 
 export default function PlayPage({ params }: PlayPageProps) {
   const tableId = decodeURIComponent(params.tableId ?? '');
-  const seats = useMemo(() => MOCK_SEATS, []);
-  const communityCards = useMemo(() => MOCK_COMMUNITY_CARDS, []);
+  const router = useRouter();
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [authStatus, setAuthStatus] = useState<AsyncState>('idle');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [gameError, setGameError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null);
+  const [selfHand, setSelfHand] = useState<Card[]>([]);
+  const socketRef = useRef<Socket | null>(null);
+  const cleanupReleasedRef = useRef(false);
+
+  const apiBaseUrl = useMemo(() => {
+    const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
+    return base.replace(/\/$/, '');
+  }, []);
+
+  useEffect(() => {
+    if (!tableId) {
+      return;
+    }
+    const bootstrap = async () => {
+      setAuthStatus('loading');
+      setAuthError(null);
+      try {
+        const storedUser = loadStoredUser();
+        const storedNickname =
+          storedUser?.nickname ??
+          (typeof window !== 'undefined' ? window.localStorage.getItem(NICKNAME_STORAGE_KEY) : null) ??
+          `玩家${Math.floor(Math.random() * 10_000)}`;
+        const authenticated = await ensureUser(apiBaseUrl, storedNickname);
+        persistStoredUser(authenticated);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(NICKNAME_STORAGE_KEY, authenticated.nickname);
+        }
+        setUser(authenticated);
+        setAuthStatus('ready');
+      } catch (error) {
+        console.error('[web] failed to ensure user before play page', error);
+        setAuthStatus('error');
+        setAuthError('无法验证用户，请返回大厅重试。');
+      }
+    };
+
+    bootstrap();
+  }, [apiBaseUrl, tableId]);
+
+  useEffect(() => subscribeToHandUpdates(cards => setSelfHand(cards)), []);
+
+  useEffect(() => {
+    if (authStatus !== 'ready' || !user || !tableId) {
+      return;
+    }
+    let active = true;
+    cleanupReleasedRef.current = false;
+    const socket = acquireTableSocket(apiBaseUrl, tableId);
+    socketRef.current = socket;
+
+    const joinPayload = { tableId, nickname: user.nickname, userId: user.id };
+
+    const requestJoin = () => {
+      if (!isTableSocketJoined(tableId)) {
+        socket.emit('joinTable', joinPayload);
+      }
+    };
+
+    const handleConnect = () => {
+      if (!active) return;
+      requestJoin();
+    };
+
+    const handleReconnect = () => {
+      if (!active) return;
+      clearTableSocketJoin(tableId);
+      requestJoin();
+    };
+
+    const handleState = (payload: ServerState) => {
+      if (!active || payload.tableId !== tableId) {
+        return;
+      }
+      if (payload.seats.some(seat => seat.userId === user.id)) {
+        markTableSocketJoined(tableId);
+      }
+    };
+
+    const handleSnapshot = (payload: GameSnapshot) => {
+      if (!active || payload.tableId !== tableId) return;
+      setSnapshot(payload);
+      setGameError(null);
+    };
+
+    const handleConnectError = (error: Error) => {
+      if (!active) return;
+      setGameError('无法连接到牌桌，请稍后重试。');
+      console.error('[web] play socket connect error', error);
+    };
+
+    const handleServerError = (payload: { message?: string }) => {
+      if (!active) return;
+      setGameError(payload?.message ?? '发生未知错误');
+    };
+
+    const handleKicked = (payload: { tableId?: string }) => {
+      if (!active || payload?.tableId !== tableId) return;
+      setGameError('你已被房主移出房间。');
+      setTimeout(() => router.push('/lobby'), 1200);
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('reconnect', handleReconnect);
+    socket.on('state', handleState);
+    socket.on('game:snapshot', handleSnapshot);
+    socket.on('connect_error', handleConnectError);
+    socket.on('errorMessage', handleServerError);
+    socket.on('kicked', handleKicked);
+    requestJoin();
+
+    return () => {
+      active = false;
+      socket.off('connect', handleConnect);
+      socket.off('reconnect', handleReconnect);
+      socket.off('state', handleState);
+      socket.off('game:snapshot', handleSnapshot);
+      socket.off('connect_error', handleConnectError);
+      socket.off('errorMessage', handleServerError);
+      socket.off('kicked', handleKicked);
+      if (!cleanupReleasedRef.current) {
+        releaseTableSocket(socket);
+        clearTableSocketJoin(tableId);
+        cleanupReleasedRef.current = true;
+        socketRef.current = null;
+      }
+    };
+  }, [apiBaseUrl, authStatus, router, tableId, user?.id, user?.nickname]);
+
+  const handRows = useMemo(() => groupHandBySuit(selfHand), [selfHand]);
+
+  const selfSeatId = useMemo(() => {
+    if (!snapshot || !user) return null;
+    const seat = snapshot.seats.find(entry => entry.userId === user.id);
+    return seat?.seatId ?? null;
+  }, [snapshot, user?.id]);
+
+  const tablePlayers = useMemo(() => {
+    if (!snapshot) return [];
+    return rotateSeats(
+      snapshot.seats.map(seat => {
+        const status =
+          snapshot.lastDealtSeatId === seat.seatId
+            ? '发牌中…'
+            : seat.handCount > 0
+            ? `持有 ${seat.handCount} 张`
+            : '等待发牌';
+        return {
+          id: seat.seatId,
+          nickname: seat.nickname,
+          avatar: seat.avatar,
+          avatarUrl: `/avatars/${seat.avatar}`,
+          status: seat.isHost ? `${status} · 房主` : status
+        };
+      }),
+      selfSeatId
+    );
+  }, [snapshot, selfSeatId]);
+
+  const currentDealingPlayer = useMemo(() => {
+    if (!snapshot || !snapshot.lastDealtSeatId) return null;
+    return snapshot.seats.find(seat => seat.seatId === snapshot.lastDealtSeatId) ?? null;
+  }, [snapshot]);
+
+  const handleExitGame = useCallback(() => {
+    const socket = socketRef.current;
+    if (socket) {
+      releaseTableSocket(socket);
+      clearTableSocketJoin(tableId);
+      cleanupReleasedRef.current = true;
+      socketRef.current = null;
+    }
+    router.push('/lobby');
+  }, [router, tableId]);
 
   return (
-    <GameTable
-      players={seats}
-      communityCards={communityCards}
-      dealerSeatId="seat-3"
-    />
+    <main
+      style={{
+        minHeight: '100dvh',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.5rem',
+        background: 'radial-gradient(circle at top, rgba(15,23,42,0.95), rgba(2,6,23,0.95))'
+      }}
+    >
+      <section
+        style={{
+          position: 'relative',
+          minHeight: 0,
+          flex: 1,
+          display: 'flex',
+          alignItems: 'stretch',
+          justifyContent: 'center'
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: '0.75rem',
+            right: '0.75rem',
+            zIndex: 5,
+            pointerEvents: 'none',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            width: 'auto'
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleExitGame}
+            style={{
+              padding: '0.28rem 0.65rem',
+              borderRadius: 8,
+              border: '1px solid rgba(248, 113, 113, 0.6)',
+              background: 'transparent',
+              color: '#fecaca',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              boxShadow: '0 10px 20px rgba(2, 6, 23, 0.55)',
+              backdropFilter: 'blur(6px)',
+              pointerEvents: 'auto'
+            }}
+          >
+            离开牌局
+          </button>
+        </div>
+        <GameTable players={tablePlayers} communityCards={[]} />
+      </section>
+
+      <section
+        style={{
+          background: 'rgba(2, 6, 23, 0.85)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          borderRadius: 28,
+          padding: '1.5rem'
+        }}
+      >
+        <CardAnimationProvider>
+          <MultiCardRow
+            rows={handRows}
+            rowGap={12}
+            rowOverlap={24}
+            overlap="60%"
+            size="md"
+            selectionMode="none"
+            angle={-12}
+            curveVerticalOffset={18}
+          />
+        </CardAnimationProvider>
+      </section>
+    </main>
   );
 }

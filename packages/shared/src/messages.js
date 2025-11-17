@@ -110,7 +110,8 @@ export const ServerState = z.object({
         userId: z.number().int().positive(),
         nickname: nicknameSchema,
         avatar: avatarSchema,
-        prepared: z.boolean()
+        prepared: z.boolean(),
+        handCount: z.number().int().min(0).optional()
     }))
 });
 
@@ -123,4 +124,39 @@ export const Heartbeat = z.object({
 export const TablePreparedRequest = z.object({
     tableId: z.string().min(1),
     prepared: z.boolean()
+});
+
+const CardSuit = z.enum(['S', 'H', 'D', 'C', 'JB', 'JR']);
+const CardRank = z.enum(['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'Joker']);
+
+export const GameCard = z.object({
+    id: z.number().int().nonnegative(),
+    rank: CardRank,
+    suit: CardSuit,
+    faceUp: z.boolean()
+});
+
+export const GamePhase = z.enum(['idle', 'dealing', 'complete']);
+
+export const GameSeatState = z.object({
+    seatId: z.string().min(1),
+    userId: z.number().int().positive(),
+    nickname: nicknameSchema,
+    avatar: avatarSchema,
+    handCount: z.number().int().min(0),
+    isHost: z.boolean()
+});
+
+export const GameSnapshot = z.object({
+    tableId: z.string().min(1),
+    phase: GamePhase,
+    deckCount: z.number().int().min(0),
+    lastDealtSeatId: z.string().min(1).optional(),
+    seats: z.array(GameSeatState)
+});
+
+export const GameDealCardEvent = z.object({
+    tableId: z.string().min(1),
+    seatId: z.string().min(1),
+    card: GameCard
 });

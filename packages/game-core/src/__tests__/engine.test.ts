@@ -5,11 +5,13 @@ import { shuffle } from '../shuffle';
 import { createTable, joinTable, deal } from '../engine';
 
 describe('deck + shuffle', () => {
-  it('has 52 unique cards', () => {
+  it('builds two packs (108 cards with jokers)', () => {
     const deck = makeDeck();
-    expect(deck).toHaveLength(52);
-    const set = new Set(deck.map(c => c.suit + c.rank));
-    expect(set.size).toBe(52);
+    expect(deck).toHaveLength(108);
+    const ids = new Set(deck.map(card => card.id));
+    expect(ids.size).toBe(108);
+    const jokers = deck.filter(card => card.rank === 'Joker');
+    expect(jokers).toHaveLength(4);
   });
 
   it('deterministic shuffle by seed', () => {

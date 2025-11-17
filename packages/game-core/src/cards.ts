@@ -1,13 +1,14 @@
+import type { Card } from '@poker/core-cards';
+import { makeDeck as makeCoreDeck } from '@poker/core-cards';
 
-export type Suit = '♠' | '♥' | '♦' | '♣';
-export type Rank = 'A'|'K'|'Q'|'J'|'10'|'9'|'8'|'7'|'6'|'5'|'4'|'3'|'2';
-export interface Card { suit: Suit; rank: Rank; }
+export type { Card };
 
-export const SUITS: Suit[] = ['♠', '♥', '♦', '♣'];
-export const RANKS: Rank[] = ['A','K','Q','J','10','9','8','7','6','5','4','3','2'];
+export interface GameDeckOptions {
+  packs?: number;
+  faceUp?: boolean;
+}
 
-export function makeDeck(): Card[] {
-  const deck: Card[] = [];
-  for (const s of SUITS) for (const r of RANKS) deck.push({ suit: s, rank: r });
-  return deck;
+export function makeDeck(options: GameDeckOptions = {}): Card[] {
+  const { packs = 2, faceUp = false } = options;
+  return makeCoreDeck({ packs, faceUp });
 }
