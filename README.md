@@ -7,16 +7,18 @@ Boring, agent-friendly stack for fast prototyping with unit + e2e tests.
 ```
 .
 ├─ AGENTS.md               # Repository conventions + Playwright workflow
-├─ table-ui-plan.md        # UI layout insights and ongoing experiments
 ├─ apps/
 │  ├─ web/
 │  │  ├─ app/
 │  │  ├─ components/
 │  │  ├─ lib/
 │  │  ├─ public/
+│  │  │  └─ avatars/       # Avatar assets used by shared contracts
+│  │  │     └─ *.png
 │  │  ├─ tests/
 │  │  │  └─ e2e/           # Playwright specs
 │  │  ├─ test-results/     # Playwright artifacts
+│  │  ├─ .storybook/       # Storybook configuration
 │  │  ├─ next.config.mjs
 │  │  ├─ vitest.config.ts
 │  │  ├─ playwright.config.ts
