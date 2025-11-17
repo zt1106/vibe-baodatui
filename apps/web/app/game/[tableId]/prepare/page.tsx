@@ -425,7 +425,9 @@ export default function PreparePage({ params }: PreparePageProps) {
               </span>
             )}
           </div>
-          <span style={{ opacity: 0.75 }}>房间编号：{tableId || '未知'}</span>
+          <span data-testid="room-code" style={{ opacity: 0.75 }}>
+            房间编号：{tableId || '未知'}
+          </span>
           {user && (
             <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>
               当前用户：{user.nickname}（ID {user.id}）
@@ -671,6 +673,7 @@ export default function PreparePage({ params }: PreparePageProps) {
                 </span>
               </header>
               <button
+                data-testid="start-game-button"
                 type="button"
                 onClick={handleStartGame}
                 disabled={!canHostStart}
@@ -693,6 +696,7 @@ export default function PreparePage({ params }: PreparePageProps) {
                 <span style={{ fontWeight: 600 }}>最多玩家数</span>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   <button
+                    data-testid="capacity-decrement"
                     type="button"
                     onClick={() => handleAdjustCapacity(-1, 2, DEFAULT_TABLE_CONFIG.capacity)}
                     style={{
@@ -708,10 +712,14 @@ export default function PreparePage({ params }: PreparePageProps) {
                   >
                     −
                   </button>
-                  <strong style={{ fontSize: '1.4rem', minWidth: 40, textAlign: 'center' }}>
+                  <strong
+                    data-testid="capacity-value"
+                    style={{ fontSize: '1.4rem', minWidth: 40, textAlign: 'center' }}
+                  >
                     {configDraft ?? resolvedCapacity}
                   </strong>
                   <button
+                    data-testid="capacity-increment"
                     type="button"
                     onClick={() => handleAdjustCapacity(1, 2, DEFAULT_TABLE_CONFIG.capacity)}
                     style={{
@@ -728,6 +736,7 @@ export default function PreparePage({ params }: PreparePageProps) {
                     ＋
                   </button>
                   <button
+                    data-testid="capacity-save-button"
                     type="button"
                     onClick={handleSaveConfig}
                     disabled={!configIsDirty}
@@ -770,6 +779,7 @@ export default function PreparePage({ params }: PreparePageProps) {
               <li>当前人数：{playerCount} 名</li>
             </ul>
             <button
+              data-testid="ready-button"
               type="button"
               onClick={handleTogglePrepared}
               disabled={!canTogglePrepared}

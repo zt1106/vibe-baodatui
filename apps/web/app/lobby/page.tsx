@@ -336,6 +336,7 @@ export default function LobbyPage() {
             返回首页
           </button>
           <button
+            data-testid="create-room-button"
             onClick={handleCreateRoom}
             disabled={isCreatingRoom || authStatus !== 'ready'}
             style={{
