@@ -6,7 +6,11 @@ import { useRouter } from 'next/navigation';
 import type { Card, Rank } from '@poker/core-cards';
 import { RANKS } from '@poker/core-cards';
 import { CardAnimationProvider, MultiCardRow } from '@poker/ui-cards';
-import type { GameSnapshot, ServerState } from '@shared/messages';
+import {
+  TablePlayStateResponse as TablePlayStateResponseSchema,
+  type GameSnapshot,
+  type ServerState
+} from '@shared/messages';
 import { GameTable, type GameTableSeat } from '../../../../components/poker/GameTable';
 import { type Socket } from 'socket.io-client';
 import {
@@ -15,7 +19,8 @@ import {
   isTableSocketJoined,
   markTableSocketJoined,
   releaseTableSocket,
-  subscribeToHandUpdates
+  subscribeToHandUpdates,
+  hydrateSharedHand
 } from '../../../../lib/tableSocket';
 import {
   ensureUser,
@@ -176,6 +181,18 @@ export default function PlayPage({ params }: PlayPageProps) {
       setGameError(null);
     };
 
+    const handleHydrate = (payload: unknown) => {
+      if (!active) return;
+      const parsed = TablePlayStateResponseSchema.safeParse(payload);
+      if (!parsed.success || parsed.data.snapshot.tableId !== tableId) {
+        return;
+      }
+      setSnapshot(parsed.data.snapshot);
+      setSelfHand(parsed.data.hand);
+      hydrateSharedHand(parsed.data.hand);
+      setGameError(null);
+    };
+
     const handleConnectError = (error: Error) => {
       if (!active) return;
       setGameError('无法连接到牌桌，请稍后重试。');
@@ -197,6 +214,7 @@ export default function PlayPage({ params }: PlayPageProps) {
     socket.on('reconnect', handleReconnect);
     socket.on('state', handleState);
     socket.on('game:snapshot', handleSnapshot);
+    socket.on('game:hydrate', handleHydrate);
     socket.on('connect_error', handleConnectError);
     socket.on('errorMessage', handleServerError);
     socket.on('kicked', handleKicked);
@@ -208,6 +226,7 @@ export default function PlayPage({ params }: PlayPageProps) {
       socket.off('reconnect', handleReconnect);
       socket.off('state', handleState);
       socket.off('game:snapshot', handleSnapshot);
+      socket.off('game:hydrate', handleHydrate);
       socket.off('connect_error', handleConnectError);
       socket.off('errorMessage', handleServerError);
       socket.off('kicked', handleKicked);

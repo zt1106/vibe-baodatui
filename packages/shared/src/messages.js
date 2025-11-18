@@ -160,3 +160,8 @@ export const GameDealCardEvent = z.object({
     seatId: z.string().min(1),
     card: GameCard
 });
+
+export const TablePlayStateResponse = z.object({
+    snapshot: GameSnapshot,
+    hand: z.array(GameCard)
+});

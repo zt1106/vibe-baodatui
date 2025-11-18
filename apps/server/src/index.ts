@@ -21,7 +21,8 @@ import {
   UpdateNicknameRequest,
   GameSnapshot,
   GameDealCardEvent,
-  GamePhase
+  GamePhase,
+  TablePlayStateResponse
 } from '@shared/messages';
 import { createTable, joinTable, clearHands, resetDeck, drawCard } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
@@ -96,6 +97,7 @@ type ManagedTable = {
     timer: NodeJS.Timeout | null;
     seatIndex: number;
   } | null;
+  pendingDisconnects: Map<number, NodeJS.Timeout>;
 };
 
 const TABLE_CAPACITY = 8;
@@ -103,6 +105,7 @@ const tables = new Map<string, ManagedTable>();
 const socketTable = new Map<string, string>();
 const socketUsers = new Map<string, number>();
 const DEAL_DELAY_MS = 220;
+const RECONNECT_GRACE_MS = 5_000;
 
 const generateTableId = () => {
   let id = '';
@@ -196,6 +199,7 @@ function buildGameSnapshot(table: ManagedTable, lastDealtSeatId?: string): GameS
 function emitGameSnapshot(table: ManagedTable, lastDealtSeatId?: string) {
   const snapshot = buildGameSnapshot(table, lastDealtSeatId);
   io.to(table.id).emit('game:snapshot', snapshot);
+  return snapshot;
 }
 
 function finishDealing(table: ManagedTable) {
@@ -303,6 +307,35 @@ function buildPreparePayload(table: ManagedTable) {
   });
 }
 
+function removePlayerSeat(table: ManagedTable, seatId: string, departingUserId?: number) {
+  const index = table.state.seats.indexOf(seatId);
+  if (index === -1) {
+    return;
+  }
+  table.state.seats.splice(index, 1);
+  delete table.state.players[seatId];
+  if (typeof departingUserId === 'number') {
+    table.prepared.delete(departingUserId);
+    const pendingTimer = table.pendingDisconnects.get(departingUserId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      table.pendingDisconnects.delete(departingUserId);
+    }
+  }
+  if (table.state.seats.length === 0) {
+    stopDealing(table);
+    tables.delete(table.id);
+    table.pendingDisconnects.forEach(timer => clearTimeout(timer));
+    table.pendingDisconnects.clear();
+    lobby.removeRoom(table.id);
+    return;
+  }
+  promoteNewHostIfNeeded(table, departingUserId);
+  resetTablePhaseIfNeeded(table);
+  updateLobbyFromState(table.id);
+  emitState(table.id);
+}
+
 function cleanupPlayerSocket(socketId: string) {
   // Keep the lobby and prepare state fresh whenever a socket leaves a table.
   const tableId = socketTable.get(socketId);
@@ -321,21 +354,25 @@ function cleanupPlayerSocket(socketId: string) {
     return;
   }
   const departingUserId = managed.state.players[socketId]?.userId ?? userId;
-  managed.state.seats.splice(seatIndex, 1);
-  delete managed.state.players[socketId];
-  if (typeof userId === 'number') {
-    managed.prepared.delete(userId);
-  }
-  if (managed.state.seats.length === 0) {
-    stopDealing(managed);
-    tables.delete(tableId);
-    lobby.removeRoom(tableId);
+  if (managed.hasStarted && typeof departingUserId === 'number') {
+    const existingTimer = managed.pendingDisconnects.get(departingUserId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+    const timer = setTimeout(() => {
+      managed.pendingDisconnects.delete(departingUserId);
+      const currentSeatId = managed.state.seats.find(
+        id => managed.state.players[id]?.userId === departingUserId
+      );
+      if (!currentSeatId || currentSeatId !== socketId) {
+        return;
+      }
+      removePlayerSeat(managed, socketId, departingUserId);
+    }, RECONNECT_GRACE_MS);
+    managed.pendingDisconnects.set(departingUserId, timer);
     return;
   }
-  promoteNewHostIfNeeded(managed, departingUserId);
-  resetTablePhaseIfNeeded(managed);
-  updateLobbyFromState(tableId);
-  emitState(tableId);
+  removePlayerSeat(managed, socketId, departingUserId);
 }
 
 function promoteNewHostIfNeeded(table: ManagedTable, departingUserId?: number) {
@@ -374,7 +411,8 @@ function createManagedTable(host: { id: number; nickname: string }, id = generat
     hasStarted: false,
     prepared: new Map(),
     gamePhase: 'idle',
-    dealingState: null
+    dealingState: null,
+    pendingDisconnects: new Map()
   };
   tables.set(normalizedId, managed);
   updateLobbyFromState(normalizedId);
@@ -491,6 +529,44 @@ app.get('/tables/:tableId/prepare', (req, res) => {
   }
 });
 
+app.get('/tables/:tableId/play', (req, res) => {
+  const requestedId = normalizeTableId(req.params.tableId ?? '');
+  if (!requestedId) {
+    res.status(400).json({ error: 'Invalid table id' });
+    return;
+  }
+  const table = tables.get(requestedId);
+  if (!table) {
+    res.status(404).json({ error: 'Unknown table' });
+    return;
+  }
+  const userId = Number(req.query.userId);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    res.status(400).json({ error: 'Invalid user id' });
+    return;
+  }
+  const seatId = table.state.seats.find(id => table.state.players[id]?.userId === userId);
+  if (!seatId) {
+    res.status(404).json({ error: 'Player not found at this table' });
+    return;
+  }
+  const player = table.state.players[seatId];
+  if (!player) {
+    res.status(404).json({ error: 'Seat unavailable' });
+    return;
+  }
+  try {
+    const payload = TablePlayStateResponse.parse({
+      snapshot: buildGameSnapshot(table),
+      hand: player.hand.map(card => ({ ...card }))
+    });
+    res.json(payload);
+  } catch (error) {
+    console.error('[server] failed to build play snapshot', error);
+    res.status(500).json({ error: 'Failed to load play state' });
+  }
+});
+
 app.post('/tables', (req, res) => {
   const parsed = CreateTableRequest.safeParse(req.body);
   if (!parsed.success) {
@@ -524,15 +600,6 @@ io.on('connection', (socket) => {
     const table = tables.get(tableId);
     if (!table) {
       socket.emit('errorMessage', { message: 'Unknown table' });
-      return;
-    }
-
-    if (table.hasStarted) {
-      socket.emit('errorMessage', { message: '牌局已开始，暂无法加入' });
-      return;
-    }
-    if (table.state.seats.length >= table.config.capacity) {
-      socket.emit('errorMessage', { message: 'Table is full' });
       return;
     }
 
@@ -571,9 +638,50 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const alreadySeated = table.state.seats.some(id => table.state.players[id]?.userId === user.id);
-    if (alreadySeated) {
+    const seatForUser = table.state.seats.find(id => table.state.players[id]?.userId === user.id);
+
+    if (table.hasStarted) {
+      if (!seatForUser) {
+        socket.emit('errorMessage', { message: '牌局已开始，暂无法加入' });
+        return;
+      }
+      if (seatForUser !== socket.id) {
+        const seatIndex = table.state.seats.indexOf(seatForUser);
+        if (seatIndex !== -1) {
+          table.state.seats[seatIndex] = socket.id;
+        }
+        const playerState = table.state.players[seatForUser];
+        if (playerState) {
+          delete table.state.players[seatForUser];
+          playerState.id = socket.id;
+          table.state.players[socket.id] = playerState;
+        }
+      }
+      const pendingTimer = table.pendingDisconnects.get(user.id);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        table.pendingDisconnects.delete(user.id);
+      }
+      socket.join(tableId);
+      socketTable.set(socket.id, tableId);
+      socketUsers.set(socket.id, user.id);
+      emitState(tableId);
+      const snapshot = emitGameSnapshot(table);
+      const hydratePayload = TablePlayStateResponse.parse({
+        snapshot,
+        hand: (table.state.players[socket.id]?.hand ?? []).map(card => ({ ...card }))
+      });
+      socket.emit('game:hydrate', hydratePayload);
+      return;
+    }
+
+    if (seatForUser) {
       socket.emit('errorMessage', { message: 'User already seated at the table' });
+      return;
+    }
+
+    if (table.state.seats.length >= table.config.capacity) {
+      socket.emit('errorMessage', { message: 'Table is full' });
       return;
     }
 

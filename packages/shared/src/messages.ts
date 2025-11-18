@@ -192,6 +192,12 @@ export const GameDealCardEvent = z.object({
 });
 export type GameDealCardEvent = z.infer<typeof GameDealCardEvent>;
 
+export const TablePlayStateResponse = z.object({
+  snapshot: GameSnapshot,
+  hand: z.array(GameCard)
+});
+export type TablePlayStateResponse = z.infer<typeof TablePlayStateResponse>;
+
 export const Heartbeat = z.object({
   status: z.literal('ok'),
   timestamp: z.number().int(),

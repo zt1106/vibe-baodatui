@@ -138,6 +138,11 @@ export function resetSharedHand() {
   notifyHand();
 }
 
+export function hydrateSharedHand(cards: Card[]) {
+  cachedHand = cloneHand(cards);
+  notifyHand();
+}
+
 export function getSharedSocket() {
   return sharedSocket;
 }
