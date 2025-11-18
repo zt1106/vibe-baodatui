@@ -33,6 +33,16 @@ type Dimensions = { width: number; height: number };
 
 const TABLE_TILT_DEG = 24;
 const MAX_TABLE_PLAYERS = 8;
+const MAX_PLAYER_NAME_CHARS = 8;
+
+function formatPlayerName(name: string, maxLength = MAX_PLAYER_NAME_CHARS) {
+  const trimmed = name.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+  const sliceLength = Math.max(1, maxLength - 2);
+  return `${trimmed.slice(0, sliceLength)}..`;
+}
 
 export function GameTable({
   players,
@@ -238,6 +248,7 @@ export function GameTable({
                 {seat.player.id !== suppressedSeatId && (
                   <PlayerAvatar
                     playerName={seat.player.nickname}
+                    displayName={formatPlayerName(seat.player.nickname)}
                     avatarUrl={seat.player.avatarUrl ?? `/avatars/${seat.player.avatar}`}
                     size={avatarSize}
                     className={styles.tableAvatar}
