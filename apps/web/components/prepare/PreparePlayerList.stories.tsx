@@ -66,15 +66,6 @@ export const GuestView: Story = {
   }
 };
 
-export const WaitingForPlayers: Story = {
-  args: {
-    seats: [],
-    playerCount: 0,
-    capacity: 8,
-    status: 'ready'
-  }
-};
-
 export const LoadingState: Story = {
   args: {
     status: 'loading',
@@ -89,18 +80,5 @@ export const ErrorState: Story = {
     status: 'error',
     error: '暂时无法加载房间信息。',
     seats: filledSeats
-  }
-};
-
-export const CompactLayout: Story = {
-  args: {
-    seats: filledSeats.slice(0, 4),
-    playerCount: 3,
-    capacity: 4
-  },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1'
-    }
   }
 };

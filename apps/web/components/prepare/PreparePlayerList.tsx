@@ -68,8 +68,8 @@ export function PreparePlayerList({
           data-testid="prepare-player-list"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-            gap: '1rem',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+            gap: '0.75rem',
             overflowY: 'auto',
             paddingRight: '0.25rem'
           }}
@@ -80,11 +80,12 @@ export function PreparePlayerList({
               style={{
                 borderRadius: 18,
                 border: '1px solid rgba(148, 163, 184, 0.25)',
-                padding: '1rem',
+                padding: '0.6rem',
                 background: player ? 'rgba(34, 197, 94, 0.08)' : 'rgba(15, 23, 42, 0.6)',
                 display: 'grid',
-                gap: '0.35rem',
-                boxShadow: '0 16px 36px rgba(15, 23, 42, 0.35)'
+                gap: '0.2rem',
+                boxShadow: '0 16px 36px rgba(15, 23, 42, 0.35)',
+                minHeight: '8.5rem'
               }}
             >
               <span style={{ fontSize: '0.85rem', opacity: 0.75 }}>座位 {seatNumber}</span>
@@ -95,14 +96,14 @@ export function PreparePlayerList({
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      gap: '0.5rem'
+                      gap: '0.3rem'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                       <div
                         style={{
-                          width: 34,
-                          height: 34,
+                          width: 28,
+                          height: 28,
                           borderRadius: 12,
                           overflow: 'hidden',
                           border: '1px solid rgba(148, 163, 184, 0.45)'
@@ -111,13 +112,13 @@ export function PreparePlayerList({
                         <img
                           src={`/avatars/${player.avatar}`}
                           alt={`${player.nickname} 头像`}
-                          width={34}
-                          height={34}
+                          width={28}
+                          height={28}
                           loading="lazy"
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       </div>
-                      <strong style={{ fontSize: '1.05rem' }}>{player.nickname}</strong>
+                      <strong style={{ fontSize: '1rem' }}>{player.nickname}</strong>
                     </div>
                     {hostUserId === player.userId && (
                       <span
@@ -133,37 +134,46 @@ export function PreparePlayerList({
                       </span>
                     )}
                   </div>
-                  <span style={{ fontSize: '0.9rem', opacity: 0.75 }}>ID：{player.userId}</span>
-                  <span
+                  <div
                     style={{
-                      fontSize: '0.85rem',
-                      color: player.prepared ? '#4ade80' : '#f87171',
-                      fontWeight: 600
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem'
                     }}
                   >
-                    {player.prepared ? '已准备' : '未准备'}
-                  </span>
-                  {isHost &&
-                    player.userId !== currentUserId &&
-                    player.userId !== hostUserId &&
-                    typeof player.userId === 'number' &&
-                    onKickPlayer && (
-                      <button
-                        type="button"
-                        onClick={() => onKickPlayer(player.userId)}
-                        style={{
-                          marginTop: '0.35rem',
-                          padding: '0.45rem 0.9rem',
-                          borderRadius: 10,
-                          border: '1px solid rgba(248, 113, 113, 0.5)',
-                          background: 'rgba(248, 113, 113, 0.12)',
-                          color: '#fecaca',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        移出房间
-                      </button>
-                    )}
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        color: player.prepared ? '#4ade80' : '#f87171',
+                        fontWeight: 600
+                      }}
+                    >
+                      {player.prepared ? '已准备' : '未准备'}
+                    </span>
+                    {isHost &&
+                      player.userId !== currentUserId &&
+                      player.userId !== hostUserId &&
+                      typeof player.userId === 'number' &&
+                      onKickPlayer && (
+                        <button
+                          type="button"
+                          onClick={() => onKickPlayer(player.userId)}
+                          style={{
+                            padding: '0.1rem 0.4rem',
+                            borderRadius: 6,
+                            border: '1px solid rgba(248, 113, 113, 0.6)',
+                            background: 'rgba(248, 113, 113, 0.12)',
+                            color: '#fecaca',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          移出
+                        </button>
+                      )}
+                  </div>
                 </>
               ) : (
                 <span style={{ opacity: 0.6 }}>空座位</span>
