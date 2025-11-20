@@ -1,32 +1,34 @@
+import type { GameCard, SeatId, TableId, UserId } from '@shared/messages';
 
-import { makeDeck, Card } from './cards';
+import { makeDeck } from './cards';
 import { shuffle } from './shuffle';
 
 export interface PlayerState {
-  id: string;
-  userId: number;
+  id: SeatId;
+  seatId: SeatId;
+  userId: UserId;
   nickname: string;
-  hand: Card[];
+  hand: GameCard[];
   hasFolded: boolean;
 }
 
 export interface TableState {
-  id: string;
+  id: TableId;
   seed: string;
-  deck: Card[];
-  players: Record<string, PlayerState>;
-  seats: string[]; // ordered player ids
+  deck: GameCard[];
+  players: Record<SeatId, PlayerState>;
+  seats: SeatId[]; // ordered player ids
 }
 
-export function createTable(id: string, seed: string): TableState {
+export function createTable(id: TableId, seed: string): TableState {
   const deck = shuffle(makeDeck({ packs: 2 }), seed);
   return { id, seed, deck, players: {}, seats: [] };
 }
 
-export function joinTable(state: TableState, playerId: string, nickname: string, userId: number) {
-  if (state.players[playerId]) return state; // idempotent
-  state.players[playerId] = { id: playerId, userId, nickname, hand: [], hasFolded: false };
-  state.seats.push(playerId);
+export function joinTable(state: TableState, seatId: SeatId, nickname: string, userId: UserId) {
+  if (state.players[seatId]) return state; // idempotent
+  state.players[seatId] = { id: seatId, seatId, userId, nickname, hand: [], hasFolded: false };
+  state.seats.push(seatId);
   return state;
 }
 
@@ -50,7 +52,7 @@ export function resetDeck(state: TableState, options: ResetDeckOptions = {}) {
   return state;
 }
 
-export function drawCard(state: TableState, seatId: string) {
+export function drawCard(state: TableState, seatId: SeatId) {
   const card = state.deck.pop();
   if (!card) {
     return null;

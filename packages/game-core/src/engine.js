@@ -4,11 +4,11 @@ export function createTable(id, seed) {
     const deck = shuffle(makeDeck({ packs: 2 }), seed);
     return { id, seed, deck, players: {}, seats: [] };
 }
-export function joinTable(state, playerId, nickname, userId) {
-    if (state.players[playerId])
+export function joinTable(state, seatId, nickname, userId) {
+    if (state.players[seatId])
         return state;
-    state.players[playerId] = { id: playerId, userId, nickname, hand: [], hasFolded: false };
-    state.seats.push(playerId);
+    state.players[seatId] = { id: seatId, seatId, userId, nickname, hand: [], hasFolded: false };
+    state.seats.push(seatId);
     return state;
 }
 export function clearHands(state) {

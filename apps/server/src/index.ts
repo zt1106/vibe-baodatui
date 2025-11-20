@@ -654,6 +654,7 @@ io.on('connection', (socket) => {
         if (playerState) {
           delete table.state.players[seatForUser];
           playerState.id = socket.id;
+          playerState.seatId = socket.id;
           table.state.players[socket.id] = playerState;
         }
       }
@@ -819,17 +820,17 @@ function emitState(tableId: string) {
       avatar: resolveUserAvatar(table.host.userId)
     },
     config: table.config,
-  seats: table.state.seats
-    .map(id => table.state.players[id])
-    .filter((player): player is NonNullable<typeof player> => Boolean(player))
-    .map(player => ({
-      id: player.id,
-      userId: player.userId,
-      nickname: player.nickname,
-      avatar: resolveUserAvatar(player.userId),
-      prepared: table.prepared.get(player.userId) ?? false,
-      handCount: player.hand.length
-    }))
+    seats: table.state.seats
+      .map(id => table.state.players[id])
+      .filter((player): player is NonNullable<typeof player> => Boolean(player))
+      .map(player => ({
+        seatId: player.seatId ?? player.id,
+        userId: player.userId,
+        nickname: player.nickname,
+        avatar: resolveUserAvatar(player.userId),
+        prepared: table.prepared.get(player.userId) ?? false,
+        handCount: player.hand.length
+      }))
 };
   io.emit('state', snapshot);
 }
