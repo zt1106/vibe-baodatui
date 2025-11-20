@@ -43,7 +43,8 @@ export function PreparePlayerList({
         borderRadius: 24,
         border: '1px solid rgba(148, 163, 184, 0.25)',
         background: 'rgba(15, 23, 42, 0.82)',
-        boxShadow: '0 24px 60px rgba(15, 23, 42, 0.45)'
+        boxShadow: '0 24px 60px rgba(15, 23, 42, 0.45)',
+        alignSelf: 'start'
       }}
     >
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -71,7 +72,9 @@ export function PreparePlayerList({
             gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
             gap: '0.75rem',
             overflowY: 'auto',
-            paddingRight: '0.25rem'
+            paddingRight: '0.25rem',
+            alignItems: 'start',
+            alignContent: 'start'
           }}
         >
           {seats.map(({ seatNumber, player }) => (
