@@ -13,6 +13,7 @@ import {
   NICKNAME_STORAGE_KEY,
   type StoredUser
 } from '../../../../lib/auth';
+import { PreparePlayerList, type PrepareSeat } from '../../../../components/prepare/PreparePlayerList';
 import { getApiBaseUrl, fetchJson } from '../../../../lib/api';
 import type { AsyncStatus } from '../../../../lib/types';
 import {
@@ -366,7 +367,7 @@ export default function PreparePage({ params }: PreparePageProps) {
     }
     sendTableEvent('table:setPrepared', { tableId, prepared: !selfPrepared });
   }, [isSelfSeated, selfPrepared, sendTableEvent, tableId]);
-  const seats = useMemo(() => {
+  const seats = useMemo<PrepareSeat[]>(() => {
     if (!prepareState) return [];
     const total = prepareState.config.capacity;
     return Array.from({ length: total }, (_, index) => ({
@@ -504,147 +505,17 @@ export default function PreparePage({ params }: PreparePageProps) {
           minHeight: 0
         }}
       >
-        <div
-          style={{
-            background: 'rgba(15, 23, 42, 0.85)',
-            borderRadius: 24,
-            border: '1px solid rgba(148, 163, 184, 0.28)',
-            padding: '1.5rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-            boxShadow: '0 24px 60px rgba(15, 23, 42, 0.4)',
-            minHeight: 0
-          }}
-        >
-          <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ margin: 0 }}>玩家列表</h2>
-              <p style={{ margin: '0.25rem 0 0', opacity: 0.75 }}>
-                当前 {playerCount} / {capacity || '—'} 名玩家
-              </p>
-            </div>
-          </header>
-
-          {prepareStatus === 'loading' && (
-            <div style={{ opacity: 0.7 }}>正在同步座位信息…</div>
-          )}
-
-          {prepareStatus === 'error' && prepareError && (
-            <div style={{ color: '#fca5a5' }}>{prepareError}</div>
-          )}
-
-          {prepareStatus === 'ready' && seats.length === 0 && (
-            <div style={{ opacity: 0.7 }}>暂未有人加入，快邀请朋友一起准备吧！</div>
-          )}
-
-          {seats.length > 0 && (
-            <div
-              data-testid="prepare-player-list"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                gap: '1rem',
-                overflowY: 'auto',
-                paddingRight: '0.25rem'
-              }}
-            >
-              {seats.map(({ seatNumber, player }) => (
-                <article
-                  key={seatNumber}
-                  style={{
-                    borderRadius: 18,
-                    border: '1px solid rgba(148, 163, 184, 0.25)',
-                    padding: '1rem',
-                    background: player ? 'rgba(34, 197, 94, 0.08)' : 'rgba(15, 23, 42, 0.6)',
-                    display: 'grid',
-                    gap: '0.35rem',
-                    boxShadow: '0 16px 36px rgba(15, 23, 42, 0.35)'
-                  }}
-                >
-                  <span style={{ fontSize: '0.85rem', opacity: 0.75 }}>座位 {seatNumber}</span>
-                  {player ? (
-                    <>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          gap: '0.5rem'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                          <div
-                            style={{
-                              width: 34,
-                              height: 34,
-                              borderRadius: 12,
-                              overflow: 'hidden',
-                              border: '1px solid rgba(148, 163, 184, 0.45)'
-                            }}
-                          >
-                            <img
-                              src={`/avatars/${player.avatar}`}
-                              alt={`${player.nickname} 头像`}
-                              width={34}
-                              height={34}
-                              loading="lazy"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          </div>
-                          <strong style={{ fontSize: '1.05rem' }}>{player.nickname}</strong>
-                        </div>
-                        {prepareState?.host.userId === player.userId && (
-                          <span
-                            style={{
-                              padding: '0.1rem 0.5rem',
-                              borderRadius: 999,
-                              fontSize: '0.75rem',
-                              background: 'rgba(234, 179, 8, 0.2)',
-                              color: '#facc15'
-                            }}
-                          >
-                            房主
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ fontSize: '0.9rem', opacity: 0.75 }}>ID：{player.userId}</span>
-                      <span
-                        style={{
-                          fontSize: '0.85rem',
-                          color: player.prepared ? '#4ade80' : '#f87171',
-                          fontWeight: 600
-                        }}
-                      >
-                        {player.prepared ? '已准备' : '未准备'}
-                      </span>
-                      {isHost && user && player.userId !== user.id && prepareState?.host.userId !== player.userId && (
-                        <button
-                          type="button"
-                          onClick={() => handleKickPlayer(player.userId)}
-                          style={{
-                            marginTop: '0.35rem',
-                            padding: '0.45rem 0.9rem',
-                            borderRadius: 10,
-                            border: '1px solid rgba(248, 113, 113, 0.5)',
-                            background: 'rgba(248, 113, 113, 0.12)',
-                            color: '#fecaca',
-                            fontSize: '0.8rem',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          移出房间
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <span style={{ opacity: 0.5 }}>空位，等待玩家加入…</span>
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
+        <PreparePlayerList
+          seats={seats}
+          playerCount={playerCount}
+          capacity={prepareState?.config.capacity ?? null}
+          status={prepareStatus}
+          error={prepareError}
+          isHost={isHost}
+          hostUserId={prepareState?.host.userId ?? null}
+          currentUserId={user?.id ?? null}
+          onKickPlayer={handleKickPlayer}
+        />
 
         <div
           style={{
