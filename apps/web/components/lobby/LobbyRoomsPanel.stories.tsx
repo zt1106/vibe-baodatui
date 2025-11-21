@@ -65,15 +65,3 @@ export const ErrorState: Story = {
     rooms: []
   }
 };
-
-export const NarrowViewport: Story = {
-  args: {
-    rooms: sampleRooms.slice(0, 2),
-    status: 'ready'
-  },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile2'
-    }
-  }
-};
