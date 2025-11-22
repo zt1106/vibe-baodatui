@@ -98,6 +98,13 @@
   display: inline-block;
 }
 
+.topBarActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
 .tableRing {
   position: relative;
   width: 100%;

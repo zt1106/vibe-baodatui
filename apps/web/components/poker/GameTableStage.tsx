@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 
 import type { Card, Rank } from '@poker/core-cards';
 import { RANKS } from '@poker/core-cards';
@@ -97,53 +97,108 @@ export function GameTableStage({
     [handCardRows, handCards, handGrouping]
   );
 
-  const [isLeaving, setIsLeaving] = useState(false);
-  const leavePromptingRef = useRef(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
-  const handleLeave = useCallback(() => {
+  const handleLeaveRequest = useCallback(() => {
     if (!onLeave) return;
-    if (isLeaving || leavePromptingRef.current) return;
-    setIsLeaving(true);
-    leavePromptingRef.current = true;
-    try {
-      const confirmed =
-        typeof window === 'undefined' || !leaveConfirmMessage
-          ? true
-          : window.confirm(leaveConfirmMessage);
-      if (confirmed) {
-        onLeave();
-      } else {
-        setIsLeaving(false);
-      }
-    } finally {
-      leavePromptingRef.current = false;
-    }
-  }, [isLeaving, leaveConfirmMessage, onLeave]);
+    setShowLeaveConfirm(true);
+  }, [onLeave]);
+
+  const handleLeaveConfirm = useCallback(() => {
+    if (!onLeave) return;
+    setShowLeaveConfirm(false);
+    onLeave();
+  }, [onLeave]);
+
+  const handleLeaveCancel = useCallback(() => {
+    setShowLeaveConfirm(false);
+  }, []);
 
   const topBarActions = useMemo(() => {
     if (!onLeave) return null;
     return (
-      <button
-        type="button"
-        onClick={handleLeave}
-        disabled={isLeaving}
+      <div
         style={{
-          padding: '0.28rem 0.65rem',
-          borderRadius: 8,
-          border: '1px solid rgba(248, 113, 113, 0.6)',
-          background: 'transparent',
-          color: '#fecaca',
-          fontWeight: 600,
-          fontSize: '0.8rem',
-          cursor: 'pointer',
-          boxShadow: '0 10px 20px rgba(2, 6, 23, 0.55)',
-          backdropFilter: 'blur(6px)'
+          position: 'relative',
+          display: 'inline-flex',
+          alignItems: 'center'
         }}
       >
-        {leaveLabel}
-      </button>
+        <button
+          type="button"
+          onClick={handleLeaveRequest}
+          style={{
+            padding: '0.28rem 0.65rem',
+            borderRadius: 8,
+            border: '1px solid rgba(248, 113, 113, 0.6)',
+            background: 'transparent',
+            color: '#fecaca',
+            fontWeight: 600,
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            boxShadow: '0 10px 20px rgba(2, 6, 23, 0.55)',
+            backdropFilter: 'blur(6px)'
+          }}
+        >
+          {leaveLabel}
+        </button>
+        {showLeaveConfirm ? (
+          <div
+            style={{
+              position: 'absolute',
+              top: '110%',
+              right: 0,
+              minWidth: 180,
+              padding: '0.75rem 0.75rem 0.5rem',
+              borderRadius: 12,
+              background: 'rgba(15,23,42,0.92)',
+              border: '1px solid rgba(148,163,184,0.25)',
+              boxShadow: '0 12px 26px rgba(0,0,0,0.45)',
+              color: '#e2e8f0',
+              zIndex: 10
+            }}
+          >
+            <div style={{ fontSize: '0.85rem', marginBottom: '0.5rem', lineHeight: 1.5 }}>
+              {leaveConfirmMessage}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem' }}>
+              <button
+                type="button"
+                onClick={handleLeaveCancel}
+                style={{
+                  padding: '0.32rem 0.65rem',
+                  borderRadius: 8,
+                  border: '1px solid rgba(148,163,184,0.4)',
+                  background: 'rgba(15,23,42,0.8)',
+                  color: '#cbd5e1',
+                  fontSize: '0.78rem',
+                  cursor: 'pointer'
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleLeaveConfirm}
+                style={{
+                  padding: '0.32rem 0.65rem',
+                  borderRadius: 8,
+                  border: '1px solid rgba(248, 113, 113, 0.6)',
+                  background: 'rgba(248, 113, 113, 0.1)',
+                  color: '#fecaca',
+                  fontWeight: 600,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer'
+                }}
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
     );
-  }, [handleLeave, isLeaving, leaveLabel, onLeave]);
+  }, [handleLeaveCancel, handleLeaveConfirm, handleLeaveRequest, leaveConfirmMessage, leaveLabel, onLeave, showLeaveConfirm]);
 
   return (
     <GameTable
