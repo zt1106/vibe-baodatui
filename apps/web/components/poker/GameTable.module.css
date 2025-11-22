@@ -42,6 +42,9 @@
   box-shadow: 0 -30px 60px rgba(0, 0, 0, 0.65);
   position: sticky;
   bottom: 0;
+  margin-top: calc(var(--hand-overlap, 0px) * -1);
+  padding-top: calc(16px + var(--hand-overlap, 0px));
+  z-index: 4;
 }
 
 .handSectionInner {

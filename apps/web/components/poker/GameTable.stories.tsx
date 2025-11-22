@@ -134,6 +134,7 @@ type TableStoryArgs = {
   handCardSize?: CardRowSize;
   seatCardSize?: CardRowSize;
   communityCardSize?: CardRowSize;
+  handSectionOverlap?: number;
 };
 
 const meta: Meta<typeof GameTable, TableStoryArgs> = {
@@ -155,7 +156,8 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     seatCardSize: 'sm',
     communityCardSize: 'md',
     avatarRingScale: 1.08,
-    cardRingScale: 0.66
+    cardRingScale: 0.66,
+    handSectionOverlap: 32
   },
   argTypes: {
     playerCount: {
@@ -191,6 +193,9 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     communityCardSize: {
       control: { type: 'radio' },
       options: ['xs', 'sm', 'md', 'lg']
+    },
+    handSectionOverlap: {
+      control: { type: 'number', min: 0, max: 120, step: 4 }
     },
     avatarRingScale: {
       control: { type: 'number', min: 0.4, max: 1.6, step: 0.02 }

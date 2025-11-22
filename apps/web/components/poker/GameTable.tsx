@@ -39,6 +39,7 @@ export type GameTableProps = {
   cardRingScale?: number;
   communityCardSize?: CardRowSize;
   seatCardSize?: CardRowSize;
+  handSectionOverlap?: number;
 };
 
 type Dimensions = { width: number; height: number };
@@ -73,7 +74,8 @@ export function GameTable({
   avatarRingScale = 1.08,
   cardRingScale = 0.66,
   communityCardSize = 'md',
-  seatCardSize = 'sm'
+  seatCardSize = 'sm',
+  handSectionOverlap = 32
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
@@ -299,7 +301,10 @@ export function GameTable({
         </div>
       </div>
       {showHandCardSection && (
-        <div className={styles.handSection}>
+        <div
+          className={styles.handSection}
+          style={{ '--hand-overlap': `${handSectionOverlap}px` } as CSSProperties}
+        >
           <div className={styles.handSectionInner}>
             <MultiCardRow
               rows={handCardRows}
