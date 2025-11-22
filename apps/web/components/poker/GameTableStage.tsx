@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import type { Card, Rank } from '@poker/core-cards';
 import { RANKS } from '@poker/core-cards';
 
 import { GameTable, type GameTableProps } from './GameTable';
+import stageStyles from './GameTableStage.module.css';
 
 type HandGrouping = 'byColor' | 'bySuit';
 
@@ -15,6 +16,8 @@ export type GameTableStageProps = GameTableProps & {
   onLeave?: () => void;
   leaveConfirmMessage?: string;
   leaveLabel?: string;
+  onUserAction?: () => void;
+  userActionLabel?: string;
 };
 
 const SUIT_DISPLAY_ORDER: Array<'S' | 'H' | 'D' | 'C'> = ['S', 'H', 'D', 'C'];
@@ -90,6 +93,9 @@ export function GameTableStage({
   onLeave,
   leaveConfirmMessage = '确定要离开牌局吗？',
   leaveLabel = '离开牌局',
+  onUserAction,
+  userActionLabel = '开始行动',
+  handActionButton,
   ...gameTableProps
 }: GameTableStageProps) {
   const resolvedHandCardRows = useMemo(
@@ -200,12 +206,23 @@ export function GameTableStage({
     );
   }, [handleLeaveCancel, handleLeaveConfirm, handleLeaveRequest, leaveConfirmMessage, leaveLabel, onLeave, showLeaveConfirm]);
 
+  const resolvedHandActionButton = useMemo(
+    () =>
+      handActionButton ?? (
+        <button type="button" onClick={onUserAction} className={stageStyles.actionButton}>
+          <span className={stageStyles.actionButtonLabel}>{userActionLabel}</span>
+        </button>
+      ),
+    [handActionButton, onUserAction, userActionLabel]
+  );
+
   return (
     <GameTable
       handCardRowGap={handCardRowGap}
       handCardRowOverlap={handCardRowOverlap}
       handCardRows={resolvedHandCardRows}
       topBarActions={topBarActions}
+      handActionButton={resolvedHandActionButton}
       {...gameTableProps}
     />
   );

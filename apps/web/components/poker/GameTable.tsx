@@ -50,6 +50,7 @@ export type GameTableProps = {
   communityCardSize?: CardRowSize;
   seatCardSize?: CardRowSize;
   handSectionOverlap?: number;
+  handActionButton?: ReactNode;
   topBarActions?: ReactNode;
   dealingCards?: DealingCardFlight[];
   dealingOrigin?: { x?: number; y?: number };
@@ -97,6 +98,7 @@ export function GameTable({
   communityCardSize = 'md',
   seatCardSize = 'sm',
   handSectionOverlap = 32,
+  handActionButton,
   topBarActions,
   dealingCards,
   dealingOrigin,
@@ -411,6 +413,11 @@ export function GameTable({
             } as CSSProperties
           }
         >
+          {handActionButton ? (
+            <div className={styles.handActionSlot}>
+              <div className={styles.handActionSlotInner}>{handActionButton}</div>
+            </div>
+          ) : null}
           <div className={styles.handSectionInner}>
             <MultiCardRow
               rows={handCardRows}

@@ -45,6 +45,7 @@
   position: sticky;
   bottom: 0;
   z-index: 4;
+  --hand-action-offset-x: 20vw;
 }
 
 .handSectionInner {
@@ -52,6 +53,33 @@
   margin: 0 auto;
   display: flex;
   justify-content: center;
+}
+
+.handActionSlot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -75%) translateX(var(--hand-action-offset-x));
+  pointer-events: none;
+  z-index: 6;
+  width: max-content;
+}
+
+.handActionSlotInner {
+  pointer-events: auto;
+  filter: drop-shadow(0 22px 28px rgba(0, 0, 0, 0.45));
+}
+
+@media (max-width: 900px) {
+  .handActionSlot {
+    transform: translate(-50%, -72%) translateX(14vw);
+  }
+}
+
+@media (max-width: 640px) {
+  .handActionSlot {
+    transform: translate(-50%, -68%) translateX(10vw);
+  }
 }
 
 .topBar {
