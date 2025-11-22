@@ -307,7 +307,7 @@ export function GameTable({
             {
               '--hand-overlap': `${handSectionOverlap}px`,
               marginTop: -handSectionOverlap,
-              paddingTop: 16 + handSectionOverlap
+              paddingTop: 16
             } as CSSProperties
           }
         >
