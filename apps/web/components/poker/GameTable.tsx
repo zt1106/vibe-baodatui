@@ -113,8 +113,12 @@ export function GameTable({
   const effectiveHeight = dimensions.height || fallbackSize;
   const minDimension = Math.min(effectiveWidth, effectiveHeight);
   const measurementBasis = minDimension > 0 ? minDimension : fallbackSize;
+  const centerX = effectiveWidth / 2;
+  const centerY = effectiveHeight / 2;
   const avatarSize = PLAYER_AVATAR_SIZE;
   const communityCardWidth = Math.round(Math.min(Math.max(measurementBasis * 0.14, 96), 150));
+  const avatarEdgeMargin = avatarSize / 2 + 18;
+  const cardEdgeMargin = Math.max(avatarEdgeMargin - 8, 40);
 
   const ellipsePaddingX = Math.max(Math.min(effectiveWidth * 0.08, 120), 36);
   const ellipsePaddingY = Math.max(Math.min(effectiveHeight * 0.08, 120), 36);
@@ -123,10 +127,14 @@ export function GameTable({
   const outerEllipseScale = 1.05;
   const ellipseRadiusX = ellipseBaseX * outerEllipseScale;
   const ellipseRadiusY = ellipseBaseY * outerEllipseScale;
-  const avatarRadiusX = ellipseRadiusX * avatarRingScale;
-  const avatarRadiusY = ellipseRadiusY * avatarRingScale;
-  const cardRadiusX = ellipseRadiusX * cardRingScale;
-  const cardRadiusY = ellipseRadiusY * cardRingScale;
+  const maxAvatarRadiusX = Math.max(centerX - avatarEdgeMargin, 0);
+  const maxAvatarRadiusY = Math.max(centerY - avatarEdgeMargin, 0);
+  const maxCardRadiusX = Math.max(centerX - cardEdgeMargin, 0);
+  const maxCardRadiusY = Math.max(centerY - cardEdgeMargin, 0);
+  const avatarRadiusX = Math.min(ellipseRadiusX * avatarRingScale, maxAvatarRadiusX);
+  const avatarRadiusY = Math.min(ellipseRadiusY * avatarRingScale, maxAvatarRadiusY);
+  const cardRadiusX = Math.min(ellipseRadiusX * cardRingScale, maxCardRadiusX);
+  const cardRadiusY = Math.min(ellipseRadiusY * cardRingScale, maxCardRadiusY);
   const dealerRadiusX = (avatarRadiusX + cardRadiusX) / 2;
   const dealerRadiusY = (avatarRadiusY + cardRadiusY) / 2;
 
@@ -136,8 +144,6 @@ export function GameTable({
     if (visiblePlayers.length === 0) {
       return [];
     }
-    const centerX = effectiveWidth / 2;
-    const centerY = effectiveHeight / 2;
     const step = (Math.PI * 2) / visiblePlayers.length;
     const rotationOffset = visiblePlayers.length % 2 === 1 ? step / 2 : 0;
     const startAngle = -Math.PI / 2 + rotationOffset; // place first player at the top edge
@@ -171,6 +177,8 @@ export function GameTable({
     dealerRadiusY,
     effectiveHeight,
     effectiveWidth,
+    centerX,
+    centerY,
     visiblePlayers
   ]);
 

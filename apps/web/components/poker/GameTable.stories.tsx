@@ -130,8 +130,6 @@ const sampleHandRows = [
 
 type TableStoryArgs = {
   playerCount: number;
-  tableMarginTop?: number;
-  tableMarginBottom?: number;
 };
 
 const meta: Meta<typeof GameTable, TableStoryArgs> = {
@@ -150,9 +148,7 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     handCardRowGap: 12,
     handCardRowOverlap: 20,
     avatarRingScale: 1.08,
-    cardRingScale: 0.75,
-    tableMarginTop: 0,
-    tableMarginBottom: 0
+    cardRingScale: 0.75
   },
   argTypes: {
     playerCount: {
@@ -182,12 +178,6 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     },
     cardRingScale: {
       control: { type: 'number', min: 0.3, max: 1.4, step: 0.02 }
-    },
-    tableMarginTop: {
-      control: { type: 'number', min: 0, max: 200, step: 4 }
-    },
-    tableMarginBottom: {
-      control: { type: 'number', min: 0, max: 200, step: 4 }
     }
   }
 };
@@ -204,9 +194,7 @@ export const FullTable: Story = {
     sceneHeight: '100vh',
     handCardRows: sampleHandRows
   },
-  render: ({ playerCount, tableMarginTop = 0, tableMarginBottom = 0, ...storyArgs }) => (
-    <div style={{ marginTop: tableMarginTop, marginBottom: tableMarginBottom }}>
-      <GameTable players={playerStubs.slice(0, playerCount)} {...storyArgs} />
-    </div>
+  render: ({ playerCount, ...storyArgs }) => (
+    <GameTable players={playerStubs.slice(0, playerCount)} {...storyArgs} />
   )
 };
