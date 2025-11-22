@@ -251,18 +251,16 @@ export function GameTable({
             </div>
             <div className={styles.centerGlow} aria-hidden="true" />
             <div className={styles.communityRow}>
-              {communityCards.length > 0 ? (
-                <CardRow
-                  cards={communityCards}
-                  size={communityCardSize}
-                  overlap="65%"
-                  angle={0}
-                  curveVerticalOffset={18}
-                  selectionMode="none"
-                />
-              ) : (
-                <span className={styles.communityPlaceholder}>等待发公共牌…</span>
-              )}
+            {communityCards.length > 0 ? (
+              <CardRow
+                cards={communityCards}
+                size={communityCardSize}
+                overlap="65%"
+                angle={0}
+                curveVerticalOffset={18}
+                selectionMode="none"
+              />
+            ) : null}
             </div>
             {seatPositions.length === 0 && (
               <div className={styles.emptyState}>等待玩家坐下…</div>
@@ -290,9 +288,7 @@ export function GameTable({
                         curveVerticalOffset={18}
                         selectionMode="none"
                       />
-                    ) : (
-                      <span className={styles.cardPlaceholder}>未发牌</span>
-                    )}
+                    ) : null}
                   </div>
                   <div
                     className={styles.avatarWrapper}

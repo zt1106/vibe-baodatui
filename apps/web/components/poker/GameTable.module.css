@@ -157,12 +157,6 @@
   border-radius: 28px;
 }
 
-.communityPlaceholder {
-  letter-spacing: 0.08em;
-  color: rgba(226, 232, 240, 0.7);
-  font-size: 0.85rem;
-}
-
 .emptyState {
   position: absolute;
   left: 50%;

@@ -108,6 +108,7 @@ const playerStubs = basePlayerStubs.map(player => ({
   ...player,
   avatarUrl: pickRandomAvatar()
 }));
+const playerStubsNoCards = playerStubs.map(player => ({ ...player, cards: [] }));
 
 const flopToRiver = [
   makeCard('10', 'S', { faceUp: true }),
@@ -226,5 +227,32 @@ export const FullTable: Story = {
   },
   render: ({ playerCount, ...storyArgs }) => (
     <GameTableStage players={playerStubs.slice(0, playerCount)} {...storyArgs} />
+  )
+};
+
+export const EmptyCards: Story = {
+  args: {
+    playerCount: 8,
+    sceneWidth: '100vw',
+    sceneHeight: '100vh',
+    sceneAlign: 'center',
+    communityCards: [],
+    handCards: [],
+    handGrouping: 'byColor',
+    handCardRows: [],
+    handCardAngle: -10,
+    handCardCurveVerticalOffset: 16,
+    handCardOverlap: '55%',
+    handCardRowGap: 0,
+    handCardRowOverlap: 40,
+    handCardSize: 'md',
+    seatCardSize: 'sm',
+    communityCardSize: 'md',
+    avatarRingScale: 1.08,
+    cardRingScale: 0.66,
+    handSectionOverlap: 32
+  },
+  render: ({ playerCount, ...storyArgs }) => (
+    <GameTableStage players={playerStubsNoCards.slice(0, playerCount)} {...storyArgs} />
   )
 };
