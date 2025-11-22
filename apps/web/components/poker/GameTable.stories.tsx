@@ -5,7 +5,8 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { makeCard } from '@poker/core-cards';
 import type { CardRowSize } from '@poker/ui-cards';
 
-import { GameTable, type GameTableSeat } from './GameTable';
+import { GameTableStage } from './GameTableStage';
+import { type GameTableSeat } from './GameTable';
 import { LOCAL_PLAYER_AVATAR_URLS } from './playerAvatarDefaults';
 
 const basePlayerStubs: GameTableSeat[] = [
@@ -137,9 +138,9 @@ type TableStoryArgs = {
   handSectionOverlap?: number;
 };
 
-const meta: Meta<typeof GameTable, TableStoryArgs> = {
+const meta: Meta<typeof GameTableStage, TableStoryArgs> = {
   title: 'Table/GameTable',
-  component: GameTable,
+  component: GameTableStage,
   tags: ['autodocs'],
   parameters: { layout: 'fullscreen' },
   args: {
@@ -151,8 +152,8 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     handCardAngle: -10,
     handCardCurveVerticalOffset: 16,
     handCardOverlap: '55%',
-    handCardRowGap: 12,
-    handCardRowOverlap: 20,
+    handCardRowGap: 0,
+    handCardRowOverlap: 40,
     handCardSize: 'md',
     seatCardSize: 'sm',
     communityCardSize: 'md',
@@ -220,6 +221,6 @@ export const FullTable: Story = {
     handCardRows: sampleHandRows
   },
   render: ({ playerCount, ...storyArgs }) => (
-    <GameTable players={playerStubs.slice(0, playerCount)} {...storyArgs} />
+    <GameTableStage players={playerStubs.slice(0, playerCount)} {...storyArgs} />
   )
 };

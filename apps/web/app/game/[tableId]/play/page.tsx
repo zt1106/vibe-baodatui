@@ -10,7 +10,8 @@ import {
   type GameSnapshot,
   type ServerState
 } from '@shared/messages';
-import { GameTable, type GameTableSeat } from '../../../../components/poker/GameTable';
+import { GameTableStage } from '../../../../components/poker/GameTableStage';
+import { type GameTableSeat } from '../../../../components/poker/GameTable';
 import { type Socket } from 'socket.io-client';
 import {
   acquireTableSocket,
@@ -285,68 +286,29 @@ export default function PlayPage({ params }: PlayPageProps) {
   }, [router, tableId]);
 
   return (
-    <main
-      style={{
-        minHeight: '100dvh',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.5rem',
-        background: 'radial-gradient(circle at top, rgba(15,23,42,0.95), rgba(2,6,23,0.95))'
-      }}
-    >
-      <section
-        style={{
-          position: 'relative',
-          minHeight: 0,
-          flex: 1,
-          display: 'flex',
-          alignItems: 'stretch',
-          justifyContent: 'center'
-        }}
-      >
-        <div
+    <GameTableStage
+      players={tablePlayers}
+      handCardRows={handRows}
+      actions={
+        <button
+          type="button"
+          onClick={handleExitGame}
           style={{
-            position: 'absolute',
-            top: '0.75rem',
-            right: '0.75rem',
-            zIndex: 5,
-            pointerEvents: 'none',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            width: 'auto'
+            padding: '0.28rem 0.65rem',
+            borderRadius: 8,
+            border: '1px solid rgba(248, 113, 113, 0.6)',
+            background: 'transparent',
+            color: '#fecaca',
+            fontWeight: 600,
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            boxShadow: '0 10px 20px rgba(2, 6, 23, 0.55)',
+            backdropFilter: 'blur(6px)'
           }}
         >
-          <button
-            type="button"
-            onClick={handleExitGame}
-            style={{
-              padding: '0.28rem 0.65rem',
-              borderRadius: 8,
-              border: '1px solid rgba(248, 113, 113, 0.6)',
-              background: 'transparent',
-              color: '#fecaca',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              boxShadow: '0 10px 20px rgba(2, 6, 23, 0.55)',
-              backdropFilter: 'blur(6px)',
-              pointerEvents: 'auto'
-            }}
-          >
-            离开牌局
-          </button>
-        </div>
-        <GameTable
-          players={tablePlayers}
-          communityCards={[]}
-          handCardRows={handRows}
-          handCardRowGap={12}
-          handCardRowOverlap={24}
-          handCardOverlap="60%"
-          handCardAngle={-12}
-          handCardCurveVerticalOffset={18}
-        />
-      </section>
-    </main>
+          离开牌局
+        </button>
+      }
+    />
   );
 }
