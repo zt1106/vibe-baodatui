@@ -248,47 +248,53 @@ export function GameTable({
             {seatPositions.length === 0 && (
               <div className={styles.emptyState}>等待玩家坐下…</div>
             )}
-            {seatPositions.map(seat => (
-              <Fragment key={seat.player.id}>
-                <div
-                  className={styles.cardArea}
-                  style={{
-                    left: `${seat.cards.x}px`,
-                    top: `${seat.cards.y}px`
-                  }}
-                >
-                  {seat.player.cards && seat.player.cards.length > 0 ? (
-                    <CardRow
-                      cards={seat.player.cards}
-                      size={seatCardSize}
-                      overlap="65%"
-                      angle={0}
-                      curveVerticalOffset={18}
-                      selectionMode="none"
-                    />
-                  ) : (
-                    <span className={styles.cardPlaceholder}>未发牌</span>
-                  )}
-                </div>
-                <div
-                  className={styles.avatarWrapper}
-                  style={{
-                    left: `${seat.avatar.x}px`,
-                    top: `${seat.avatar.y}px`
-                  }}
-                >
-                  {seat.player.id !== suppressedSeatId && (
-                    <PlayerAvatar
-                      playerName={seat.player.nickname}
-                      displayName={formatPlayerName(seat.player.nickname)}
-                      avatarUrl={seat.player.avatarUrl ?? `/avatars/${seat.player.avatar}`}
-                      size={avatarSize}
-                      className={styles.tableAvatar}
-                    />
-                  )}
-                </div>
-              </Fragment>
-            ))}
+            {seatPositions.map(seat => {
+              const hasCards = Boolean(seat.player.cards && seat.player.cards.length > 0);
+              const cardAreaClass = hasCards
+                ? `${styles.cardArea} ${styles.cardAreaActive}`
+                : styles.cardArea;
+              return (
+                <Fragment key={seat.player.id}>
+                  <div
+                    className={cardAreaClass}
+                    style={{
+                      left: `${seat.cards.x}px`,
+                      top: `${seat.cards.y}px`
+                    }}
+                  >
+                    {hasCards ? (
+                      <CardRow
+                        cards={seat.player.cards}
+                        size={seatCardSize}
+                        overlap="65%"
+                        angle={0}
+                        curveVerticalOffset={18}
+                        selectionMode="none"
+                      />
+                    ) : (
+                      <span className={styles.cardPlaceholder}>未发牌</span>
+                    )}
+                  </div>
+                  <div
+                    className={styles.avatarWrapper}
+                    style={{
+                      left: `${seat.avatar.x}px`,
+                      top: `${seat.avatar.y}px`
+                    }}
+                  >
+                    {seat.player.id !== suppressedSeatId && (
+                      <PlayerAvatar
+                        playerName={seat.player.nickname}
+                        displayName={formatPlayerName(seat.player.nickname)}
+                        avatarUrl={seat.player.avatarUrl ?? `/avatars/${seat.player.avatar}`}
+                        size={avatarSize}
+                        className={styles.tableAvatar}
+                      />
+                    )}
+                  </div>
+                </Fragment>
+              );
+            })}
           </div>
         </div>
       </div>

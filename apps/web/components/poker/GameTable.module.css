@@ -131,6 +131,13 @@
 .cardArea {
   position: absolute;
   transform: translate(-50%, -50%) rotateX(var(--table-tilt-deg, 22deg));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.cardAreaActive {
   padding: 8px 10px 6px;
   border-radius: 18px;
   background: rgba(2, 30, 15, 0.78);
@@ -138,8 +145,6 @@
   box-shadow:
     0 6px 12px rgba(0, 0, 0, 0.45),
     inset 0 0 35px rgba(74, 222, 128, 0.08);
-  z-index: 2;
-  min-width: 160px;
 }
 
 .cardPlaceholder {
