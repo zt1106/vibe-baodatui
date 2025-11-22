@@ -195,7 +195,7 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
       options: ['xs', 'sm', 'md', 'lg']
     },
     handSectionOverlap: {
-      control: { type: 'number', min: 0, max: 120, step: 4 }
+      control: { type: 'number', min: 0, max: 240, step: 4 }
     },
     avatarRingScale: {
       control: { type: 'number', min: 0.4, max: 1.6, step: 0.02 }
