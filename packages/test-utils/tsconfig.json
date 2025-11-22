@@ -4,7 +4,19 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "declaration": true
+    "declaration": true,
+    "paths": {
+      "@game-core/*": ["packages/game-core/dist/*"],
+      "@shared/*": ["packages/shared/dist/*"],
+      "@test-utils/*": ["packages/test-utils/src/*"],
+      "@core-cards/*": ["packages/core-cards/src/*"],
+      "@ui-cards/*": ["packages/ui-cards/src/*"],
+      "@poker/core-cards": ["packages/core-cards/src"],
+      "@poker/ui-cards": ["packages/ui-cards/src"],
+      "@poker/game-core": ["packages/game-core/dist"],
+      "@poker/shared": ["packages/shared/dist"],
+      "@poker/test-utils": ["packages/test-utils/src"]
+    }
   },
   "include": ["src"]
 }

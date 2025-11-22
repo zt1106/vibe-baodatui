@@ -9,6 +9,12 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -b --pretty false"
   },
+  "dependencies": {
+    "@poker/game-core": "workspace:*",
+    "@poker/shared": "workspace:*",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5"
+  },
   "devDependencies": {
     "typescript": "^5.6.3",
     "vitest": "^2.0.5",
