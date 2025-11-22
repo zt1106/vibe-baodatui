@@ -818,6 +818,9 @@ io.on('connection', (socket) => {
     if (!userId) return;
     const seatId =
       managed.state.seats.find(id => managed.state.players[id]?.userId === userId) ?? socket.id;
+    socket.leave(tableId);
+    socketTable.delete(socket.id);
+    socketUsers.delete(socket.id);
     if (managed.hasStarted) {
       endGameAndReset(managed, 'player-left');
     }
