@@ -35,6 +35,8 @@ export type GameTableProps = {
   handCardAngle?: number;
   handCardCurveVerticalOffset?: number;
   handCardSize?: CardRowSize;
+  avatarRingScale?: number;
+  cardRingScale?: number;
 };
 
 type Dimensions = { width: number; height: number };
@@ -65,7 +67,9 @@ export function GameTable({
   handCardOverlap = '60%',
   handCardAngle = -12,
   handCardCurveVerticalOffset = 18,
-  handCardSize = 'md'
+  handCardSize = 'md',
+  avatarRingScale = 1.08,
+  cardRingScale = 0.75
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
@@ -119,12 +123,10 @@ export function GameTable({
   const outerEllipseScale = 1.05;
   const ellipseRadiusX = ellipseBaseX * outerEllipseScale;
   const ellipseRadiusY = ellipseBaseY * outerEllipseScale;
-  const avatarScale = 1.08;
-  const cardScale = 0.75;
-  const avatarRadiusX = ellipseRadiusX * avatarScale;
-  const avatarRadiusY = ellipseRadiusY * avatarScale;
-  const cardRadiusX = ellipseRadiusX * cardScale;
-  const cardRadiusY = ellipseRadiusY * cardScale;
+  const avatarRadiusX = ellipseRadiusX * avatarRingScale;
+  const avatarRadiusY = ellipseRadiusY * avatarRingScale;
+  const cardRadiusX = ellipseRadiusX * cardRingScale;
+  const cardRadiusY = ellipseRadiusY * cardRingScale;
   const dealerRadiusX = (avatarRadiusX + cardRadiusX) / 2;
   const dealerRadiusY = (avatarRadiusY + cardRadiusY) / 2;
 

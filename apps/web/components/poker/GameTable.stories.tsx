@@ -146,7 +146,9 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     handCardCurveVerticalOffset: 16,
     handCardOverlap: '55%',
     handCardRowGap: 12,
-    handCardRowOverlap: 20
+    handCardRowOverlap: 20,
+    avatarRingScale: 1.08,
+    cardRingScale: 0.75
   },
   argTypes: {
     playerCount: {
@@ -170,6 +172,12 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     },
     handCardRowOverlap: {
       control: { type: 'number', min: 0, max: 60, step: 2 }
+    },
+    avatarRingScale: {
+      control: { type: 'number', min: 0.4, max: 1.6, step: 0.02 }
+    },
+    cardRingScale: {
+      control: { type: 'number', min: 0.3, max: 1.4, step: 0.02 }
     }
   }
 };
