@@ -3,6 +3,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { makeCard } from '@poker/core-cards';
+import type { Card } from '@poker/core-cards';
 import type { CardRowSize } from '@poker/ui-cards';
 
 import { GameTableStage } from './GameTableStage';
@@ -116,18 +117,14 @@ const flopToRiver = [
   makeCard('3', 'H', { faceUp: true })
 ];
 
-const sampleHandRows = [
-  [
-    makeCard('A', 'S', { faceUp: true }),
-    makeCard('K', 'S', { faceUp: true }),
-    makeCard('Q', 'S', { faceUp: true })
-  ],
-  [
-    makeCard('5', 'H', { faceUp: true }),
-    makeCard('5', 'D', { faceUp: true }),
-    makeCard('5', 'C', { faceUp: true }),
-    makeCard('9', 'H', { faceUp: true })
-  ]
+const sampleHandCards = [
+  makeCard('A', 'S', { faceUp: true }),
+  makeCard('K', 'S', { faceUp: true }),
+  makeCard('Q', 'S', { faceUp: true }),
+  makeCard('5', 'H', { faceUp: true }),
+  makeCard('5', 'D', { faceUp: true }),
+  makeCard('5', 'C', { faceUp: true }),
+  makeCard('9', 'H', { faceUp: true })
 ];
 
 type TableStoryArgs = {
@@ -136,6 +133,8 @@ type TableStoryArgs = {
   seatCardSize?: CardRowSize;
   communityCardSize?: CardRowSize;
   handSectionOverlap?: number;
+  handCards?: Card[];
+  handGrouping?: 'byColor' | 'bySuit';
 };
 
 const meta: Meta<typeof GameTableStage, TableStoryArgs> = {
@@ -148,7 +147,8 @@ const meta: Meta<typeof GameTableStage, TableStoryArgs> = {
     sceneWidth: '80%',
     sceneHeight: '520px',
     sceneAlign: 'center',
-    handCardRows: sampleHandRows,
+    handCards: sampleHandCards,
+    handGrouping: 'byColor',
     handCardAngle: -10,
     handCardCurveVerticalOffset: 16,
     handCardOverlap: '55%',
@@ -170,6 +170,10 @@ const meta: Meta<typeof GameTableStage, TableStoryArgs> = {
     sceneAlign: {
       control: { type: 'radio' },
       options: ['flex-start', 'center', 'flex-end']
+    },
+    handGrouping: {
+      control: { type: 'radio' },
+      options: ['byColor', 'bySuit']
     },
     handCardAngle: {
       control: { type: 'number', min: -30, max: 30, step: 1 }
@@ -218,7 +222,7 @@ export const FullTable: Story = {
     dealerSeatId: 'seat-3',
     sceneWidth: '100vw',
     sceneHeight: '100vh',
-    handCardRows: sampleHandRows
+    handCards: sampleHandCards
   },
   render: ({ playerCount, ...storyArgs }) => (
     <GameTableStage players={playerStubs.slice(0, playerCount)} {...storyArgs} />
