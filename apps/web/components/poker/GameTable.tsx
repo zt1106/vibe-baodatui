@@ -303,7 +303,13 @@ export function GameTable({
       {showHandCardSection && (
         <div
           className={styles.handSection}
-          style={{ '--hand-overlap': `${handSectionOverlap}px` } as CSSProperties}
+          style={
+            {
+              '--hand-overlap': `${handSectionOverlap}px`,
+              marginTop: -handSectionOverlap,
+              paddingTop: 16 + handSectionOverlap
+            } as CSSProperties
+          }
         >
           <div className={styles.handSectionInner}>
             <MultiCardRow
