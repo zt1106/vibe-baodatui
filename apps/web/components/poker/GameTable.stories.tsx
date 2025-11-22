@@ -3,6 +3,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { makeCard } from '@poker/core-cards';
+import type { CardRowSize } from '@poker/ui-cards';
 
 import { GameTable, type GameTableSeat } from './GameTable';
 import { LOCAL_PLAYER_AVATAR_URLS } from './playerAvatarDefaults';
@@ -130,6 +131,7 @@ const sampleHandRows = [
 
 type TableStoryArgs = {
   playerCount: number;
+  handCardSize?: CardRowSize;
 };
 
 const meta: Meta<typeof GameTable, TableStoryArgs> = {
@@ -147,6 +149,7 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     handCardOverlap: '55%',
     handCardRowGap: 12,
     handCardRowOverlap: 20,
+    handCardSize: 'md',
     avatarRingScale: 1.08,
     cardRingScale: 0.75
   },
@@ -172,6 +175,10 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     },
     handCardRowOverlap: {
       control: { type: 'number', min: 0, max: 60, step: 2 }
+    },
+    handCardSize: {
+      control: { type: 'radio' },
+      options: ['xs', 'sm', 'md', 'lg']
     },
     avatarRingScale: {
       control: { type: 'number', min: 0.4, max: 1.6, step: 0.02 }
