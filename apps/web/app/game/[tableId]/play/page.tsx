@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 
 import type { Card, Rank } from '@poker/core-cards';
 import { RANKS } from '@poker/core-cards';
-import { CardAnimationProvider, MultiCardRow } from '@poker/ui-cards';
 import {
   TablePlayStateResponse as TablePlayStateResponseSchema,
   type GameSnapshot,
@@ -337,29 +336,16 @@ export default function PlayPage({ params }: PlayPageProps) {
             离开牌局
           </button>
         </div>
-        <GameTable players={tablePlayers} communityCards={[]} />
-      </section>
-
-      <section
-        style={{
-          background: 'rgba(2, 6, 23, 0.85)',
-          border: '1px solid rgba(59, 130, 246, 0.25)',
-          borderRadius: 28,
-          padding: '1.5rem'
-        }}
-      >
-        <CardAnimationProvider>
-          <MultiCardRow
-            rows={handRows}
-            rowGap={12}
-            rowOverlap={24}
-            overlap="60%"
-            size="md"
-            selectionMode="none"
-            angle={-12}
-            curveVerticalOffset={18}
-          />
-        </CardAnimationProvider>
+        <GameTable
+          players={tablePlayers}
+          communityCards={[]}
+          handCardRows={handRows}
+          handCardRowGap={12}
+          handCardRowOverlap={24}
+          handCardOverlap="60%"
+          handCardAngle={-12}
+          handCardCurveVerticalOffset={18}
+        />
       </section>
     </main>
   );

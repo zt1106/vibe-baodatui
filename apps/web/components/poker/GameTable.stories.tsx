@@ -114,6 +114,20 @@ const flopToRiver = [
   makeCard('3', 'H', { faceUp: true })
 ];
 
+const sampleHandRows = [
+  [
+    makeCard('A', 'S', { faceUp: true }),
+    makeCard('K', 'S', { faceUp: true }),
+    makeCard('Q', 'S', { faceUp: true })
+  ],
+  [
+    makeCard('5', 'H', { faceUp: true }),
+    makeCard('5', 'D', { faceUp: true }),
+    makeCard('5', 'C', { faceUp: true }),
+    makeCard('9', 'H', { faceUp: true })
+  ]
+];
+
 type TableStoryArgs = {
   playerCount: number;
 };
@@ -126,7 +140,13 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     playerCount: 8,
     sceneWidth: '80%',
     sceneHeight: '520px',
-    sceneAlign: 'center'
+    sceneAlign: 'center',
+    handCardRows: sampleHandRows,
+    handCardAngle: -10,
+    handCardCurveVerticalOffset: 16,
+    handCardOverlap: '55%',
+    handCardRowGap: 12,
+    handCardRowOverlap: 20
   },
   argTypes: {
     playerCount: {
@@ -137,6 +157,19 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     sceneAlign: {
       control: { type: 'radio' },
       options: ['flex-start', 'center', 'flex-end']
+    },
+    handCardAngle: {
+      control: { type: 'number', min: -30, max: 30, step: 1 }
+    },
+    handCardCurveVerticalOffset: {
+      control: { type: 'number', min: -50, max: 50, step: 1 }
+    },
+    handCardOverlap: { control: 'text' },
+    handCardRowGap: {
+      control: { type: 'number', min: 0, max: 48, step: 2 }
+    },
+    handCardRowOverlap: {
+      control: { type: 'number', min: 0, max: 60, step: 2 }
     }
   }
 };
@@ -149,8 +182,9 @@ export const FullTable: Story = {
   args: {
     communityCards: flopToRiver,
     dealerSeatId: 'seat-3',
-    sceneWidth: '80vw',
-    sceneHeight: '80vh'
+    sceneWidth: '100vw',
+    sceneHeight: '100vh',
+    handCardRows: sampleHandRows
   },
   render: ({ playerCount, ...storyArgs }) => (
     <GameTable players={playerStubs.slice(0, playerCount)} {...storyArgs} />

@@ -3,7 +3,8 @@
 import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Card } from '@poker/core-cards';
-import { CardRow } from '@poker/ui-cards';
+import { CardRow, MultiCardRow } from '@poker/ui-cards';
+import type { CardRowOverlap, CardRowSize } from '@poker/ui-cards';
 
 import { PlayerAvatar } from './PlayerAvatar';
 import { PLAYER_AVATAR_SIZE } from './playerAvatarDefaults';
@@ -27,6 +28,13 @@ export type GameTableProps = {
   sceneWidth?: string;
   sceneHeight?: string;
   sceneAlign?: 'flex-start' | 'center' | 'flex-end';
+  handCardRows?: Card[][];
+  handCardRowGap?: number;
+  handCardRowOverlap?: number;
+  handCardOverlap?: CardRowOverlap;
+  handCardAngle?: number;
+  handCardCurveVerticalOffset?: number;
+  handCardSize?: CardRowSize;
 };
 
 type Dimensions = { width: number; height: number };
@@ -50,7 +58,14 @@ export function GameTable({
   dealerSeatId,
   sceneWidth,
   sceneHeight,
-  sceneAlign
+  sceneAlign,
+  handCardRows = [],
+  handCardRowGap = 12,
+  handCardRowOverlap = 24,
+  handCardOverlap = '60%',
+  handCardAngle = -12,
+  handCardCurveVerticalOffset = 18,
+  handCardSize = 'md'
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
@@ -190,75 +205,94 @@ export function GameTable({
     }),
     [resolvedSceneHeight, sceneAlign, sceneWidth]
   );
+  const showHandCardSection = handCardRows.length > 0;
 
   return (
     <section className={styles.tableStage} data-testid="game-table-stage">
-      <div className={styles.tableScene} style={sceneStyle}>
-        <div ref={tableRef} className={styles.tableRing} style={tableStyle}>
-          <div className={styles.tableSurface} aria-hidden="true">
-            <div className={styles.tableInset} />
-          </div>
-          <div className={styles.centerGlow} aria-hidden="true" />
-          <div className={styles.communityRow}>
-            {communityCards.length > 0 ? (
-              <CardRow
-                cards={communityCards}
-                size="md"
-                overlap="65%"
-                angle={0}
-                curveVerticalOffset={18}
-                selectionMode="none"
-              />
-            ) : (
-              <span className={styles.communityPlaceholder}>等待发公共牌…</span>
+      <div className={styles.tableBody}>
+        <div className={styles.tableScene} style={sceneStyle}>
+          <div ref={tableRef} className={styles.tableRing} style={tableStyle}>
+            <div className={styles.tableSurface} aria-hidden="true">
+              <div className={styles.tableInset} />
+            </div>
+            <div className={styles.centerGlow} aria-hidden="true" />
+            <div className={styles.communityRow}>
+              {communityCards.length > 0 ? (
+                <CardRow
+                  cards={communityCards}
+                  size="md"
+                  overlap="65%"
+                  angle={0}
+                  curveVerticalOffset={18}
+                  selectionMode="none"
+                />
+              ) : (
+                <span className={styles.communityPlaceholder}>等待发公共牌…</span>
+              )}
+            </div>
+            {seatPositions.length === 0 && (
+              <div className={styles.emptyState}>等待玩家坐下…</div>
             )}
+            {seatPositions.map(seat => (
+              <Fragment key={seat.player.id}>
+                <div
+                  className={styles.cardArea}
+                  style={{
+                    left: `${seat.cards.x}px`,
+                    top: `${seat.cards.y}px`
+                  }}
+                >
+                  {seat.player.cards && seat.player.cards.length > 0 ? (
+                    <CardRow
+                      cards={seat.player.cards}
+                      size="md"
+                      overlap="65%"
+                      angle={0}
+                      curveVerticalOffset={18}
+                      selectionMode="none"
+                    />
+                  ) : (
+                    <span className={styles.cardPlaceholder}>未发牌</span>
+                  )}
+                </div>
+                <div
+                  className={styles.avatarWrapper}
+                  style={{
+                    left: `${seat.avatar.x}px`,
+                    top: `${seat.avatar.y}px`
+                  }}
+                >
+                  {seat.player.id !== suppressedSeatId && (
+                    <PlayerAvatar
+                      playerName={seat.player.nickname}
+                      displayName={formatPlayerName(seat.player.nickname)}
+                      avatarUrl={seat.player.avatarUrl ?? `/avatars/${seat.player.avatar}`}
+                      size={avatarSize}
+                      className={styles.tableAvatar}
+                    />
+                  )}
+                </div>
+              </Fragment>
+            ))}
           </div>
-          {seatPositions.length === 0 && (
-            <div className={styles.emptyState}>等待玩家坐下…</div>
-          )}
-          {seatPositions.map(seat => (
-            <Fragment key={seat.player.id}>
-              <div
-                className={styles.cardArea}
-                style={{
-                  left: `${seat.cards.x}px`,
-                  top: `${seat.cards.y}px`
-                }}
-              >
-                {seat.player.cards && seat.player.cards.length > 0 ? (
-                  <CardRow
-                    cards={seat.player.cards}
-                    size="md"
-                    overlap="65%"
-                    angle={0}
-                    curveVerticalOffset={18}
-                    selectionMode="none"
-                  />
-                ) : (
-                  <span className={styles.cardPlaceholder}>未发牌</span>
-                )}
-              </div>
-              <div
-                className={styles.avatarWrapper}
-                style={{
-                  left: `${seat.avatar.x}px`,
-                  top: `${seat.avatar.y}px`
-                }}
-              >
-                {seat.player.id !== suppressedSeatId && (
-                  <PlayerAvatar
-                    playerName={seat.player.nickname}
-                    displayName={formatPlayerName(seat.player.nickname)}
-                    avatarUrl={seat.player.avatarUrl ?? `/avatars/${seat.player.avatar}`}
-                    size={avatarSize}
-                    className={styles.tableAvatar}
-                  />
-                )}
-              </div>
-            </Fragment>
-          ))}
         </div>
       </div>
+      {showHandCardSection && (
+        <div className={styles.handSection}>
+          <div className={styles.handSectionInner}>
+            <MultiCardRow
+              rows={handCardRows}
+              rowGap={handCardRowGap}
+              rowOverlap={handCardRowOverlap}
+              overlap={handCardOverlap}
+              angle={handCardAngle}
+              curveVerticalOffset={handCardCurveVerticalOffset}
+              size={handCardSize}
+              selectionMode="none"
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
