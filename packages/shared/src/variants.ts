@@ -22,7 +22,7 @@ const definitions: Record<GameVariantId, GameVariantDefinition> = {
 export const DEFAULT_VARIANT_ID: GameVariantId = 'dou-dizhu';
 
 function toSummary(def: GameVariantDefinition): GameVariantSummary {
-  const { capacity, ...rest } = def;
+  const { capacity, deck: _deck, ...rest } = def;
   const { default: _default, ...restCapacity } = capacity;
   return { ...rest, capacity: restCapacity };
 }
