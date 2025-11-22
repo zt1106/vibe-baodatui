@@ -134,6 +134,7 @@ function ensureHostAction(socket: Socket, tableId: string) {
 }
 
 function resetTablePhaseIfNeeded(table: ManagedTable) {
+  const wasStarted = table.hasStarted;
   if (table.state.seats.length < table.config.capacity) {
     table.hasStarted = false;
     table.gamePhase = 'idle';
@@ -142,6 +143,9 @@ function resetTablePhaseIfNeeded(table: ManagedTable) {
     resetDeck(table.state);
     setAllPrepared(table, false);
     emitGameSnapshot(table);
+    if (wasStarted) {
+      io.to(table.id).emit('game:ended', { tableId: table.id, reason: 'player-left' });
+    }
   }
 }
 

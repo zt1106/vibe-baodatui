@@ -159,6 +159,15 @@ export default function PlayPage({ params }: PlayPageProps) {
       console.error('[web] play socket connect error', error);
     };
 
+    const handleGameEnded = (payload: { tableId?: string }) => {
+      if (!active) return;
+      if (payload?.tableId && payload.tableId !== tableId) return;
+      setGameError('有玩家离开，牌局已结束，返回准备房间。');
+      setTimeout(() => {
+        router.push(`/game/${encodeURIComponent(tableId)}/prepare`);
+      }, 400);
+    };
+
     const handleServerError = (payload: { message?: string }) => {
       if (!active) return;
       setGameError(payload?.message ?? '发生未知错误');
@@ -176,6 +185,7 @@ export default function PlayPage({ params }: PlayPageProps) {
     socket.on('game:snapshot', handleSnapshot);
     socket.on('game:hydrate', handleHydrate);
     socket.on('connect_error', handleConnectError);
+    socket.on('game:ended', handleGameEnded);
     socket.on('errorMessage', handleServerError);
     socket.on('kicked', handleKicked);
     requestJoin();
@@ -188,6 +198,7 @@ export default function PlayPage({ params }: PlayPageProps) {
       socket.off('game:snapshot', handleSnapshot);
       socket.off('game:hydrate', handleHydrate);
       socket.off('connect_error', handleConnectError);
+      socket.off('game:ended', handleGameEnded);
       socket.off('errorMessage', handleServerError);
       socket.off('kicked', handleKicked);
       if (!cleanupReleasedRef.current) {
