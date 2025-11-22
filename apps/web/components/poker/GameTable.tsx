@@ -73,7 +73,7 @@ export function GameTable({
   avatarRingScale = 1.08,
   cardRingScale = 0.66,
   communityCardSize = 'md',
-  seatCardSize = 'md'
+  seatCardSize = 'sm'
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });

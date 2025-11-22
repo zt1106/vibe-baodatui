@@ -152,7 +152,7 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     handCardRowGap: 12,
     handCardRowOverlap: 20,
     handCardSize: 'md',
-    seatCardSize: 'md',
+    seatCardSize: 'sm',
     communityCardSize: 'md',
     avatarRingScale: 1.08,
     cardRingScale: 0.66
