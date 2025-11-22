@@ -7,12 +7,9 @@ import { RANKS } from '@poker/core-cards';
 
 import { GameTable, type GameTableProps } from './GameTable';
 
-import styles from './GameTableStage.module.css';
-
 type HandGrouping = 'byColor' | 'bySuit';
 
 export type GameTableStageProps = GameTableProps & {
-  actions?: ReactNode;
   handCards?: Card[];
   handGrouping?: HandGrouping;
   onLeave?: () => void;
@@ -85,7 +82,6 @@ function deriveHandRows(handCards: Card[] | undefined, handGrouping: HandGroupin
 }
 
 export function GameTableStage({
-  actions,
   handCards,
   handGrouping = 'byColor',
   handCardRows,
@@ -112,43 +108,37 @@ export function GameTableStage({
     }
   }, [leaveConfirmMessage, onLeave]);
 
-  const hasActions = Boolean(actions || onLeave);
+  const topBarActions = useMemo(() => {
+    if (!onLeave) return null;
+    return (
+      <button
+        type="button"
+        onClick={handleLeave}
+        style={{
+          padding: '0.28rem 0.65rem',
+          borderRadius: 8,
+          border: '1px solid rgba(248, 113, 113, 0.6)',
+          background: 'transparent',
+          color: '#fecaca',
+          fontWeight: 600,
+          fontSize: '0.8rem',
+          cursor: 'pointer',
+          boxShadow: '0 10px 20px rgba(2, 6, 23, 0.55)',
+          backdropFilter: 'blur(6px)'
+        }}
+      >
+        {leaveLabel}
+      </button>
+    );
+  }, [handleLeave, leaveLabel, onLeave]);
 
   return (
-    <div className={styles.stageShell}>
-      {hasActions ? (
-        <div className={styles.actions}>
-          <div className={styles.actionsInner}>
-            {actions}
-            {onLeave ? (
-              <button
-                type="button"
-                onClick={handleLeave}
-                style={{
-                  padding: '0.28rem 0.65rem',
-                  borderRadius: 8,
-                  border: '1px solid rgba(248, 113, 113, 0.6)',
-                  background: 'transparent',
-                  color: '#fecaca',
-                  fontWeight: 600,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 10px 20px rgba(2, 6, 23, 0.55)',
-                  backdropFilter: 'blur(6px)'
-                }}
-              >
-                {leaveLabel}
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-      <GameTable
-        handCardRowGap={handCardRowGap}
-        handCardRowOverlap={handCardRowOverlap}
-        handCardRows={resolvedHandCardRows}
-        {...gameTableProps}
-      />
-    </div>
+    <GameTable
+      handCardRowGap={handCardRowGap}
+      handCardRowOverlap={handCardRowOverlap}
+      handCardRows={resolvedHandCardRows}
+      topBarActions={topBarActions}
+      {...gameTableProps}
+    />
   );
 }

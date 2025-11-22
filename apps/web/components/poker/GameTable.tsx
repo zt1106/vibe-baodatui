@@ -1,6 +1,14 @@
 'use client';
 
-import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 
 import type { Card } from '@poker/core-cards';
 import { CardRow, MultiCardRow } from '@poker/ui-cards';
@@ -40,6 +48,7 @@ export type GameTableProps = {
   communityCardSize?: CardRowSize;
   seatCardSize?: CardRowSize;
   handSectionOverlap?: number;
+  topBarActions?: ReactNode;
 };
 
 type Dimensions = { width: number; height: number };
@@ -75,7 +84,8 @@ export function GameTable({
   cardRingScale = 0.66,
   communityCardSize = 'md',
   seatCardSize = 'sm',
-  handSectionOverlap = 32
+  handSectionOverlap = 32,
+  topBarActions
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
@@ -230,7 +240,10 @@ export function GameTable({
         <div className={styles.tableScene} style={sceneStyle}>
           <div className={styles.topBar} aria-live="polite">
             <span className={styles.topBarLeft}>示例牌局信息：小盲 25 / 大盲 50 · 经典模式</span>
-            <span className={styles.topBarRight}>底池 1,250</span>
+            <div className={styles.topBarRight}>
+              <span className={styles.topBarRightText}>底池 1,250</span>
+              {topBarActions ? <div className={styles.topBarActions}>{topBarActions}</div> : null}
+            </div>
           </div>
           <div ref={tableRef} className={styles.tableRing} style={tableStyle}>
             <div className={styles.tableSurface} aria-hidden="true">

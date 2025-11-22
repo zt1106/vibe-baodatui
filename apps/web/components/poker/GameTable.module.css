@@ -86,9 +86,16 @@
 
 .topBarRight {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
   text-align: right;
   white-space: nowrap;
   opacity: 0.82;
+}
+
+.topBarRightText {
+  display: inline-block;
 }
 
 .tableRing {
