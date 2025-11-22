@@ -7,6 +7,7 @@ const resolveFromRoot = (relativePath: string) =>
 
 export default defineConfig({
   resolve: {
+    extensions: ['.ts', '.tsx', '.js', '.mjs', '.jsx', '.json'],
     alias: {
       // Point to source to avoid stale built output in workspace dependencies.
       '@poker/core-cards': resolveFromRoot('../core-cards/src/index.ts'),
