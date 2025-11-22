@@ -136,16 +136,20 @@ function ensureHostAction(socket: Socket, tableId: string) {
 function resetTablePhaseIfNeeded(table: ManagedTable) {
   const wasStarted = table.hasStarted;
   if (table.state.seats.length < table.config.capacity) {
-    table.hasStarted = false;
-    table.gamePhase = 'idle';
-    stopDealing(table);
-    clearHands(table.state);
-    resetDeck(table.state);
-    setAllPrepared(table, false);
-    emitGameSnapshot(table);
-    if (wasStarted) {
-      io.to(table.id).emit('game:ended', { tableId: table.id, reason: 'player-left' });
-    }
+    endGameAndReset(table, wasStarted ? 'player-left' : undefined);
+  }
+}
+
+function endGameAndReset(table: ManagedTable, reason: 'player-left' | 'manual-reset' | undefined) {
+  table.hasStarted = false;
+  table.gamePhase = 'idle';
+  stopDealing(table);
+  clearHands(table.state);
+  resetDeck(table.state);
+  setAllPrepared(table, false);
+  emitGameSnapshot(table);
+  if (reason) {
+    io.to(table.id).emit('game:ended', { tableId: table.id, reason });
   }
 }
 
@@ -814,6 +818,9 @@ io.on('connection', (socket) => {
     if (!userId) return;
     const seatId =
       managed.state.seats.find(id => managed.state.players[id]?.userId === userId) ?? socket.id;
+    if (managed.hasStarted) {
+      endGameAndReset(managed, 'player-left');
+    }
     removePlayerSeat(managed, seatId, userId);
     emitState(tableId);
     emitGameSnapshot(managed);
