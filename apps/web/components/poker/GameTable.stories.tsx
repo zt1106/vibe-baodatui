@@ -155,7 +155,7 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     seatCardSize: 'md',
     communityCardSize: 'md',
     avatarRingScale: 1.08,
-    cardRingScale: 0.75
+    cardRingScale: 0.66
   },
   argTypes: {
     playerCount: {

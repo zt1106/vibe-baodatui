@@ -71,7 +71,7 @@ export function GameTable({
   handCardCurveVerticalOffset = 18,
   handCardSize = 'md',
   avatarRingScale = 1.08,
-  cardRingScale = 0.75,
+  cardRingScale = 0.66,
   communityCardSize = 'md',
   seatCardSize = 'md'
 }: GameTableProps) {
