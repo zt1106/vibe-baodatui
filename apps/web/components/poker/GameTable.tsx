@@ -218,7 +218,7 @@ export function GameTable({
           : sceneAlign === 'flex-end'
           ? 'flex-end'
           : 'center',
-      alignItems: 'center'
+      alignItems: 'flex-start'
     }),
     [resolvedSceneHeight, sceneAlign, sceneWidth]
   );
@@ -228,6 +228,9 @@ export function GameTable({
     <section className={styles.tableStage} data-testid="game-table-stage">
       <div className={styles.tableBody}>
         <div className={styles.tableScene} style={sceneStyle}>
+          <div className={styles.topBar} aria-live="polite">
+            示例牌局信息：小盲 25 / 大盲 50 · 经典模式
+          </div>
           <div ref={tableRef} className={styles.tableRing} style={tableStyle}>
             <div className={styles.tableSurface} aria-hidden="true">
               <div className={styles.tableInset} />
