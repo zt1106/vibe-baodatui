@@ -10,12 +10,14 @@ import {
   useState
 } from 'react';
 
-import type { Card } from '@poker/core-cards';
+import type { Card, CardId } from '@poker/core-cards';
 import { CardRow, MultiCardRow } from '@poker/ui-cards';
 import type { CardRowOverlap, CardRowSize } from '@poker/ui-cards';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import { PlayerAvatar } from './PlayerAvatar';
 import { PLAYER_AVATAR_SIZE } from './playerAvatarDefaults';
+import { SingleCard } from '../cards/SingleCard';
 
 import styles from './GameTable.module.css';
 
@@ -49,6 +51,9 @@ export type GameTableProps = {
   seatCardSize?: CardRowSize;
   handSectionOverlap?: number;
   topBarActions?: ReactNode;
+  dealingCards?: DealingCardFlight[];
+  dealingOrigin?: { x?: number; y?: number };
+  onDealingCardComplete?: (flightId: string) => void;
 };
 
 type Dimensions = { width: number; height: number };
@@ -56,6 +61,13 @@ type Dimensions = { width: number; height: number };
 const TABLE_TILT_DEG = 24;
 const MAX_TABLE_PLAYERS = 8;
 const MAX_PLAYER_NAME_CHARS = 8;
+
+export type DealingCardFlight = {
+  id: string;
+  seatId: string;
+  cardId: CardId;
+  faceUp?: boolean;
+};
 
 function formatPlayerName(name: string, maxLength = MAX_PLAYER_NAME_CHARS) {
   const trimmed = name.trim();
@@ -85,7 +97,10 @@ export function GameTable({
   communityCardSize = 'md',
   seatCardSize = 'sm',
   handSectionOverlap = 32,
-  topBarActions
+  topBarActions,
+  dealingCards,
+  dealingOrigin,
+  onDealingCardComplete
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
@@ -155,7 +170,6 @@ export function GameTable({
   const dealerRadiusY = (avatarRadiusY + cardRadiusY) / 2;
 
   const visiblePlayers = useMemo(() => players.slice(0, MAX_TABLE_PLAYERS), [players]);
-
   const seatPositions = useMemo(() => {
     if (visiblePlayers.length === 0) {
       return [];
@@ -199,6 +213,11 @@ export function GameTable({
     visiblePlayers
   ]);
 
+  const seatLookup = useMemo(
+    () => new Map(seatPositions.map(seat => [seat.player.id, seat])),
+    [seatPositions]
+  );
+
   const suppressedSeatId = useMemo(() => {
     if (seatPositions.length === 0) {
       return null;
@@ -233,6 +252,38 @@ export function GameTable({
     [resolvedSceneHeight, sceneAlign, sceneWidth]
   );
   const showHandCardSection = handCardRows.length > 0;
+  const dealingOriginPoint = useMemo(
+    () => ({
+      x: dealingOrigin?.x ?? centerX,
+      y: dealingOrigin?.y ?? centerY
+    }),
+    [centerX, centerY, dealingOrigin?.x, dealingOrigin?.y]
+  );
+  const activeDealingCards = useMemo(() => {
+    if (!dealingCards || dealingCards.length === 0) {
+      return [];
+    }
+    return dealingCards
+      .map(flight => {
+        const targetSeat = seatLookup.get(flight.seatId);
+        if (!targetSeat || targetSeat.player.id === suppressedSeatId) {
+          return null;
+        }
+        const towardAvatarWeight = 0.7;
+        const targetX =
+          targetSeat.avatar.x * towardAvatarWeight + targetSeat.cards.x * (1 - towardAvatarWeight);
+        const targetY =
+          targetSeat.avatar.y * towardAvatarWeight + targetSeat.cards.y * (1 - towardAvatarWeight);
+        return {
+          ...flight,
+          target: {
+            x: targetX,
+            y: targetY
+          }
+        };
+      })
+      .filter(Boolean) as Array<DealingCardFlight & { target: { x: number; y: number } }>;
+  }, [dealingCards, seatLookup, suppressedSeatId]);
 
   return (
     <section className={styles.tableStage} data-testid="game-table-stage">
@@ -250,6 +301,42 @@ export function GameTable({
               <div className={styles.tableInset} />
             </div>
             <div className={styles.centerGlow} aria-hidden="true" />
+            <AnimatePresence>
+              {activeDealingCards.map(flight => (
+                <motion.div
+                  key={flight.id}
+                  initial={{ x: dealingOriginPoint.x, y: dealingOriginPoint.y, opacity: 0, scale: 0.92 }}
+                  animate={{
+                    x: flight.target.x,
+                    y: flight.target.y,
+                    opacity: [0, 1, 1, 0],
+                    scale: [0.92, 1, 1, 0.9]
+                  }}
+                  transition={{
+                    duration: 1.05,
+                    times: [0, 0.18, 0.78, 1],
+                    ease: ['easeOut', 'easeOut', 'easeInOut']
+                  }}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    transform: 'translate(-50%, -50%)',
+                    pointerEvents: 'none',
+                    zIndex: 4,
+                    filter: 'drop-shadow(0 18px 28px rgba(0, 0, 0, 0.28))'
+                  }}
+                  onAnimationComplete={() => onDealingCardComplete?.(flight.id)}
+                >
+                  <SingleCard
+                    cardId={flight.cardId}
+                    size={seatCardSize}
+                    faceUp={flight.faceUp ?? false}
+                    elevation={3}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
             <div className={styles.communityRow}>
             {communityCards.length > 0 ? (
               <CardRow

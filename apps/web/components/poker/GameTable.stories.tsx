@@ -1,13 +1,15 @@
 'use client';
 
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { makeCard } from '@poker/core-cards';
+import { createCardId, makeCard } from '@poker/core-cards';
 import type { Card } from '@poker/core-cards';
 import type { CardRowSize } from '@poker/ui-cards';
 
 import { GameTableStage } from './GameTableStage';
-import { type GameTableSeat } from './GameTable';
+import { type DealingCardFlight, type GameTableSeat } from './GameTable';
 import { LOCAL_PLAYER_AVATAR_URLS } from './playerAvatarDefaults';
 
 const basePlayerStubs: GameTableSeat[] = [
@@ -126,6 +128,12 @@ const sampleHandCards = [
   makeCard('5', 'D', { faceUp: true }),
   makeCard('5', 'C', { faceUp: true }),
   makeCard('9', 'H', { faceUp: true })
+];
+const dealingCardIds = [
+  createCardId('A', 'S'),
+  createCardId('K', 'H'),
+  createCardId('Q', 'C'),
+  createCardId('J', 'D')
 ];
 
 type TableStoryArgs = {
@@ -255,4 +263,70 @@ export const EmptyCards: Story = {
   render: ({ playerCount, ...storyArgs }) => (
     <GameTableStage players={playerStubsNoCards.slice(0, playerCount)} {...storyArgs} />
   )
+};
+
+export const Dealing: Story = {
+  args: {
+    playerCount: 6,
+    communityCards: [],
+    handCards: [],
+    handCardRows: [],
+    handSectionOverlap: 16,
+    sceneHeight: '520px',
+    sceneWidth: '80vw',
+    sceneAlign: 'center',
+    handCardAngle: -8,
+    handCardCurveVerticalOffset: 12,
+    handCardOverlap: '55%',
+    handCardRowGap: 0,
+    handCardRowOverlap: 40,
+    handCardSize: 'md',
+    seatCardSize: 'sm',
+    communityCardSize: 'md',
+    avatarRingScale: 1.08,
+    cardRingScale: 0.62
+  },
+  render: ({ playerCount, ...storyArgs }) => {
+    const players = useMemo(() => playerStubsNoCards.slice(0, playerCount), [playerCount]);
+    const targetSeatIds = useMemo(
+      () => players.map(player => player.id),
+      [players]
+    );
+    const maxDeals = targetSeatIds.length ? targetSeatIds.length * 2 : 0;
+    const [dealingIndex, setDealingIndex] = useState(0);
+    const [inFlight, setInFlight] = useState<DealingCardFlight[]>([]);
+
+    useEffect(() => {
+      setDealingIndex(0);
+      setInFlight([]);
+    }, [playerCount]);
+
+    useEffect(() => {
+      if (maxDeals === 0 || dealingIndex >= maxDeals) {
+        return;
+      }
+      const timer = setTimeout(() => {
+        const seatId = targetSeatIds[dealingIndex % targetSeatIds.length];
+        const cardId = dealingCardIds[dealingIndex % dealingCardIds.length];
+        const id = `deal-${dealingIndex}-${seatId}`;
+        setInFlight(prev => [...prev, { id, seatId, cardId, faceUp: false }]);
+        setDealingIndex(index => index + 1);
+      }, 780);
+
+      return () => clearTimeout(timer);
+    }, [dealingIndex, maxDeals, targetSeatIds]);
+
+    const handleDealingComplete = useCallback((flightId: string) => {
+      setInFlight(prev => prev.filter(card => card.id !== flightId));
+    }, []);
+
+    return (
+      <GameTableStage
+        players={players}
+        dealingCards={inFlight}
+        onDealingCardComplete={handleDealingComplete}
+        {...storyArgs}
+      />
+    );
+  }
 };

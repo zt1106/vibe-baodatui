@@ -104,7 +104,7 @@ const TABLE_CAPACITY = 8;
 const tables = new Map<string, ManagedTable>();
 const socketTable = new Map<string, string>();
 const socketUsers = new Map<string, number>();
-const DEAL_DELAY_MS = 220;
+const DEAL_DELAY_MS = 600;
 const RECONNECT_GRACE_MS = 5_000;
 
 const generateTableId = () => {

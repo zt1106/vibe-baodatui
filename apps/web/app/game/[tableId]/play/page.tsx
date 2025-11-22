@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { Card } from '@poker/core-cards';
+import { createCardId } from '@poker/core-cards';
 import {
   TablePlayStateResponse as TablePlayStateResponseSchema,
   type GameSnapshot,
   type ServerState
 } from '@shared/messages';
 import { GameTableStage } from '../../../../components/poker/GameTableStage';
-import { type GameTableSeat } from '../../../../components/poker/GameTable';
+import { type DealingCardFlight, type GameTableSeat } from '../../../../components/poker/GameTable';
 import { type Socket } from 'socket.io-client';
 import {
   acquireTableSocket,
@@ -58,8 +59,11 @@ export default function PlayPage({ params }: PlayPageProps) {
   const [gameError, setGameError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null);
   const [selfHand, setSelfHand] = useState<Card[]>([]);
+  const [dealingFlights, setDealingFlights] = useState<DealingCardFlight[]>([]);
   const socketRef = useRef<Socket | null>(null);
   const cleanupReleasedRef = useRef(false);
+  const lastSnapshotRef = useRef<GameSnapshot | null>(null);
+  const dealSeqRef = useRef(0);
 
   const apiBaseUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
@@ -243,6 +247,62 @@ export default function PlayPage({ params }: PlayPageProps) {
     return snapshot.seats.find(seat => seat.seatId === snapshot.lastDealtSeatId) ?? null;
   }, [snapshot]);
 
+  const dealingCardIds = useMemo(
+    () => [
+      createCardId('A', 'S'),
+      createCardId('K', 'H'),
+      createCardId('Q', 'C'),
+      createCardId('J', 'D'),
+      createCardId('10', 'S'),
+      createCardId('9', 'H')
+    ],
+    []
+  );
+
+  useEffect(() => {
+    if (!snapshot) {
+      lastSnapshotRef.current = snapshot;
+      setDealingFlights([]);
+      dealSeqRef.current = 0;
+      return;
+    }
+    const prev = lastSnapshotRef.current;
+    if (!prev) {
+      lastSnapshotRef.current = snapshot;
+      return;
+    }
+    const prevHandCounts = new Map(prev.seats.map(seat => [seat.seatId, seat.handCount]));
+    const updates: DealingCardFlight[] = [];
+    for (const seat of snapshot.seats) {
+      if (seat.seatId === selfSeatId) {
+        continue;
+      }
+      const prevCount = prevHandCounts.get(seat.seatId) ?? 0;
+      const delta = seat.handCount - prevCount;
+      if (delta <= 0) {
+        continue;
+      }
+      for (let i = 0; i < delta; i += 1) {
+        const seq = dealSeqRef.current++;
+        const cardId = dealingCardIds[seq % dealingCardIds.length];
+        updates.push({
+          id: `deal-${seq}-${seat.seatId}`,
+          seatId: seat.seatId,
+          cardId,
+          faceUp: false
+        });
+      }
+    }
+    if (updates.length) {
+      setDealingFlights(prevFlights => [...prevFlights, ...updates]);
+    }
+    lastSnapshotRef.current = snapshot;
+  }, [dealingCardIds, selfSeatId, snapshot]);
+
+  const handleDealingComplete = useCallback((flightId: string) => {
+    setDealingFlights(prev => prev.filter(flight => flight.id !== flightId));
+  }, []);
+
   const handleExitGame = useCallback(() => {
     const socket = socketRef.current;
     const finish = () => {
@@ -276,6 +336,8 @@ export default function PlayPage({ params }: PlayPageProps) {
     <GameTableStage
       players={tablePlayers}
       handCards={selfHand}
+      dealingCards={dealingFlights}
+      onDealingCardComplete={handleDealingComplete}
       onLeave={handleExitGame}
     />
   );
