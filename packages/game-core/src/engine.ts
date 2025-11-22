@@ -112,6 +112,9 @@ export function drawCard(state: TableState, seatId: SeatId) {
   if (!outcome.ok) {
     return null;
   }
+  if (outcome.result.type !== 'deck/card-drawn') {
+    return null;
+  }
   return outcome.result.card;
 }
 
@@ -236,6 +239,9 @@ function applyDeal(state: TableState, action: DealCardsAction): TableReducerResu
       const draw = applyDrawCard(state, { type: 'deck/draw', seatId });
       if (!draw.ok) {
         return failure(state, action, draw.error);
+      }
+      if (draw.result.type !== 'deck/card-drawn') {
+        return failure(state, action, { type: 'deck/empty', seatId });
       }
       hands[seatId].push(draw.result.card);
     }

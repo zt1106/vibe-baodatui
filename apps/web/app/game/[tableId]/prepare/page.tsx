@@ -2,83 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TablePrepareResponse as TablePrepareResponseSchema } from '@shared/messages';
-import type { ServerState, TablePrepareResponse } from '@shared/messages';
+import type { TablePrepareResponse } from '@shared/messages';
 
-import {
-  ensureUser,
-  loadStoredUser,
-  persistStoredUser,
-  NICKNAME_STORAGE_KEY,
-  type StoredUser
-} from '../../../../lib/auth';
 import { PreparePlayerList, type PrepareSeat } from '../../../../components/prepare/PreparePlayerList';
-import { getApiBaseUrl, fetchJson } from '../../../../lib/api';
-import type { AsyncStatus } from '../../../../lib/types';
-import {
-  attachTableSocketLifecycle,
-  createTableSocketLease,
-  markTableSocketJoined,
-  resetSharedHand,
-  type TableSocketLease
-} from '../../../../lib/tableSocket';
-import { generateRandomChineseName } from '../../../../lib/nickname';
-
-const apiBaseUrl = getApiBaseUrl();
+import { resetSharedHand } from '../../../../lib/tableSocket';
+import { usePrepareRoom } from '../../../../hooks/usePrepareRoom';
 
 type PreparePageProps = {
   params: { tableId: string };
 };
 
-type AsyncState = AsyncStatus;
-
 const FALLBACK_MIN_CAPACITY = 2;
 const FALLBACK_MAX_CAPACITY = 8;
 
 const PREPARE_PAGE_REFRESH_EVENT = 'prepare-page-refresh';
-
-function usePrepareUser(apiBaseUrl: string, tableId: string) {
-  const [user, setUser] = useState<StoredUser | null>(null);
-  const [status, setStatus] = useState<AsyncState>('idle');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!tableId) return;
-    let cancelled = false;
-    const bootstrap = async () => {
-      setStatus('loading');
-      setError(null);
-      try {
-        const storedUser = loadStoredUser();
-        const storedNickname =
-          storedUser?.nickname ??
-          (typeof window !== 'undefined' ? window.localStorage.getItem(NICKNAME_STORAGE_KEY) : null) ??
-          generateRandomChineseName();
-        const authenticated = await ensureUser(apiBaseUrl, storedNickname);
-        if (cancelled) return;
-        persistStoredUser(authenticated);
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem(NICKNAME_STORAGE_KEY, authenticated.nickname);
-        }
-        setUser(authenticated);
-        setStatus('ready');
-      } catch (bootstrapError) {
-        if (cancelled) return;
-        console.error('[web] failed to ensure user before prepare page', bootstrapError);
-        setStatus('error');
-        setError('无法验证用户，请返回大厅重试。');
-      }
-    };
-
-    bootstrap();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiBaseUrl, tableId]);
-
-  return { user, status, error };
-}
 
 function seatStatusTone(status: TablePrepareResponse['status']) {
   switch (status) {
@@ -96,13 +33,19 @@ function seatStatusTone(status: TablePrepareResponse['status']) {
 export default function PreparePage({ params }: PreparePageProps) {
   const tableId = decodeURIComponent(params.tableId ?? '');
   const router = useRouter();
-  const { user, status: authStatus, error: authError } = usePrepareUser(apiBaseUrl, tableId);
-  const [prepareState, setPrepareState] = useState<TablePrepareResponse | null>(null);
-  const [prepareStatus, setPrepareStatus] = useState<AsyncState>('idle');
-  const [prepareError, setPrepareError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
+  const {
+    user,
+    authStatus,
+    authError,
+    prepareState,
+    prepareStatus,
+    prepareError,
+    reloadPrepareState,
+    sendTableEvent,
+    releaseLease,
+    setPrepareError
+  } = usePrepareRoom(tableId);
   const [configDraft, setConfigDraft] = useState<number | null>(null);
-  const socketLeaseRef = useRef<TableSocketLease | null>(null);
   const navigatedToPlayRef = useRef(false);
 
   useEffect(() => {
@@ -117,141 +60,21 @@ export default function PreparePage({ params }: PreparePageProps) {
     setConfigDraft(prepareState.config.capacity);
   }, [prepareState]);
 
-  useEffect(() => {
-    if (authStatus !== 'ready' || !tableId) return;
-    let cancelled = false;
-    const controller = new AbortController();
-
-    const loadPrepareState = async () => {
-      setPrepareStatus('loading');
-      setPrepareError(null);
-      try {
-        const payload = await fetchJson<unknown>(
-          `${apiBaseUrl}/tables/${encodeURIComponent(tableId)}/prepare`,
-          {
-            method: 'GET',
-            credentials: 'include',
-            signal: controller.signal
-          }
-        );
-        const parsed = TablePrepareResponseSchema.safeParse(payload);
-        if (!parsed.success) {
-          throw new Error('Invalid table payload');
-        }
-        if (cancelled) return;
-        setPrepareState(prev => {
-          if (prev && prev.players.length > 0) {
-            const nextPlayers = prev.players;
-            return {
-              ...parsed.data,
-              players: nextPlayers,
-              status: prev.status
-            };
-          }
-          return parsed.data;
-        });
-        setPrepareStatus('ready');
-      } catch (error) {
-        if (controller.signal.aborted || cancelled) {
-          return;
-        }
-        console.error('[web] failed to load prepare state', error);
-        setPrepareError('暂时无法加载房间信息，请稍后重试。');
-        setPrepareStatus('error');
-      }
-    };
-
-    loadPrepareState();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [apiBaseUrl, authStatus, tableId, reloadToken]);
-
-  useEffect(() => {
-    if (authStatus !== 'ready' || !user || !tableId) {
-      return;
-    }
-    const lease = createTableSocketLease(apiBaseUrl, tableId);
-    socketLeaseRef.current = lease;
-    const socket = lease.socket;
-
-    const detachLifecycle = attachTableSocketLifecycle(
-      socket,
-      tableId,
-      { userId: user.id, nickname: user.nickname },
-      {
-        onConnectError: error => {
-          console.error('[web] failed to connect table socket', error);
-        },
-        onServerError: payload => {
-          console.warn('[web] server rejected joinTable request', payload?.message);
-          setPrepareError(payload?.message ?? '加入房间失败，请稍后再试。');
-        },
-        onKicked: payload => {
-          if (payload?.tableId !== tableId) return;
-          setPrepareError('你已被房主移出房间。');
-          setPrepareStatus('error');
-          setTimeout(() => router.push('/lobby'), 1200);
-        }
-      }
-    );
-
-    const handleState = (payload: ServerState) => {
-      if (payload.tableId !== tableId) {
-        return;
-      }
-      setPrepareState({
-        tableId: payload.tableId,
-        status: payload.status,
-        host: payload.host,
-        players: payload.seats.map(player => ({
-          userId: player.userId,
-          nickname: player.nickname,
-          avatar: player.avatar,
-          prepared: player.prepared
-        })),
-        config: payload.config
-      });
-      if (payload.seats.some(player => player.userId === user.id)) {
-        markTableSocketJoined(tableId);
-      }
-      setPrepareStatus('ready');
-      setPrepareError(null);
-    };
-
-    socket.on('state', handleState);
-
-    return () => {
-      socket.off('state', handleState);
-      detachLifecycle();
-      lease.release();
-      if (socketLeaseRef.current === lease) {
-        socketLeaseRef.current = null;
-      }
-    };
-  }, [apiBaseUrl, authStatus, tableId, router, user?.id, user?.nickname]);
-
   const handleLeaveRoom = useCallback(() => {
-    const lease = socketLeaseRef.current;
-    if (lease) {
-      lease.release();
-      socketLeaseRef.current = null;
-    }
+    releaseLease();
     router.push('/lobby');
-  }, [router, tableId]);
+  }, [releaseLease, router]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleExternalRefresh = () => {
-      setReloadToken(token => token + 1);
+      reloadPrepareState();
     };
     window.addEventListener(PREPARE_PAGE_REFRESH_EVENT, handleExternalRefresh);
     return () => {
       window.removeEventListener(PREPARE_PAGE_REFRESH_EVENT, handleExternalRefresh);
     };
-  }, []);
+  }, [reloadPrepareState]);
 
   useEffect(() => {
     if (!tableId || !prepareState || !user) return;
@@ -263,15 +86,13 @@ export default function PreparePage({ params }: PreparePageProps) {
     router.push(`/game/${encodeURIComponent(tableId)}/play`);
   }, [prepareState, router, tableId, user?.id]);
 
-  const sendTableEvent = useCallback((event: string, payload: Record<string, unknown>) => {
-    const socket = socketLeaseRef.current?.socket;
-    if (!socket) {
-      setPrepareError('连接未建立，稍后再试。');
-      return false;
+  useEffect(() => {
+    if (prepareStatus !== 'error' || prepareError !== '你已被房主移出房间。') {
+      return;
     }
-    socket.emit(event, payload);
-    return true;
-  }, []);
+    const timer = setTimeout(() => router.push('/lobby'), 1200);
+    return () => clearTimeout(timer);
+  }, [prepareError, prepareStatus, router]);
 
   const handleStartGame = useCallback(() => {
     sendTableEvent('table:start', { tableId });

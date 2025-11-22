@@ -106,6 +106,7 @@ export function GameTable({
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
+  const singleSeatCardSize = typeof seatCardSize === 'string' ? seatCardSize : 'sm';
 
   useEffect(() => {
     const element = tableRef.current;
@@ -332,7 +333,7 @@ export function GameTable({
                 >
                   <SingleCard
                     cardId={flight.cardId}
-                    size={seatCardSize}
+                    size={singleSeatCardSize}
                     faceUp={flight.faceUp ?? false}
                     elevation={3}
                   />
@@ -370,7 +371,7 @@ export function GameTable({
                   >
                     {hasCards ? (
                       <CardRow
-                        cards={seat.player.cards}
+                        cards={seat.player.cards ?? []}
                         size={seatCardSize}
                         overlap="65%"
                         angle={0}

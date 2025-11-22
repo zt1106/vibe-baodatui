@@ -8,6 +8,7 @@ export type GameVariantDefinition = Omit<GameVariantSummary, 'capacity'> & {
   capacity: GameVariantCapacity & { default: number };
   deck: { packs: number };
 };
+export type { GameVariantId };
 
 const definitions: Record<GameVariantId, GameVariantDefinition> = {
   'dou-dizhu': {

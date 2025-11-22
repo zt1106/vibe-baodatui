@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import http from 'http';
 import { Server } from 'socket.io';
-import Client from 'socket.io-client';
+import { io as createClient, type Socket as ClientSocket } from 'socket.io-client';
+import type { ServerState } from '@shared/messages';
 import { TableManager } from '../domain/tableManager';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import { createUserRegistry } from '../infrastructure/userRegistry';
@@ -34,7 +35,7 @@ async function startSocketServer() {
 }
 
 describe('table socket handlers', () => {
-  const sockets: Client.Socket[] = [];
+  const sockets: ClientSocket[] = [];
 
   afterEach(async () => {
     await Promise.all(
@@ -65,17 +66,17 @@ describe('table socket handlers', () => {
     const playerThree = users.register('Player Three');
     const table = tableManager.createTable(host, 'dou-dizhu');
 
-    const hostClient = Client(`http://127.0.0.1:${port}`);
+    const hostClient = createClient(`http://127.0.0.1:${port}`);
     sockets.push(hostClient);
     await waitFor(hostClient, 'connect');
-    const hostJoined = waitFor(hostClient, 'state', state => state.seats.length === 1);
+    const hostJoined = waitFor<ServerState>(hostClient, 'state', state => state.seats.length === 1);
     hostClient.emit('joinTable', { tableId: table.tableId, nickname: host.nickname, userId: host.id });
     await hostJoined;
 
-    const p2Client = Client(`http://127.0.0.1:${port}`);
+    const p2Client = createClient(`http://127.0.0.1:${port}`);
     sockets.push(p2Client);
     await waitFor(p2Client, 'connect');
-    const p2Joined = waitFor(hostClient, 'state', state => state.seats.length === 2);
+    const p2Joined = waitFor<ServerState>(hostClient, 'state', state => state.seats.length === 2);
     p2Client.emit('joinTable', {
       tableId: table.tableId,
       nickname: playerTwo.nickname,
@@ -83,10 +84,10 @@ describe('table socket handlers', () => {
     });
     await p2Joined;
 
-    const p3Client = Client(`http://127.0.0.1:${port}`);
+    const p3Client = createClient(`http://127.0.0.1:${port}`);
     sockets.push(p3Client);
     await waitFor(p3Client, 'connect');
-    const p3Joined = waitFor(hostClient, 'state', state => state.seats.length === 3);
+    const p3Joined = waitFor<ServerState>(hostClient, 'state', state => state.seats.length === 3);
     p3Client.emit('joinTable', {
       tableId: table.tableId,
       nickname: playerThree.nickname,
@@ -94,18 +95,26 @@ describe('table socket handlers', () => {
     });
     await p3Joined;
 
-    const preparedState = waitFor(hostClient, 'state', state => state.seats.every((seat: any) => seat.prepared));
+    const preparedState = waitFor<ServerState>(
+      hostClient,
+      'state',
+      state => state.seats.every(seat => seat.prepared)
+    );
     hostClient.emit('table:setPrepared', { tableId: table.tableId, prepared: true });
     p2Client.emit('table:setPrepared', { tableId: table.tableId, prepared: true });
     p3Client.emit('table:setPrepared', { tableId: table.tableId, prepared: true });
     await preparedState;
 
-    const startedPromise = waitFor(hostClient, 'state', state => state.status === 'in-progress');
+    const startedPromise = waitFor<ServerState>(hostClient, 'state', state => state.status === 'in-progress');
     hostClient.emit('table:start', { tableId: table.tableId });
     const started = await startedPromise;
     expect(started.seats).toHaveLength(3);
 
-    const waitingState = waitFor(hostClient, 'state', state => state.seats.length === 2 && state.status === 'waiting');
+    const waitingState = waitFor<ServerState>(
+      hostClient,
+      'state',
+      state => state.seats.length === 2 && state.status === 'waiting'
+    );
     const leaveAck = await new Promise<{ ok: boolean }>(resolve => {
       p2Client.emit('game:leave', { tableId: table.tableId, userId: playerTwo.id }, resolve);
     });

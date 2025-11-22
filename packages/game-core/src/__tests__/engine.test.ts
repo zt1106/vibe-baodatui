@@ -28,12 +28,18 @@ describe('table flow', () => {
     const t = createTable('t1', 'seed123');
     const first = reduceTable(t, { type: 'seat/join', seatId: 'p1', nickname: 'Alice', userId: 1 });
     expect(first.ok).toBe(true);
-    expect(first.result).toMatchObject({ type: 'seat/joined', created: true });
+    if (first.ok) {
+      expect(first.result).toMatchObject({ type: 'seat/joined', created: true });
+    }
     const second = reduceTable(t, { type: 'seat/join', seatId: 'p1', nickname: 'Alice', userId: 1 });
     expect(second.ok).toBe(true);
-    expect(second.result).toMatchObject({ type: 'seat/joined', created: false });
+    if (second.ok) {
+      expect(second.result).toMatchObject({ type: 'seat/joined', created: false });
+    }
     const third = reduceTable(t, { type: 'seat/join', seatId: 'p2', nickname: 'Bob', userId: 2 });
-    expect(third.result).toMatchObject({ type: 'seat/joined', created: true });
+    if (third.ok) {
+      expect(third.result).toMatchObject({ type: 'seat/joined', created: true });
+    }
     expect(t.seats).toEqual(['p1', 'p2']);
   });
 
