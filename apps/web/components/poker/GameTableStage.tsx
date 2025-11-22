@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 
 import type { Card, Rank } from '@poker/core-cards';
 import { RANKS } from '@poker/core-cards';
@@ -97,14 +97,22 @@ export function GameTableStage({
     [handCardRows, handCards, handGrouping]
   );
 
+  const leavePromptingRef = useRef(false);
+
   const handleLeave = useCallback(() => {
     if (!onLeave) return;
-    const confirmed =
-      typeof window === 'undefined' || !leaveConfirmMessage
-        ? true
-        : window.confirm(leaveConfirmMessage);
-    if (confirmed) {
-      onLeave();
+    if (leavePromptingRef.current) return;
+    leavePromptingRef.current = true;
+    try {
+      const confirmed =
+        typeof window === 'undefined' || !leaveConfirmMessage
+          ? true
+          : window.confirm(leaveConfirmMessage);
+      if (confirmed) {
+        onLeave();
+      }
+    } finally {
+      leavePromptingRef.current = false;
     }
   }, [leaveConfirmMessage, onLeave]);
 
