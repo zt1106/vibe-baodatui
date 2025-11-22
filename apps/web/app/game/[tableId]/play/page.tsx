@@ -247,26 +247,7 @@ export default function PlayPage({ params }: PlayPageProps) {
     <GameTableStage
       players={tablePlayers}
       handCards={selfHand}
-      actions={
-        <button
-          type="button"
-          onClick={handleExitGame}
-          style={{
-            padding: '0.28rem 0.65rem',
-            borderRadius: 8,
-            border: '1px solid rgba(248, 113, 113, 0.6)',
-            background: 'transparent',
-            color: '#fecaca',
-            fontWeight: 600,
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            boxShadow: '0 10px 20px rgba(2, 6, 23, 0.55)',
-            backdropFilter: 'blur(6px)'
-          }}
-        >
-          离开牌局
-        </button>
-      }
+      onLeave={handleExitGame}
     />
   );
 }

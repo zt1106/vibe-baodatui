@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 
 import type { Card, Rank } from '@poker/core-cards';
 import { RANKS } from '@poker/core-cards';
@@ -15,6 +15,9 @@ export type GameTableStageProps = GameTableProps & {
   actions?: ReactNode;
   handCards?: Card[];
   handGrouping?: HandGrouping;
+  onLeave?: () => void;
+  leaveConfirmMessage?: string;
+  leaveLabel?: string;
 };
 
 const SUIT_DISPLAY_ORDER: Array<'S' | 'H' | 'D' | 'C'> = ['S', 'H', 'D', 'C'];
@@ -88,6 +91,9 @@ export function GameTableStage({
   handCardRows,
   handCardRowGap = 0,
   handCardRowOverlap = 40,
+  onLeave,
+  leaveConfirmMessage = '确定要离开牌局吗？',
+  leaveLabel = '离开牌局',
   ...gameTableProps
 }: GameTableStageProps) {
   const resolvedHandCardRows = useMemo(
@@ -95,11 +101,46 @@ export function GameTableStage({
     [handCardRows, handCards, handGrouping]
   );
 
+  const handleLeave = useCallback(() => {
+    if (!onLeave) return;
+    const confirmed =
+      typeof window === 'undefined' || !leaveConfirmMessage
+        ? true
+        : window.confirm(leaveConfirmMessage);
+    if (confirmed) {
+      onLeave();
+    }
+  }, [leaveConfirmMessage, onLeave]);
+
+  const hasActions = Boolean(actions || onLeave);
+
   return (
     <div className={styles.stageShell}>
-      {actions ? (
+      {hasActions ? (
         <div className={styles.actions}>
-          <div className={styles.actionsInner}>{actions}</div>
+          <div className={styles.actionsInner}>
+            {actions}
+            {onLeave ? (
+              <button
+                type="button"
+                onClick={handleLeave}
+                style={{
+                  padding: '0.28rem 0.65rem',
+                  borderRadius: 8,
+                  border: '1px solid rgba(248, 113, 113, 0.6)',
+                  background: 'transparent',
+                  color: '#fecaca',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 10px 20px rgba(2, 6, 23, 0.55)',
+                  backdropFilter: 'blur(6px)'
+                }}
+              >
+                {leaveLabel}
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
       <GameTable
