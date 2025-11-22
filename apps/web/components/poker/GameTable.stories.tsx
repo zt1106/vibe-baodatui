@@ -141,6 +141,7 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
   title: 'Table/GameTable',
   component: GameTable,
   tags: ['autodocs'],
+  parameters: { layout: 'fullscreen' },
   args: {
     playerCount: 8,
     sceneWidth: '80%',
