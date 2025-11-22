@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { Server, type Socket } from 'socket.io';
 import {
   GameDealCardEvent,
+  deriveLobbyRoomStatus,
   GamePhase,
   GameSnapshot,
   GameVariantId,
@@ -18,7 +19,7 @@ import {
   getVariantSummary,
   type GameVariantDefinition
 } from '@shared/variants';
-import { createLobbyRegistry, deriveLobbyRoomStatus } from '../infrastructure/lobbyRegistry';
+import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import {
   DuplicateNicknameError,
   UserNotFoundError,

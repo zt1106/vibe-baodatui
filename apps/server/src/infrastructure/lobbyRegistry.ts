@@ -1,4 +1,4 @@
-import { LobbyRoomsResponse } from '@shared/messages';
+import { LobbyRoomsResponse, deriveLobbyRoomStatus } from '@shared/messages';
 import type {
   LobbyNotification,
   LobbyRoom,
@@ -12,16 +12,6 @@ export type LobbyRegistrySnapshot = LobbyRoomsSnapshot;
 
 type LobbyRoomRecord = LobbyRoom;
 type LobbyNotificationRecord = LobbyNotification;
-
-export function deriveLobbyRoomStatus(players: number, capacity: number): LobbyRoomStatus {
-  if (players === 0) {
-    return 'waiting';
-  }
-  if (players >= capacity) {
-    return 'full';
-  }
-  return 'waiting';
-}
 
 export function createLobbyRegistry(initial: Partial<LobbyRegistrySnapshot> = {}) {
   const rooms = new Map<string, LobbyRoomRecord>();

@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createLobbyRegistry,
-  deriveLobbyRoomStatus
-} from '../infrastructure/lobbyRegistry';
+import { deriveLobbyRoomStatus } from '@shared/messages';
+import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import { getVariantSummary } from '@shared/variants';
 
 const defaultVariant = getVariantSummary('dou-dizhu');
