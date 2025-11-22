@@ -245,17 +245,32 @@ export default function PlayPage({ params }: PlayPageProps) {
 
   const handleExitGame = useCallback(() => {
     const socket = socketRef.current;
-    if (socket) {
-      if (tableId && user?.id) {
-        socket.emit('game:leave', { tableId, userId: user.id });
+    const finish = () => {
+      if (socket) {
+        releaseTableSocket(socket);
+        clearTableSocketJoin(tableId);
+        cleanupReleasedRef.current = true;
+        socketRef.current = null;
       }
-      releaseTableSocket(socket);
-      clearTableSocketJoin(tableId);
-      cleanupReleasedRef.current = true;
-      socketRef.current = null;
+      router.push('/lobby');
+    };
+    if (socket && tableId && user?.id) {
+      let settled = false;
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        finish();
+      }, 600);
+      socket.emit('game:leave', { tableId, userId: user.id }, () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        finish();
+      });
+      return;
     }
-    router.push('/lobby');
-  }, [router, tableId]);
+    finish();
+  }, [router, tableId, user?.id]);
 
   return (
     <GameTableStage

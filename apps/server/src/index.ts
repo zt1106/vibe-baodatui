@@ -809,7 +809,7 @@ io.on('connection', (socket) => {
     emitGameSnapshot(managed);
   });
 
-  socket.on('game:leave', (payload: { tableId?: string; userId?: number }) => {
+  socket.on('game:leave', (payload: { tableId?: string; userId?: number }, ack?: (result: { ok: boolean }) => void) => {
     const tableId = normalizeTableId(payload?.tableId ?? '');
     if (!tableId) return;
     const managed = tables.get(tableId);
@@ -824,6 +824,7 @@ io.on('connection', (socket) => {
     removePlayerSeat(managed, seatId, userId);
     emitState(tableId);
     emitGameSnapshot(managed);
+    if (ack) ack({ ok: true });
   });
 
   socket.on('disconnect', () => {
