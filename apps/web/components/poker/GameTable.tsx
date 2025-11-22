@@ -155,20 +155,21 @@ export function GameTable({
       const angle = startAngle + index * step;
       const cosAngle = Math.cos(angle);
       const sinAngle = Math.sin(angle);
+      const shapedSin = Math.sign(sinAngle) * Math.pow(Math.abs(sinAngle), 0.65);
       return {
         player,
         angle,
         avatar: {
           x: centerX + cosAngle * avatarRadiusX,
-          y: centerY + sinAngle * avatarRadiusY
+          y: centerY + shapedSin * avatarRadiusY
         },
         cards: {
           x: centerX + cosAngle * cardRadiusX,
-          y: centerY + sinAngle * cardRadiusY
+          y: centerY + shapedSin * cardRadiusY
         },
         dealer: {
           x: centerX + cosAngle * dealerRadiusX,
-          y: centerY + sinAngle * dealerRadiusY
+          y: centerY + shapedSin * dealerRadiusY
         }
       };
     });
