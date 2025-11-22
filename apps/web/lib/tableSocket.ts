@@ -146,3 +146,83 @@ export function hydrateSharedHand(cards: Card[]) {
 export function getSharedSocket() {
   return sharedSocket;
 }
+
+export type TableSocketLease = {
+  socket: Socket;
+  release: () => void;
+};
+
+export type TableSocketLifecycleCallbacks = {
+  onConnect?: () => void;
+  onReconnect?: () => void;
+  onConnectError?: (error: Error) => void;
+  onServerError?: (payload: { message?: string }) => void;
+  onKicked?: (payload: { tableId?: string }) => void;
+};
+
+export function createTableSocketLease(baseUrl: string, tableId: string): TableSocketLease {
+  const socket = acquireTableSocket(baseUrl, tableId);
+  let released = false;
+  return {
+    socket,
+    release: () => {
+      if (released) return;
+      released = true;
+      releaseTableSocket(socket);
+      clearTableSocketJoin(tableId);
+    }
+  };
+}
+
+export function attachTableSocketLifecycle(
+  socket: Socket,
+  tableId: string,
+  payload: { userId: number; nickname: string },
+  callbacks: TableSocketLifecycleCallbacks = {}
+) {
+  const joinPayload = { ...payload, tableId };
+
+  const requestJoin = () => {
+    if (!isTableSocketJoined(tableId)) {
+      socket.emit('joinTable', joinPayload);
+    }
+  };
+
+  const handleConnect = () => {
+    requestJoin();
+    callbacks.onConnect?.();
+  };
+
+  const handleReconnect = () => {
+    clearTableSocketJoin(tableId);
+    requestJoin();
+    callbacks.onReconnect?.();
+  };
+
+  const handleConnectError = (error: Error) => {
+    callbacks.onConnectError?.(error);
+  };
+
+  const handleServerError = (serverPayload: { message?: string }) => {
+    callbacks.onServerError?.(serverPayload);
+  };
+
+  const handleKicked = (serverPayload: { tableId?: string }) => {
+    callbacks.onKicked?.(serverPayload);
+  };
+
+  socket.on('connect', handleConnect);
+  socket.on('reconnect', handleReconnect);
+  socket.on('connect_error', handleConnectError);
+  socket.on('errorMessage', handleServerError);
+  socket.on('kicked', handleKicked);
+  requestJoin();
+
+  return () => {
+    socket.off('connect', handleConnect);
+    socket.off('reconnect', handleReconnect);
+    socket.off('connect_error', handleConnectError);
+    socket.off('errorMessage', handleServerError);
+    socket.off('kicked', handleKicked);
+  };
+}

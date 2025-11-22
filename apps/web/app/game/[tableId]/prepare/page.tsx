@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TablePrepareResponse as TablePrepareResponseSchema } from '@shared/messages';
 import type { ServerState, TablePrepareResponse } from '@shared/messages';
-import { type Socket } from 'socket.io-client';
 
 import {
   ensureUser,
@@ -17,12 +16,11 @@ import { PreparePlayerList, type PrepareSeat } from '../../../../components/prep
 import { getApiBaseUrl, fetchJson } from '../../../../lib/api';
 import type { AsyncStatus } from '../../../../lib/types';
 import {
-  acquireTableSocket,
-  clearTableSocketJoin,
-  isTableSocketJoined,
+  attachTableSocketLifecycle,
+  createTableSocketLease,
   markTableSocketJoined,
-  releaseTableSocket,
-  resetSharedHand
+  resetSharedHand,
+  type TableSocketLease
 } from '../../../../lib/tableSocket';
 import { generateRandomChineseName } from '../../../../lib/nickname';
 
@@ -39,14 +37,47 @@ const FALLBACK_MAX_CAPACITY = 8;
 
 const PREPARE_PAGE_REFRESH_EVENT = 'prepare-page-refresh';
 
-function deriveTableStatus(players: number, capacity: number): TablePrepareResponse['status'] {
-  if (players >= capacity) {
-    return 'full';
-  }
-  if (players > 0) {
-    return 'in-progress';
-  }
-  return 'waiting';
+function usePrepareUser(apiBaseUrl: string, tableId: string) {
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [status, setStatus] = useState<AsyncState>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!tableId) return;
+    let cancelled = false;
+    const bootstrap = async () => {
+      setStatus('loading');
+      setError(null);
+      try {
+        const storedUser = loadStoredUser();
+        const storedNickname =
+          storedUser?.nickname ??
+          (typeof window !== 'undefined' ? window.localStorage.getItem(NICKNAME_STORAGE_KEY) : null) ??
+          generateRandomChineseName();
+        const authenticated = await ensureUser(apiBaseUrl, storedNickname);
+        if (cancelled) return;
+        persistStoredUser(authenticated);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(NICKNAME_STORAGE_KEY, authenticated.nickname);
+        }
+        setUser(authenticated);
+        setStatus('ready');
+      } catch (bootstrapError) {
+        if (cancelled) return;
+        console.error('[web] failed to ensure user before prepare page', bootstrapError);
+        setStatus('error');
+        setError('无法验证用户，请返回大厅重试。');
+      }
+    };
+
+    bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, tableId]);
+
+  return { user, status, error };
 }
 
 function seatStatusTone(status: TablePrepareResponse['status']) {
@@ -65,56 +96,18 @@ function seatStatusTone(status: TablePrepareResponse['status']) {
 export default function PreparePage({ params }: PreparePageProps) {
   const tableId = decodeURIComponent(params.tableId ?? '');
   const router = useRouter();
-  const [user, setUser] = useState<StoredUser | null>(null);
-  const [authStatus, setAuthStatus] = useState<AsyncState>('idle');
-  const [authError, setAuthError] = useState<string | null>(null);
+  const { user, status: authStatus, error: authError } = usePrepareUser(apiBaseUrl, tableId);
   const [prepareState, setPrepareState] = useState<TablePrepareResponse | null>(null);
   const [prepareStatus, setPrepareStatus] = useState<AsyncState>('idle');
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [configDraft, setConfigDraft] = useState<number | null>(null);
-  const socketRef = useRef<Socket | null>(null);
-  const preserveSocketForPlayRef = useRef(false);
-  const manualReleaseRef = useRef(false);
-  const cleanupReleasedRef = useRef(false);
+  const socketLeaseRef = useRef<TableSocketLease | null>(null);
   const navigatedToPlayRef = useRef(false);
 
-  // static per module
-
   useEffect(() => {
-    preserveSocketForPlayRef.current = false;
-    manualReleaseRef.current = false;
-    cleanupReleasedRef.current = false;
     navigatedToPlayRef.current = false;
   }, [tableId]);
-
-  useEffect(() => {
-    if (!tableId) return;
-    const bootstrap = async () => {
-      setAuthStatus('loading');
-      setAuthError(null);
-      try {
-        const storedUser = loadStoredUser();
-        const storedNickname =
-          storedUser?.nickname ??
-          (typeof window !== 'undefined' ? window.localStorage.getItem(NICKNAME_STORAGE_KEY) : null) ??
-          generateRandomChineseName();
-        const authenticated = await ensureUser(apiBaseUrl, storedNickname);
-        persistStoredUser(authenticated);
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem(NICKNAME_STORAGE_KEY, authenticated.nickname);
-        }
-        setUser(authenticated);
-        setAuthStatus('ready');
-      } catch (error) {
-        console.error('[web] failed to ensure user before prepare page', error);
-        setAuthStatus('error');
-        setAuthError('无法验证用户，请返回大厅重试。');
-      }
-    };
-
-    bootstrap();
-  }, [apiBaseUrl, tableId]);
 
   useEffect(() => {
     if (!prepareState) {
@@ -180,33 +173,33 @@ export default function PreparePage({ params }: PreparePageProps) {
     if (authStatus !== 'ready' || !user || !tableId) {
       return;
     }
-    let active = true;
-    manualReleaseRef.current = false;
-    cleanupReleasedRef.current = false;
-    const socket = acquireTableSocket(apiBaseUrl, tableId);
-    socketRef.current = socket;
+    const lease = createTableSocketLease(apiBaseUrl, tableId);
+    socketLeaseRef.current = lease;
+    const socket = lease.socket;
 
-    const joinPayload = { tableId, nickname: user.nickname, userId: user.id };
-
-    const requestJoin = () => {
-      if (!isTableSocketJoined(tableId)) {
-        socket.emit('joinTable', joinPayload);
+    const detachLifecycle = attachTableSocketLifecycle(
+      socket,
+      tableId,
+      { userId: user.id, nickname: user.nickname },
+      {
+        onConnectError: error => {
+          console.error('[web] failed to connect table socket', error);
+        },
+        onServerError: payload => {
+          console.warn('[web] server rejected joinTable request', payload?.message);
+          setPrepareError(payload?.message ?? '加入房间失败，请稍后再试。');
+        },
+        onKicked: payload => {
+          if (payload?.tableId !== tableId) return;
+          setPrepareError('你已被房主移出房间。');
+          setPrepareStatus('error');
+          setTimeout(() => router.push('/lobby'), 1200);
+        }
       }
-    };
-
-    const handleConnect = () => {
-      if (!active) return;
-      requestJoin();
-    };
-
-    const handleReconnect = () => {
-      if (!active) return;
-      clearTableSocketJoin(tableId);
-      requestJoin();
-    };
+    );
 
     const handleState = (payload: ServerState) => {
-      if (!active || payload.tableId !== tableId) {
+      if (payload.tableId !== tableId) {
         return;
       }
       setPrepareState({
@@ -228,57 +221,23 @@ export default function PreparePage({ params }: PreparePageProps) {
       setPrepareError(null);
     };
 
-    const handleConnectError = (error: Error) => {
-      if (!active) return;
-      console.error('[web] failed to connect table socket', error);
-    };
-
-    const handleServerError = (payload: { message?: string }) => {
-      if (!active) return;
-      console.warn('[web] server rejected joinTable request', payload?.message);
-      setPrepareError(payload?.message ?? '加入房间失败，请稍后再试。');
-    };
-
-    const handleKicked = (payload: { tableId?: string }) => {
-      if (!active) return;
-      if (payload?.tableId !== tableId) return;
-      setPrepareError('你已被房主移出房间。');
-      setPrepareStatus('error');
-      setTimeout(() => router.push('/lobby'), 1200);
-    };
-
-    socket.on('connect', handleConnect);
-    socket.on('reconnect', handleReconnect);
     socket.on('state', handleState);
-    socket.on('connect_error', handleConnectError);
-    socket.on('errorMessage', handleServerError);
-    socket.on('kicked', handleKicked);
-    requestJoin();
 
     return () => {
-      active = false;
-      socket.off('connect', handleConnect);
-      socket.off('reconnect', handleReconnect);
       socket.off('state', handleState);
-      socket.off('connect_error', handleConnectError);
-      socket.off('errorMessage', handleServerError);
-      socket.off('kicked', handleKicked);
-      if (!preserveSocketForPlayRef.current && !manualReleaseRef.current && !cleanupReleasedRef.current) {
-        releaseTableSocket(socket);
-        clearTableSocketJoin(tableId);
-        cleanupReleasedRef.current = true;
-        socketRef.current = null;
+      detachLifecycle();
+      lease.release();
+      if (socketLeaseRef.current === lease) {
+        socketLeaseRef.current = null;
       }
     };
   }, [apiBaseUrl, authStatus, tableId, router, user?.id, user?.nickname]);
 
   const handleLeaveRoom = useCallback(() => {
-    manualReleaseRef.current = true;
-    const socket = socketRef.current;
-    if (socket) {
-      releaseTableSocket(socket);
-      clearTableSocketJoin(tableId);
-      socketRef.current = null;
+    const lease = socketLeaseRef.current;
+    if (lease) {
+      lease.release();
+      socketLeaseRef.current = null;
     }
     router.push('/lobby');
   }, [router, tableId]);
@@ -300,13 +259,12 @@ export default function PreparePage({ params }: PreparePageProps) {
     const isSeated = prepareState.players.some(player => player.userId === user.id);
     if (!isSeated || navigatedToPlayRef.current) return;
     navigatedToPlayRef.current = true;
-    preserveSocketForPlayRef.current = true;
     resetSharedHand();
     router.push(`/game/${encodeURIComponent(tableId)}/play`);
   }, [prepareState, router, tableId, user?.id]);
 
   const sendTableEvent = useCallback((event: string, payload: Record<string, unknown>) => {
-    const socket = socketRef.current;
+    const socket = socketLeaseRef.current?.socket;
     if (!socket) {
       setPrepareError('连接未建立，稍后再试。');
       return false;

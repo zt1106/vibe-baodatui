@@ -5,7 +5,20 @@ import * as tsMessages from '../messages';
 import * as jsMessages from '../messages.js';
 
 const samplePayload = {
-  rooms: [{ id: 'demo', status: 'waiting', players: 1, capacity: 8 }],
+  rooms: [
+    {
+      id: 'demo',
+      status: 'waiting',
+      players: 1,
+      capacity: 8,
+      variant: {
+        id: 'dou-dizhu',
+        name: '斗地主',
+        description: '斗地主经典玩法',
+        capacity: { min: 3, max: 3, locked: 3 }
+      }
+    }
+  ],
   notifications: [{ id: 'notice', message: 'ok', tone: 'info' }]
 };
 
