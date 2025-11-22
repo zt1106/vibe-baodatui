@@ -22,11 +22,20 @@ import {
   GameSnapshot,
   GameDealCardEvent,
   GamePhase,
-  TablePlayStateResponse
+  TablePlayStateResponse,
+  GameVariantId,
+  GameVariantSummary
 } from '@shared/messages';
 import { createTable, joinTable, clearHands, resetDeck, drawCard } from '@game-core/engine';
 import { loadServerEnv } from '@shared/env';
 import { DEFAULT_AVATAR, type AvatarFilename } from '@shared/avatars';
+import {
+  DEFAULT_VARIANT_ID,
+  GAME_VARIANTS_BY_ID,
+  getVariantDefinition,
+  getVariantSummary,
+  type GameVariantDefinition
+} from '@shared/variants';
 import { createHeartbeatPublisher } from './infrastructure/heartbeat';
 import { createLobbyRegistry, deriveLobbyRoomStatus } from './infrastructure/lobbyRegistry';
 import {
@@ -85,7 +94,9 @@ type ManagedTable = {
   state: ReturnType<typeof createTable>;
   config: {
     capacity: number;
+    variant: GameVariantSummary;
   };
+  variant: GameVariantDefinition;
   host: {
     userId: number;
     nickname: string;
@@ -98,9 +109,9 @@ type ManagedTable = {
     seatIndex: number;
   } | null;
   pendingDisconnects: Map<number, NodeJS.Timeout>;
+  variantState: Record<string, unknown>;
 };
 
-const TABLE_CAPACITY = 8;
 const tables = new Map<string, ManagedTable>();
 const socketTable = new Map<string, string>();
 const socketUsers = new Map<string, number>();
@@ -145,8 +156,9 @@ function endGameAndReset(table: ManagedTable, reason: 'player-left' | 'manual-re
   table.gamePhase = 'idle';
   stopDealing(table);
   clearHands(table.state);
-  resetDeck(table.state);
+  resetDeck(table.state, { packs: table.variant.deck.packs });
   setAllPrepared(table, false);
+  table.variantState = {};
   emitGameSnapshot(table);
   if (reason) {
     io.to(table.id).emit('game:ended', { tableId: table.id, reason });
@@ -187,6 +199,7 @@ function buildGameSnapshot(table: ManagedTable, lastDealtSeatId?: string): GameS
     phase: table.gamePhase,
     deckCount: table.state.deck.length,
     lastDealtSeatId,
+    variant: table.config.variant,
     seats: table.state.seats
       .map(seatId => {
         const player = table.state.players[seatId];
@@ -214,6 +227,62 @@ function finishDealing(table: ManagedTable) {
   stopDealing(table);
   table.gamePhase = 'complete';
   emitGameSnapshot(table);
+}
+
+function finishDouDizhuDealing(table: ManagedTable) {
+  stopDealing(table);
+  table.variantState = {
+    ...table.variantState,
+    bottomCards: table.state.deck.map(card => ({ ...card }))
+  };
+  table.gamePhase = 'complete';
+  emitGameSnapshot(table);
+}
+
+function startDouDizhuDealing(table: ManagedTable) {
+  if (table.state.seats.length === 0) {
+    return;
+  }
+  stopDealing(table);
+  table.gamePhase = 'dealing';
+  table.dealingState = { timer: null, seatIndex: 0 };
+  emitGameSnapshot(table);
+  const tick = () => {
+    if (!table.dealingState) {
+      return;
+    }
+    const seats = table.state.seats;
+    if (seats.length === 0) {
+      table.gamePhase = 'idle';
+      stopDealing(table);
+      emitGameSnapshot(table);
+      return;
+    }
+    if (table.state.deck.length <= 3) {
+      finishDouDizhuDealing(table);
+      return;
+    }
+    const currentIndex = table.dealingState.seatIndex % seats.length;
+    const seatId = seats[currentIndex];
+    const card = drawCard(table.state, seatId);
+    if (!card) {
+      table.dealingState.seatIndex = (currentIndex + 1) % seats.length;
+      table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
+      return;
+    }
+    card.faceUp = true;
+    const payload: GameDealCardEvent = {
+      tableId: table.id,
+      seatId,
+      card
+    };
+    io.to(seatId).emit('game:deal', payload);
+    emitState(table.id);
+    emitGameSnapshot(table, seatId);
+    table.dealingState.seatIndex = (currentIndex + 1) % seats.length;
+    table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
+  };
+  table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
 }
 
 function startDealing(table: ManagedTable) {
@@ -262,6 +331,41 @@ function startDealing(table: ManagedTable) {
   table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
 }
 
+function startClassicVariant(table: ManagedTable) {
+  table.hasStarted = true;
+  table.gamePhase = 'dealing';
+  const dealSeed = `deal-${table.id}-${Date.now()}`;
+  resetDeck(table.state, { seed: dealSeed, packs: table.variant.deck.packs });
+  clearHands(table.state);
+  setAllPrepared(table, false);
+  table.variantState = {};
+  updateLobbyFromState(table.id);
+  emitState(table.id);
+  startDealing(table);
+}
+
+function startDouDizhuVariant(table: ManagedTable) {
+  table.hasStarted = true;
+  table.gamePhase = 'dealing';
+  const dealSeed = `deal-${table.id}-${Date.now()}`;
+  resetDeck(table.state, { seed: dealSeed, packs: table.variant.deck.packs });
+  clearHands(table.state);
+  setAllPrepared(table, false);
+  table.variantState = {};
+  updateLobbyFromState(table.id);
+  emitState(table.id);
+  startDouDizhuDealing(table);
+}
+
+const variantStartHandlers: Partial<Record<GameVariantId, (table: ManagedTable) => void>> = {
+  'dou-dizhu': startDouDizhuVariant
+};
+
+function startVariantGame(table: ManagedTable) {
+  const handler = variantStartHandlers[table.variant.id] ?? startClassicVariant;
+  handler(table);
+}
+
 function getTableStatus(managed: ManagedTable) {
   const {
     state,
@@ -281,12 +385,14 @@ function updateLobbyFromState(tableId: string) {
     state,
     config: { capacity }
   } = managed;
+  managed.config.variant = getVariantSummary(managed.variant.id);
   const status = getTableStatus(managed);
   lobby.upsertRoom({
     id: tableId,
     capacity,
     players: state.seats.length,
-    status
+    status,
+    variant: managed.config.variant
   });
 }
 
@@ -310,7 +416,8 @@ function buildPreparePayload(table: ManagedTable) {
         prepared: table.prepared.get(player.userId) ?? false
       })),
     config: {
-      capacity: table.config.capacity
+      capacity: table.config.capacity,
+      variant: table.config.variant
     }
   });
 }
@@ -398,7 +505,11 @@ function promoteNewHostIfNeeded(table: ManagedTable, departingUserId?: number) {
   table.host = { userId: nextPlayer.userId, nickname: nextPlayer.nickname };
 }
 
-function createManagedTable(host: { id: number; nickname: string }, id = generateTableId()): ManagedTable {
+function createManagedTable(
+  host: { id: number; nickname: string },
+  variantId: GameVariantId,
+  id = generateTableId()
+): ManagedTable {
   const normalizedId = normalizeTableId(id);
   if (!normalizedId) {
     throw new Error('Invalid table id');
@@ -406,12 +517,19 @@ function createManagedTable(host: { id: number; nickname: string }, id = generat
   if (tables.has(normalizedId)) {
     throw new Error(`Table ${normalizedId} already exists`);
   }
+  const variant = getVariantDefinition(variantId);
+  const variantSummary = getVariantSummary(variant.id);
+  const defaultCapacity = variant.capacity.locked ?? variant.capacity.default;
+  const state = createTable(normalizedId, `seed-${normalizedId}`);
+  resetDeck(state, { packs: variant.deck.packs });
   const managed: ManagedTable = {
     id: normalizedId,
-    state: createTable(normalizedId, `seed-${normalizedId}`),
+    state,
     config: {
-      capacity: TABLE_CAPACITY
+      capacity: defaultCapacity,
+      variant: variantSummary
     },
+    variant,
     host: {
       userId: host.id,
       nickname: host.nickname
@@ -420,7 +538,8 @@ function createManagedTable(host: { id: number; nickname: string }, id = generat
     prepared: new Map(),
     gamePhase: 'idle',
     dealingState: null,
-    pendingDisconnects: new Map()
+    pendingDisconnects: new Map(),
+    variantState: {}
   };
   tables.set(normalizedId, managed);
   updateLobbyFromState(normalizedId);
@@ -587,7 +706,12 @@ app.post('/tables', (req, res) => {
     return;
   }
   try {
-    const table = createManagedTable(hostRecord);
+    const variantId = parsed.data.variantId;
+    if (!GAME_VARIANTS_BY_ID[variantId]) {
+      res.status(400).json({ error: 'Unknown game variant' });
+      return;
+    }
+    const table = createManagedTable(hostRecord, variantId);
     res.status(201).json(buildPreparePayload(table));
   } catch (error) {
     console.error('[server] failed to create table', error);
@@ -722,15 +846,7 @@ io.on('connection', (socket) => {
       socket.emit('errorMessage', { message: '仍有玩家未准备' });
       return;
     }
-    managed.hasStarted = true;
-    managed.gamePhase = 'dealing';
-    const dealSeed = `deal-${managed.id}-${Date.now()}`;
-    resetDeck(managed.state, { seed: dealSeed });
-    clearHands(managed.state);
-    setAllPrepared(managed, false);
-    updateLobbyFromState(tableId);
-    emitState(tableId);
-    startDealing(managed);
+    startVariantGame(managed);
   });
 
   socket.on('table:kick', (payload) => {
@@ -768,13 +884,20 @@ io.on('connection', (socket) => {
     const tableId = normalizeTableId(parsed.data.tableId ?? '');
     const managed = ensureHostAction(socket, tableId);
     if (!managed) return;
-    const requestedCapacity = Math.min(Math.max(parsed.data.capacity, 2), TABLE_CAPACITY);
+    if (managed.variant.capacity.locked) {
+      socket.emit('errorMessage', { message: '当前玩法固定人数，无法调整' });
+      return;
+    }
+    const minCapacity = managed.variant.capacity.min;
+    const maxCapacity = managed.variant.capacity.max;
+    const requestedCapacity = Math.min(Math.max(parsed.data.capacity, minCapacity), maxCapacity);
     const currentPlayers = managed.state.seats.length;
     if (requestedCapacity < currentPlayers) {
       socket.emit('errorMessage', { message: '人数已超过该上限' });
       return;
     }
     managed.config.capacity = requestedCapacity;
+    managed.config.variant = getVariantSummary(managed.variant.id);
     resetTablePhaseIfNeeded(managed);
     updateLobbyFromState(tableId);
     emitState(tableId);

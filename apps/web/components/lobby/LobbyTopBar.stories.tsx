@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 
 import type { LobbyNotification } from '@shared/messages';
+import { GAME_VARIANTS } from '@shared/variants';
 
 import { LobbyTopBar } from './LobbyTopBar';
 
@@ -32,6 +33,8 @@ const meta: Meta<typeof LobbyTopBar> = {
       nickname: '晨星',
       avatar: '1F42D.png'
     },
+    variants: GAME_VARIANTS,
+    selectedVariantId: GAME_VARIANTS[0].id,
     onBackHome: fn(),
     onCreateRoom: fn(),
     onOpenAvatarDialog: fn(),

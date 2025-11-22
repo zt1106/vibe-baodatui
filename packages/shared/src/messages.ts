@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { AVATAR_FILENAMES } from './avatars';
 
-export const DomainContractVersion = '2024-11-01' as const;
+export const DomainContractVersion = '2024-12-01' as const;
 
 const identifier = z.string().min(1);
 const positiveInt = z.number().int().positive();
@@ -20,6 +20,29 @@ export type SeatId = z.infer<typeof SeatId>;
 export const UserId = positiveInt;
 export type UserId = z.infer<typeof UserId>;
 
+export const GameVariantId = z.enum(['dou-dizhu']);
+export type GameVariantId = z.infer<typeof GameVariantId>;
+
+export const GameVariantCapacity = z
+  .object({
+    min: positiveInt,
+    max: positiveInt,
+    locked: positiveInt.optional()
+  })
+  .refine(value => value.min <= value.max, { message: 'min cannot exceed max' })
+  .refine(value => !value.locked || (value.locked >= value.min && value.locked <= value.max), {
+    message: 'locked capacity must be within range'
+  });
+export type GameVariantCapacity = z.infer<typeof GameVariantCapacity>;
+
+export const GameVariantSummary = z.object({
+  id: GameVariantId,
+  name: z.string().min(1),
+  description: z.string().min(1),
+  capacity: GameVariantCapacity
+});
+export type GameVariantSummary = z.infer<typeof GameVariantSummary>;
+
 const NotificationId = identifier;
 
 export const PlayerIdentity = z.object({
@@ -36,7 +59,8 @@ export const LobbyRoom = z.object({
   id: TableId,
   status: LobbyRoomStatus,
   players: nonNegativeInt,
-  capacity: positiveInt
+  capacity: positiveInt,
+  variant: GameVariantSummary
 });
 export type LobbyRoom = z.infer<typeof LobbyRoom>;
 
@@ -52,6 +76,14 @@ export const LobbyRoomsResponse = z.object({
   notifications: z.array(LobbyNotification)
 });
 export type LobbyRoomsResponse = z.infer<typeof LobbyRoomsResponse>;
+
+export const Heartbeat = z.object({
+  status: z.enum(['ok', 'degraded']),
+  timestamp: nonNegativeInt,
+  uptimeMs: nonNegativeInt,
+  connections: nonNegativeInt
+});
+export type Heartbeat = z.infer<typeof Heartbeat>;
 
 export const TablePlayer = PlayerIdentity.extend({
   prepared: z.boolean()
@@ -69,7 +101,8 @@ export const TableSeatState = PlayerIdentity.extend({
 export type TableSeatState = z.infer<typeof TableSeatState>;
 
 export const TableConfig = z.object({
-  capacity: positiveInt
+  capacity: positiveInt,
+  variant: GameVariantSummary
 });
 export type TableConfig = z.infer<typeof TableConfig>;
 
@@ -131,7 +164,8 @@ export const JoinTable = z.object({
 export type JoinTable = z.infer<typeof JoinTable>;
 
 export const CreateTableRequest = z.object({
-  host: TableHost
+  host: TableHost,
+  variantId: GameVariantId
 });
 export type CreateTableRequest = z.infer<typeof CreateTableRequest>;
 
@@ -202,6 +236,7 @@ export const GameSnapshot = z.object({
   phase: GamePhase,
   deckCount: nonNegativeInt,
   lastDealtSeatId: SeatId.optional(),
+  variant: GameVariantSummary,
   seats: z.array(GameSeatState)
 });
 export type GameSnapshot = z.infer<typeof GameSnapshot>;
@@ -226,11 +261,19 @@ export const DomainContracts = {
     SeatId,
     UserId
   },
+  variants: {
+    GameVariantId,
+    GameVariantCapacity,
+    GameVariantSummary
+  },
   lobby: {
     LobbyRoomStatus,
     LobbyRoom,
     LobbyNotification,
     LobbyRoomsResponse
+  },
+  heartbeat: {
+    Heartbeat
   },
   auth: {
     UserPayload,

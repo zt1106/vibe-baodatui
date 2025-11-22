@@ -10,7 +10,17 @@ import {
   TablePrepareResponse as TablePrepareResponseSchema,
   UpdateNicknameResponse as UpdateNicknameResponseSchema
 } from '@shared/messages';
-import type { LobbyNotification, LobbyRoom, TablePrepareResponse } from '@shared/messages';
+import type {
+  LobbyNotification,
+  LobbyRoom,
+  TablePrepareResponse,
+  GameVariantId
+} from '@shared/messages';
+import {
+  DEFAULT_VARIANT_ID,
+  listVariantDefinitions,
+  type GameVariantDefinition
+} from '@shared/variants';
 
 import { LobbyRoomsPanel } from '../../components/lobby/LobbyRoomsPanel';
 import { LobbyTopBar } from '../../components/lobby/LobbyTopBar';
@@ -41,6 +51,9 @@ export default function LobbyPage() {
   const [nameDraft, setNameDraft] = useState('');
   const [nameDialogError, setNameDialogError] = useState<string | null>(null);
   const [isUpdatingName, setIsUpdatingName] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState<GameVariantId>(DEFAULT_VARIANT_ID);
+
+  const variants = useMemo<GameVariantDefinition[]>(() => listVariantDefinitions(), []);
   // derive once per module; env never changes at runtime
 
   useEffect(() => {
@@ -118,7 +131,8 @@ export default function LobbyPage() {
     router.push('/');
   }, [router]);
 
-  const handleCreateRoom = useCallback(async () => {
+  const handleCreateRoom = useCallback(
+    async (variantId?: GameVariantId) => {
     if (isCreatingRoom) {
       return;
     }
@@ -129,6 +143,10 @@ export default function LobbyPage() {
     setRoomActionError(null);
     setIsCreatingRoom(true);
     try {
+      const chosenVariant =
+        variants.find(variant => variant.id === (variantId ?? selectedVariantId)) ??
+        variants[0];
+      const requestedVariantId = chosenVariant?.id ?? DEFAULT_VARIANT_ID;
       const payload = await fetchJson<unknown>(`${apiBaseUrl}/tables`, {
         method: 'POST',
         credentials: 'include',
@@ -138,7 +156,8 @@ export default function LobbyPage() {
             userId: user.id,
             nickname: user.nickname,
             avatar: user.avatar
-          }
+          },
+          variantId: requestedVariantId
         })
       });
       const parsed = TablePrepareResponseSchema.safeParse(payload);
@@ -153,7 +172,9 @@ export default function LobbyPage() {
     } finally {
       setIsCreatingRoom(false);
     }
-  }, [apiBaseUrl, isCreatingRoom, router, user]);
+    },
+    [apiBaseUrl, isCreatingRoom, router, selectedVariantId, user, variants]
+  );
 
   const handleOpenAvatarDialog = useCallback(() => {
     if (!user) return;
@@ -290,6 +311,9 @@ export default function LobbyPage() {
         onCreateRoom={handleCreateRoom}
         onOpenAvatarDialog={handleOpenAvatarDialog}
         onOpenNameDialog={handleOpenNameDialog}
+        variants={variants}
+        selectedVariantId={selectedVariantId}
+        onSelectVariant={setSelectedVariantId}
       />
 
       {roomActionError && (

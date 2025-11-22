@@ -3,12 +3,16 @@ import {
   createLobbyRegistry,
   deriveLobbyRoomStatus
 } from '../infrastructure/lobbyRegistry';
+import { getVariantSummary } from '@shared/variants';
+
+const defaultVariant = getVariantSummary('dou-dizhu');
 
 const sampleRoom = {
   id: 'table-1',
   status: 'waiting' as const,
   players: 1,
-  capacity: 4
+  capacity: 4,
+  variant: defaultVariant
 };
 
 const sampleNotification = {

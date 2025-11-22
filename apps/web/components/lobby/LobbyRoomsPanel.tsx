@@ -104,6 +104,12 @@ export function LobbyRoomsPanel({ rooms, status, onEnterRoom }: LobbyRoomsPanelP
                     {tone.label}
                   </span>
                 </header>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                    玩法：{room.variant.name}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{room.variant.description}</span>
+                </div>
                 <div
                   style={{
                     display: 'flex',

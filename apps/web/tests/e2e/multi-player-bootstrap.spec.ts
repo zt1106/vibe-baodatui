@@ -3,7 +3,6 @@ import {
   loginAndEnterLobby,
   createRoom,
   joinPrepareDirect,
-  ensureCapacity,
   readyUp,
   startGame,
   type PlayerSession
@@ -37,8 +36,6 @@ test('bootstrap multi-player session for manual gameplay debugging', async ({ br
     joinPrepareDirect(playerTwo.page, createdRoom.prepareUrl),
     joinPrepareDirect(playerThree.page, createdRoom.prepareUrl)
   ]);
-
-  await ensureCapacity(host.page, SESSION_CAPACITY);
 
   await Promise.all(
     players.map(({ page, label }) => readyUp(page, label))

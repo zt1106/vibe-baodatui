@@ -1,4 +1,6 @@
 import { expect, type BrowserContext, type Page } from '@playwright/test';
+import type { GameVariantId } from '@shared/messages';
+import { DEFAULT_VARIANT_ID } from '@shared/variants';
 
 const BASE_URL = (process.env.E2E_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const urlFor = (path: string) => {
@@ -16,10 +18,35 @@ export async function loginAndEnterLobby(page: Page, nickname: string, label: st
   await expect(page.getByTestId('lobby-user-summary')).toBeVisible({ timeout: 20_000 });
 }
 
-export async function createRoom(page: Page) {
+export async function createRoom(page: Page, variantId: GameVariantId = DEFAULT_VARIANT_ID) {
   await expect(page.getByTestId('create-room-button')).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId('create-room-button').click();
-  await page.waitForURL('**/game/**/prepare', { timeout: 20_000 });
+  const variantToggle = page.getByTestId('variant-select');
+  let variantVisible = false;
+  try {
+    variantVisible = await variantToggle.isVisible({ timeout: 2_000 });
+  } catch {
+    variantVisible = false;
+  }
+  if (variantVisible) {
+    const labelMap: Record<GameVariantId, string> = {
+      'dou-dizhu': '斗地主'
+    };
+    await variantToggle.click();
+    const targetLabel = labelMap[variantId] ?? variantId;
+    const options = page.getByRole('option');
+    await options.first().waitFor({ state: 'visible', timeout: 2_000 });
+    const optionByName = page.getByRole('option', { name: new RegExp(targetLabel, 'i') });
+    const hasNamedOption = (await optionByName.count()) > 0;
+    if (hasNamedOption) {
+      await optionByName.first().click();
+    } else {
+      await options.first().click();
+    }
+  }
+  await Promise.all([
+    page.waitForURL('**/game/**/prepare', { timeout: 20_000 }),
+    page.getByTestId('create-room-button').click()
+  ]);
   const currentUrl = page.url();
   const tableMatch = currentUrl.match(/\/game\/([^/]+)\/prepare/i);
   if (!tableMatch) {

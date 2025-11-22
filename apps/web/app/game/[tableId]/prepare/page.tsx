@@ -34,9 +34,8 @@ type PreparePageProps = {
 
 type AsyncState = AsyncStatus;
 
-const DEFAULT_TABLE_CONFIG = {
-  capacity: 8
-};
+const FALLBACK_MIN_CAPACITY = 2;
+const FALLBACK_MAX_CAPACITY = 8;
 
 const PREPARE_PAGE_REFRESH_EVENT = 'prepare-page-refresh';
 
@@ -327,26 +326,34 @@ export default function PreparePage({ params }: PreparePageProps) {
     [sendTableEvent, tableId]
   );
 
+  const variantConfig = prepareState?.config.variant ?? null;
+  const variantCapacity = variantConfig?.capacity ?? null;
+  const capacityLockedValue = variantCapacity?.locked ?? null;
+  const capacityMin = capacityLockedValue ?? variantCapacity?.min ?? FALLBACK_MIN_CAPACITY;
+  const capacityMax = capacityLockedValue ?? variantCapacity?.max ?? FALLBACK_MAX_CAPACITY;
+  const playerCount = prepareState?.players.length ?? 0;
+  const capacity = prepareState?.config.capacity ?? capacityMax;
+  const resolvedCapacity = capacity || capacityMax;
+  const isHost = Boolean(user && prepareState && prepareState.host.userId === user.id);
+  const canAdjustCapacity = Boolean(isHost && variantConfig && !capacityLockedValue);
+
   const handleAdjustCapacity = useCallback(
-    (delta: number, min = 2, max = DEFAULT_TABLE_CONFIG.capacity) => {
+    (delta: number) => {
+      if (!canAdjustCapacity) return;
       setConfigDraft(current => {
-        const baseline = current ?? prepareState?.config.capacity ?? DEFAULT_TABLE_CONFIG.capacity;
-        const next = Math.min(Math.max(baseline + delta, min), max);
+        const baseline = current ?? prepareState?.config.capacity ?? capacityMax;
+        const next = Math.min(Math.max(baseline + delta, capacityMin), capacityMax);
         return next;
       });
     },
-    [prepareState?.config.capacity]
+    [capacityMax, capacityMin, canAdjustCapacity, prepareState?.config.capacity]
   );
 
   const handleSaveConfig = useCallback(() => {
     if (configDraft === null) return;
+    if (prepareState?.config.variant.capacity.locked) return;
     sendTableEvent('table:updateConfig', { tableId, capacity: configDraft });
   }, [configDraft, sendTableEvent, tableId]);
-
-  const playerCount = prepareState?.players.length ?? 0;
-  const capacity = prepareState?.config.capacity ?? 0;
-  const resolvedCapacity = capacity || DEFAULT_TABLE_CONFIG.capacity;
-  const isHost = Boolean(user && prepareState && prepareState.host.userId === user.id);
   const selfPlayer = useMemo(() => {
     if (!prepareState || !user) return null;
     return prepareState.players.find(player => player.userId === user.id) ?? null;
@@ -356,7 +363,11 @@ export default function PreparePage({ params }: PreparePageProps) {
   const everyonePrepared = prepareState?.players.every(player => player.prepared) ?? false;
   const canHostStart = isHost && playerCount === resolvedCapacity && everyonePrepared;
   const configIsDirty = Boolean(
-    isHost && prepareState && configDraft !== null && configDraft !== prepareState.config.capacity
+    isHost &&
+      canAdjustCapacity &&
+      prepareState &&
+      configDraft !== null &&
+      configDraft !== prepareState.config.capacity
   );
   const canTogglePrepared = prepareStatus === 'ready' && isSelfSeated;
   const preparedButtonLabel = !isSelfSeated ? '等待入座' : selfPrepared ? '已准备' : '准备';
@@ -428,6 +439,11 @@ export default function PreparePage({ params }: PreparePageProps) {
           <span data-testid="room-code" style={{ opacity: 0.75 }}>
             房间编号：{tableId || '未知'}
           </span>
+          {variantConfig && (
+            <span style={{ fontSize: '0.95rem', opacity: 0.8 }}>
+              玩法：{variantConfig.name}（{variantConfig.description}）
+            </span>
+          )}
           {user && (
             <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>
               当前用户：{user.nickname}（ID {user.id}）
@@ -508,7 +524,7 @@ export default function PreparePage({ params }: PreparePageProps) {
         <PreparePlayerList
           seats={seats}
           playerCount={playerCount}
-          capacity={prepareState?.config.capacity ?? null}
+          capacity={resolvedCapacity || null}
           status={prepareStatus}
           error={prepareError}
           isHost={isHost}
@@ -539,7 +555,7 @@ export default function PreparePage({ params }: PreparePageProps) {
               <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 style={{ margin: 0 }}>房主控制台</h2>
                 <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
-                  当前人数：{playerCount} / {capacity || '—'}
+                  当前人数：{playerCount} / {resolvedCapacity || '—'}
                 </span>
               </header>
               <button
@@ -562,26 +578,28 @@ export default function PreparePage({ params }: PreparePageProps) {
               >
                 开始对局
               </button>
-              <div style={{ display: 'grid', gap: '0.5rem' }}>
-                <span style={{ fontWeight: 600 }}>最多玩家数</span>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button
-                    data-testid="capacity-decrement"
-                    type="button"
-                    onClick={() => handleAdjustCapacity(-1, 2, DEFAULT_TABLE_CONFIG.capacity)}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 12,
-                      border: '1px solid rgba(148, 163, 184, 0.4)',
-                      background: 'rgba(15, 23, 42, 0.6)',
-                      color: '#e2e8f0',
-                      fontSize: '1.25rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    −
-                  </button>
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                  <span style={{ fontWeight: 600 }}>最多玩家数</span>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      data-testid="capacity-decrement"
+                      type="button"
+                      onClick={() => handleAdjustCapacity(-1)}
+                      disabled={!canAdjustCapacity}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 12,
+                        border: '1px solid rgba(148, 163, 184, 0.4)',
+                        background: 'rgba(15, 23, 42, 0.6)',
+                        color: canAdjustCapacity ? '#e2e8f0' : '#475569',
+                        fontSize: '1.25rem',
+                        cursor: canAdjustCapacity ? 'pointer' : 'not-allowed',
+                        opacity: canAdjustCapacity ? 1 : 0.5
+                      }}
+                    >
+                      −
+                    </button>
                   <strong
                     data-testid="capacity-value"
                     style={{ fontSize: '1.4rem', minWidth: 40, textAlign: 'center' }}
@@ -591,16 +609,18 @@ export default function PreparePage({ params }: PreparePageProps) {
                   <button
                     data-testid="capacity-increment"
                     type="button"
-                    onClick={() => handleAdjustCapacity(1, 2, DEFAULT_TABLE_CONFIG.capacity)}
+                    onClick={() => handleAdjustCapacity(1)}
+                    disabled={!canAdjustCapacity}
                     style={{
                       width: 36,
                       height: 36,
                       borderRadius: 12,
                       border: '1px solid rgba(148, 163, 184, 0.4)',
                       background: 'rgba(15, 23, 42, 0.6)',
-                      color: '#e2e8f0',
+                      color: canAdjustCapacity ? '#e2e8f0' : '#475569',
                       fontSize: '1.25rem',
-                      cursor: 'pointer'
+                      cursor: canAdjustCapacity ? 'pointer' : 'not-allowed',
+                      opacity: canAdjustCapacity ? 1 : 0.5
                     }}
                   >
                     ＋
@@ -625,6 +645,11 @@ export default function PreparePage({ params }: PreparePageProps) {
                     保存配置
                   </button>
                 </div>
+                {capacityLockedValue && (
+                  <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+                    当前玩法固定 {capacityLockedValue} 人，无法调整。
+                  </span>
+                )}
               </div>
             </section>
           )}
@@ -645,7 +670,7 @@ export default function PreparePage({ params }: PreparePageProps) {
               <p style={{ margin: '0.35rem 0 0', opacity: 0.75 }}>更多选项即将上线</p>
             </header>
             <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'grid', gap: '0.5rem' }}>
-              <li>最多玩家：{capacity || '—'} 名</li>
+              <li>最多玩家：{resolvedCapacity || '—'} 名</li>
               <li>当前人数：{playerCount} 名</li>
             </ul>
             <button

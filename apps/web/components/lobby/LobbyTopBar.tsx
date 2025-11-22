@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
+
 import type { LobbyNotification } from '@shared/messages';
+import type { GameVariantDefinition, GameVariantId } from '@shared/variants';
 
 import type { AsyncStatus } from '../../lib/types';
 
@@ -16,9 +19,12 @@ export type LobbyTopBarProps = {
   isCreatingRoom: boolean;
   error?: string | null;
   onBackHome?: () => void;
-  onCreateRoom?: () => void;
+  onCreateRoom?: (variantId: GameVariantId) => void;
   onOpenAvatarDialog?: () => void;
   onOpenNameDialog?: () => void;
+  variants?: GameVariantDefinition[];
+  selectedVariantId?: GameVariantId;
+  onSelectVariant?: (variantId: GameVariantId) => void;
 };
 
 const noop = () => {};
@@ -33,9 +39,26 @@ export function LobbyTopBar({
   onBackHome = noop,
   onCreateRoom = noop,
   onOpenAvatarDialog = noop,
-  onOpenNameDialog = noop
+  onOpenNameDialog = noop,
+  variants = [],
+  selectedVariantId,
+  onSelectVariant = noop
 }: LobbyTopBarProps) {
   const isCreateDisabled = isCreatingRoom || authStatus !== 'ready';
+  const selectedVariant = variants.find(variant => variant.id === selectedVariantId) ?? variants[0];
+  const variantId = selectedVariant?.id;
+  const [isVariantMenuOpen, setIsVariantMenuOpen] = useState(false);
+  const variantMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (variantMenuRef.current && !variantMenuRef.current.contains(event.target as Node)) {
+        setIsVariantMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header
@@ -70,10 +93,104 @@ export function LobbyTopBar({
         >
           返回首页
         </button>
+        <div style={{ display: 'grid', gap: '0.25rem', position: 'relative' }} ref={variantMenuRef}>
+          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>玩法</span>
+          <button
+            type="button"
+            data-testid="variant-select"
+            onClick={() => setIsVariantMenuOpen(open => !open)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              borderRadius: 12,
+              border: '1px solid rgba(148, 163, 184, 0.35)',
+              background: 'rgba(15, 23, 42, 0.85)',
+              color: '#e2e8f0',
+              minWidth: 150,
+              maxWidth: 200,
+              cursor: 'pointer',
+              boxShadow: '0 10px 28px rgba(15, 23, 42, 0.4)'
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {selectedVariant ? selectedVariant.name : '选择玩法'}
+            </span>
+            <span aria-hidden="true" style={{ opacity: 0.6 }}>
+              ▼
+            </span>
+          </button>
+          {isVariantMenuOpen && (
+            <div
+              role="listbox"
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '0.25rem',
+                background: 'rgba(15, 23, 42, 0.95)',
+                borderRadius: 12,
+                border: '1px solid rgba(148, 163, 184, 0.28)',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.35)',
+                minWidth: 220,
+                maxWidth: 260,
+                zIndex: 20,
+                overflow: 'hidden'
+              }}
+            >
+              {variants.map(variant => (
+                <button
+                  key={variant.id}
+                  role="option"
+                  aria-selected={variant.id === variantId}
+                  onClick={() => {
+                    onSelectVariant(variant.id);
+                    setIsVariantMenuOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '0.75rem 0.85rem',
+                    background: variant.id === variantId ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                    color: '#e2e8f0',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'grid',
+                    gap: '0.2rem'
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{variant.name}</span>
+                  <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>{variant.description}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {selectedVariant && (
+            <span
+              data-testid="variant-description"
+              style={{
+                fontSize: '0.85rem',
+                opacity: 0.75,
+                paddingLeft: '0.25rem',
+                maxWidth: 240,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {selectedVariant.description}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           data-testid="create-room-button"
-          onClick={onCreateRoom}
+          onClick={() => {
+            if (!variantId) return;
+            onCreateRoom(variantId);
+          }}
           disabled={isCreateDisabled}
           style={{
             padding: '0.75rem 1.25rem',
