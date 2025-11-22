@@ -805,6 +805,20 @@ io.on('connection', (socket) => {
     emitGameSnapshot(managed);
   });
 
+  socket.on('game:leave', (payload: { tableId?: string; userId?: number }) => {
+    const tableId = normalizeTableId(payload?.tableId ?? '');
+    if (!tableId) return;
+    const managed = tables.get(tableId);
+    if (!managed) return;
+    const userId = payload?.userId ?? socketUsers.get(socket.id);
+    if (!userId) return;
+    const seatId =
+      managed.state.seats.find(id => managed.state.players[id]?.userId === userId) ?? socket.id;
+    removePlayerSeat(managed, seatId, userId);
+    emitState(tableId);
+    emitGameSnapshot(managed);
+  });
+
   socket.on('disconnect', () => {
     cleanupPlayerSocket(socket.id);
     heartbeat.publish();

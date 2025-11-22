@@ -246,6 +246,9 @@ export default function PlayPage({ params }: PlayPageProps) {
   const handleExitGame = useCallback(() => {
     const socket = socketRef.current;
     if (socket) {
+      if (tableId && user?.id) {
+        socket.emit('game:leave', { tableId, userId: user.id });
+      }
       releaseTableSocket(socket);
       clearTableSocketJoin(tableId);
       cleanupReleasedRef.current = true;
