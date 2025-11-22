@@ -132,6 +132,8 @@ const sampleHandRows = [
 type TableStoryArgs = {
   playerCount: number;
   handCardSize?: CardRowSize;
+  seatCardSize?: CardRowSize;
+  communityCardSize?: CardRowSize;
 };
 
 const meta: Meta<typeof GameTable, TableStoryArgs> = {
@@ -150,6 +152,8 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
     handCardRowGap: 12,
     handCardRowOverlap: 20,
     handCardSize: 'md',
+    seatCardSize: 'md',
+    communityCardSize: 'md',
     avatarRingScale: 1.08,
     cardRingScale: 0.75
   },
@@ -177,6 +181,14 @@ const meta: Meta<typeof GameTable, TableStoryArgs> = {
       control: { type: 'number', min: 0, max: 60, step: 2 }
     },
     handCardSize: {
+      control: { type: 'radio' },
+      options: ['xs', 'sm', 'md', 'lg']
+    },
+    seatCardSize: {
+      control: { type: 'radio' },
+      options: ['xs', 'sm', 'md', 'lg']
+    },
+    communityCardSize: {
       control: { type: 'radio' },
       options: ['xs', 'sm', 'md', 'lg']
     },

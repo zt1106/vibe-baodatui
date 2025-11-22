@@ -37,6 +37,8 @@ export type GameTableProps = {
   handCardSize?: CardRowSize;
   avatarRingScale?: number;
   cardRingScale?: number;
+  communityCardSize?: CardRowSize;
+  seatCardSize?: CardRowSize;
 };
 
 type Dimensions = { width: number; height: number };
@@ -69,7 +71,9 @@ export function GameTable({
   handCardCurveVerticalOffset = 18,
   handCardSize = 'md',
   avatarRingScale = 1.08,
-  cardRingScale = 0.75
+  cardRingScale = 0.75,
+  communityCardSize = 'md',
+  seatCardSize = 'md'
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
@@ -230,7 +234,7 @@ export function GameTable({
               {communityCards.length > 0 ? (
                 <CardRow
                   cards={communityCards}
-                  size="md"
+                  size={communityCardSize}
                   overlap="65%"
                   angle={0}
                   curveVerticalOffset={18}
@@ -255,7 +259,7 @@ export function GameTable({
                   {seat.player.cards && seat.player.cards.length > 0 ? (
                     <CardRow
                       cards={seat.player.cards}
-                      size="md"
+                      size={seatCardSize}
                       overlap="65%"
                       angle={0}
                       curveVerticalOffset={18}
