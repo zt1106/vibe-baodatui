@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import type { Card, Rank } from '@poker/core-cards';
 import { RANKS } from '@poker/core-cards';
@@ -97,11 +97,13 @@ export function GameTableStage({
     [handCardRows, handCards, handGrouping]
   );
 
+  const [isLeaving, setIsLeaving] = useState(false);
   const leavePromptingRef = useRef(false);
 
   const handleLeave = useCallback(() => {
     if (!onLeave) return;
-    if (leavePromptingRef.current) return;
+    if (isLeaving || leavePromptingRef.current) return;
+    setIsLeaving(true);
     leavePromptingRef.current = true;
     try {
       const confirmed =
@@ -110,11 +112,13 @@ export function GameTableStage({
           : window.confirm(leaveConfirmMessage);
       if (confirmed) {
         onLeave();
+      } else {
+        setIsLeaving(false);
       }
     } finally {
       leavePromptingRef.current = false;
     }
-  }, [leaveConfirmMessage, onLeave]);
+  }, [isLeaving, leaveConfirmMessage, onLeave]);
 
   const topBarActions = useMemo(() => {
     if (!onLeave) return null;
@@ -122,6 +126,7 @@ export function GameTableStage({
       <button
         type="button"
         onClick={handleLeave}
+        disabled={isLeaving}
         style={{
           padding: '0.28rem 0.65rem',
           borderRadius: 8,
@@ -138,7 +143,7 @@ export function GameTableStage({
         {leaveLabel}
       </button>
     );
-  }, [handleLeave, leaveLabel, onLeave]);
+  }, [handleLeave, isLeaving, leaveLabel, onLeave]);
 
   return (
     <GameTable
