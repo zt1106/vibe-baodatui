@@ -14,6 +14,7 @@ import { registerTableRoutes } from './http/routes/tables';
 import { TableManager } from './domain/tableManager';
 import { registerTableSocketHandlers } from './socket/tableHandlers';
 import { AutoPlayBot } from './bots/autoPlayBot';
+import { setDealDelayMs } from './domain/tableManager';
 
 type ServerCliFlags = {
   autoPlay: boolean;
@@ -55,6 +56,9 @@ const users = createUserRegistry();
 const lobby = createLobbyRegistry();
 const tableManager = new TableManager({ io, lobby, users });
 const autoPlayBot = flags.autoPlay ? new AutoPlayBot(tableManager) : null;
+if (flags.autoPlay) {
+  setDealDelayMs(100);
+}
 
 registerSystemRoutes(app, heartbeat);
 registerAuthRoutes(app, users);

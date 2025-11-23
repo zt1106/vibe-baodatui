@@ -97,7 +97,11 @@ export type TableManagerDeps = {
   users: ReturnType<typeof createUserRegistry>;
 };
 
-const DEAL_DELAY_MS = 600;
+let DEAL_DELAY_MS = 600;
+
+export function setDealDelayMs(delay: number) {
+  DEAL_DELAY_MS = Math.max(0, delay);
+}
 const RECONNECT_GRACE_MS = 5_000;
 
 export const normalizeTableId = (id: string) => id.trim();
