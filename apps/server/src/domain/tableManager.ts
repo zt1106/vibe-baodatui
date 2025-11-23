@@ -3,7 +3,6 @@ import { Server, type Socket } from 'socket.io';
 import {
   GameDealCardEvent,
   deriveLobbyRoomStatus,
-  GamePhase,
   GameSnapshot,
   GameVariantId,
   GameVariantSummary,
@@ -19,6 +18,12 @@ import {
   getVariantSummary,
   type GameVariantDefinition
 } from '@shared/variants';
+import {
+  derivePhaseStatus,
+  initialTablePhase,
+  tablePhaseReducer,
+  type TablePhase
+} from '@shared/tablePhases';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import {
   DuplicateNicknameError,
@@ -40,7 +45,7 @@ export type ManagedTable = {
   };
   hasStarted: boolean;
   prepared: Map<number, boolean>;
-  gamePhase: GamePhase;
+  phase: TablePhase;
   dealingState: {
     timer: NodeJS.Timeout | null;
     seatIndex: number;
@@ -74,6 +79,11 @@ export class TableManager {
     this.io = deps.io;
     this.lobby = deps.lobby;
     this.users = deps.users;
+  }
+
+  private transitionPhase(table: ManagedTable, action: Parameters<typeof tablePhaseReducer>[1]) {
+    table.phase = tablePhaseReducer(table.phase, action);
+    return table.phase;
   }
 
   private resolveRequestId(requestId?: string) {
@@ -127,7 +137,7 @@ export class TableManager {
 
   private endGameAndReset(table: ManagedTable, reason: 'player-left' | 'manual-reset' | undefined) {
     table.hasStarted = false;
-    table.gamePhase = 'idle';
+    this.transitionPhase(table, { type: 'reset' });
     this.stopDealing(table);
     clearHands(table.state);
     resetDeck(table.state, { packs: table.variant.deck.packs });
@@ -170,7 +180,7 @@ export class TableManager {
   private buildGameSnapshot(table: ManagedTable, lastDealtSeatId?: string): GameSnapshot {
     return {
       tableId: table.id,
-      phase: table.gamePhase,
+      phase: derivePhaseStatus(table.phase),
       deckCount: table.state.deck.length,
       lastDealtSeatId,
       variant: table.config.variant,
@@ -199,7 +209,7 @@ export class TableManager {
 
   private finishDealing(table: ManagedTable) {
     this.stopDealing(table);
-    table.gamePhase = 'complete';
+    this.transitionPhase(table, { type: 'complete', reason: 'deck-depleted' });
     this.emitGameSnapshot(table);
   }
 
@@ -209,7 +219,7 @@ export class TableManager {
       ...table.variantState,
       bottomCards: table.state.deck.map(card => ({ ...card }))
     };
-    table.gamePhase = 'complete';
+    this.transitionPhase(table, { type: 'complete', reason: 'bottom-cards' });
     this.emitGameSnapshot(table);
   }
 
@@ -218,8 +228,8 @@ export class TableManager {
       return;
     }
     this.stopDealing(table);
-    table.gamePhase = 'dealing';
     const traceId = this.resolveRequestId();
+    this.transitionPhase(table, { type: 'start-dealing', traceId });
     table.dealingState = { timer: null, seatIndex: 0, traceId };
     this.logStructured('deal:start', {
       traceId,
@@ -237,7 +247,7 @@ export class TableManager {
       }
       const seats = table.state.seats;
       if (seats.length === 0) {
-        table.gamePhase = 'idle';
+        this.transitionPhase(table, { type: 'reset' });
         this.stopDealing(table);
         this.emitGameSnapshot(table);
         return;
@@ -274,8 +284,8 @@ export class TableManager {
       return;
     }
     this.stopDealing(table);
-    table.gamePhase = 'dealing';
     const traceId = this.resolveRequestId();
+    this.transitionPhase(table, { type: 'start-dealing', traceId });
     table.dealingState = { timer: null, seatIndex: 0, traceId };
     this.logStructured('deal:start', {
       traceId,
@@ -293,7 +303,7 @@ export class TableManager {
       }
       const seats = table.state.seats;
       if (seats.length === 0) {
-        table.gamePhase = 'idle';
+        this.transitionPhase(table, { type: 'reset' });
         this.stopDealing(table);
         this.emitGameSnapshot(table);
         return;
@@ -327,7 +337,6 @@ export class TableManager {
 
   private startClassicVariant(table: ManagedTable) {
     table.hasStarted = true;
-    table.gamePhase = 'dealing';
     const dealSeed = `deal-${table.id}-${Date.now()}`;
     resetDeck(table.state, { seed: dealSeed, packs: table.variant.deck.packs });
     clearHands(table.state);
@@ -340,7 +349,6 @@ export class TableManager {
 
   private startDouDizhuVariant(table: ManagedTable) {
     table.hasStarted = true;
-    table.gamePhase = 'dealing';
     const dealSeed = `deal-${table.id}-${Date.now()}`;
     resetDeck(table.state, { seed: dealSeed, packs: table.variant.deck.packs });
     clearHands(table.state);
@@ -529,7 +537,7 @@ export class TableManager {
       },
       hasStarted: false,
       prepared: new Map(),
-      gamePhase: 'idle',
+      phase: initialTablePhase,
       dealingState: null,
       pendingDisconnects: new Map(),
       variantState: {}

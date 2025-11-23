@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import type { Card } from '@poker/core-cards';
 import { createCardId } from '@poker/core-cards';
 import { TablePlayStateResponse as TablePlayStateResponseSchema, type GameSnapshot, type ServerState } from '@shared/messages';
+import { derivePhaseStatus, initialTablePhase, tablePhaseReducer } from '@shared/tablePhases';
 
 import { ensureUser, loadStoredUser, persistStoredUser, NICKNAME_STORAGE_KEY, type StoredUser } from '../lib/auth';
 import {
@@ -38,6 +39,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null);
   const [selfHand, setSelfHand] = useState<Card[]>([]);
   const [dealingFlights, setDealingFlights] = useState<DealingCardFlight[]>([]);
+  const [tablePhase, dispatchTablePhase] = useReducer(tablePhaseReducer, initialTablePhase);
   const socketRef = useRef<ReturnType<typeof acquireTableSocket> | null>(null);
   const cleanupReleasedRef = useRef(false);
   const lastSnapshotRef = useRef<GameSnapshot | null>(null);
@@ -48,6 +50,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     setSelfHand([]);
     setGameError(null);
     setDealingFlights([]);
+    dispatchTablePhase({ type: 'reset' });
     lastSnapshotRef.current = null;
     dealSeqRef.current = 0;
   }, [tableId]);
@@ -89,6 +92,21 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
 
   useEffect(() => subscribeToHandUpdates(cards => setSelfHand(cards)), []);
 
+  const syncPhaseFromSnapshot = useCallback(
+    (phase: GameSnapshot['phase']) => {
+      if (phase === 'idle') {
+        dispatchTablePhase({ type: 'reset' });
+        return;
+      }
+      if (phase === 'dealing') {
+        dispatchTablePhase({ type: 'start-dealing' });
+        return;
+      }
+      dispatchTablePhase({ type: 'complete' });
+    },
+    []
+  );
+
   useEffect(() => {
     if (authStatus !== 'ready' || !user || !tableId) {
       return;
@@ -129,6 +147,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     const handleSnapshot = (payload: GameSnapshot) => {
       if (!active || payload.tableId !== tableId) return;
       setSnapshot(payload);
+      syncPhaseFromSnapshot(payload.phase);
       setGameError(null);
     };
 
@@ -141,6 +160,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
       setSnapshot(parsed.data.snapshot);
       setSelfHand(parsed.data.hand);
       hydrateSharedHand(parsed.data.hand);
+      syncPhaseFromSnapshot(parsed.data.snapshot.phase);
       setGameError(null);
     };
 
@@ -154,6 +174,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
       if (!active) return;
       if (payload?.tableId && payload.tableId !== tableId) return;
       setGameError('有玩家离开，牌局已结束，返回准备房间。');
+      dispatchTablePhase({ type: 'reset' });
       options.onGameEnded?.(tableId);
     };
 
@@ -202,10 +223,13 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     authStatus,
     options.onGameEnded,
     options.onKicked,
+    syncPhaseFromSnapshot,
     tableId,
     user?.id,
     user?.nickname
   ]);
+
+  const tablePhaseStatus = useMemo(() => derivePhaseStatus(tablePhase), [tablePhase]);
 
   const selfSeatId = useMemo(() => {
     if (!snapshot || !user) return null;
@@ -308,6 +332,8 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     authError,
     gameError,
     snapshot,
+    tablePhase,
+    tablePhaseStatus,
     selfHand,
     selfSeatId,
     dealingFlights,

@@ -55,7 +55,7 @@ describe('table socket handlers', () => {
       .spyOn<any, any>(TableManager.prototype as any, 'startDouDizhuDealing')
       .mockImplementation((table: any) => {
         table.dealingState = null;
-        table.gamePhase = 'dealing';
+        table.phase = { status: 'dealing' };
       });
 
     const server = await startSocketServer();

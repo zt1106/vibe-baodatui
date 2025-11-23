@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { TABLE_PHASE_STATUSES, type TablePhaseStatus } from '../tablePhases';
 import { GameVariantSummary, SeatId, TableId, nonNegativeIntSchema } from './common';
 import { PlayerIdentity } from './table';
 
@@ -23,8 +24,8 @@ export const GameCard = z.object({
 });
 export type GameCard = z.infer<typeof GameCard>;
 
-export const GamePhase = z.enum(['idle', 'dealing', 'complete']);
-export type GamePhase = z.infer<typeof GamePhase>;
+export const GamePhase = z.enum(TABLE_PHASE_STATUSES);
+export type GamePhase = TablePhaseStatus;
 
 export const GameSeatState = PlayerIdentity.extend({
   seatId: SeatId,

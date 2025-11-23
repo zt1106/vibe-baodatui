@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Server, Socket } from 'socket.io';
+import { derivePhaseStatus } from '@shared/tablePhases';
 import { TableManager } from '../domain/tableManager';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import { createUserRegistry } from '../infrastructure/userRegistry';
@@ -128,7 +129,7 @@ describe('TableManager lifecycle', () => {
       .spyOn<any, any>(manager as any, 'startDouDizhuDealing')
       .mockImplementation((tableState: any) => {
         tableState.dealingState = null;
-        tableState.gamePhase = 'dealing';
+        tableState.phase = { status: 'dealing' };
       });
 
     manager.handleStart(p2Socket as unknown as Socket, { tableId: table.tableId });
@@ -145,7 +146,7 @@ describe('TableManager lifecycle', () => {
 
     const managed = (manager as any).tables.get(table.tableId);
     expect(managed.hasStarted).toBe(true);
-    expect(managed.gamePhase).toBe('dealing');
+    expect(derivePhaseStatus(managed.phase)).toBe('dealing');
     expect(Array.from(managed.prepared.values()).every(flag => flag === false)).toBe(true);
     expect(lobby.snapshot().rooms[0].status).toBe('in-progress');
 
@@ -182,7 +183,7 @@ describe('TableManager lifecycle', () => {
 
     const managed = (manager as any).tables.get(table.tableId);
     managed.hasStarted = true;
-    managed.gamePhase = 'dealing';
+    managed.phase = { status: 'dealing' };
 
     manager.handleDisconnect(p2Socket.id);
     expect(managed.pendingDisconnects.size).toBe(1);

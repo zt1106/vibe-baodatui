@@ -39,7 +39,15 @@ export default function PlayPage({ params }: PlayPageProps) {
     }, 1200);
   }, [router]);
 
-  const { snapshot, selfHand, selfSeatId, dealingFlights, handleDealingComplete, exitGame } =
+  const {
+    snapshot,
+    selfHand,
+    selfSeatId,
+    dealingFlights,
+    tablePhaseStatus,
+    handleDealingComplete,
+    exitGame
+  } =
     usePlaySession(tableId, {
       onGameEnded: handleGameEnded,
       onKicked: handleKicked
@@ -50,11 +58,15 @@ export default function PlayPage({ params }: PlayPageProps) {
     return rotateSeats(
       snapshot.seats.map(seat => {
         const status =
-          snapshot.lastDealtSeatId === seat.seatId
+          tablePhaseStatus === 'complete'
+            ? '等待下一局'
+            : snapshot.lastDealtSeatId === seat.seatId
             ? '发牌中…'
             : seat.handCount > 0
             ? `持有 ${seat.handCount} 张`
-            : '等待发牌';
+            : tablePhaseStatus === 'dealing'
+            ? '等待发牌'
+            : '等待开局';
         return {
           id: seat.seatId,
           nickname: seat.nickname,
@@ -65,7 +77,7 @@ export default function PlayPage({ params }: PlayPageProps) {
       }),
       selfSeatId
     );
-  }, [snapshot, selfSeatId]);
+  }, [snapshot, selfSeatId, tablePhaseStatus]);
 
   const handleExitGame = useCallback(() => {
     exitGame(() => router.push('/lobby'));
