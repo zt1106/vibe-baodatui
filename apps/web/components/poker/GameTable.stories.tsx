@@ -143,7 +143,6 @@ type TableStoryArgs = {
   communityCardSize?: CardRowSize;
   handSectionOverlap?: number;
   handCards?: Card[];
-  handGrouping?: 'byColor' | 'bySuit';
 };
 
 const meta: Meta<typeof GameTableStage, TableStoryArgs> = {
@@ -157,7 +156,6 @@ const meta: Meta<typeof GameTableStage, TableStoryArgs> = {
     sceneHeight: '520px',
     sceneAlign: 'center',
     handCards: sampleHandCards,
-    handGrouping: 'byColor',
     handCardAngle: -10,
     handCardCurveVerticalOffset: 16,
     handCardOverlap: '55%',
@@ -179,10 +177,6 @@ const meta: Meta<typeof GameTableStage, TableStoryArgs> = {
     sceneAlign: {
       control: { type: 'radio' },
       options: ['flex-start', 'center', 'flex-end']
-    },
-    handGrouping: {
-      control: { type: 'radio' },
-      options: ['byColor', 'bySuit']
     },
     handCardAngle: {
       control: { type: 'number', min: -30, max: 30, step: 1 }
@@ -246,7 +240,6 @@ export const EmptyCards: Story = {
     sceneAlign: 'center',
     communityCards: [],
     handCards: [],
-    handGrouping: 'byColor',
     handCardRows: [],
     handCardAngle: -10,
     handCardCurveVerticalOffset: 16,

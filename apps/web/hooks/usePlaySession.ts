@@ -379,10 +379,24 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
         return;
       }
       socket.emit('game:play', { tableId, cardIds }, (response?: { ok: boolean; message?: string }) => {
-        if (!response?.ok && response?.message) {
-          setGameError(response.message);
+        const result = response ?? { ok: false, message: '未知错误' };
+        if (!result.ok && result.message) {
+          setGameError(result.message);
+          onComplete?.(result);
+          return;
         }
-        onComplete?.(response ?? { ok: false, message: '未知错误' });
+        if (result.ok && cardIds.length > 0) {
+          const played = new Set(cardIds);
+          setSelfHand(prev => {
+            if (prev.length === 0) return prev;
+            const next = prev.filter(card => !played.has(card.id));
+            if (next.length !== prev.length) {
+              hydrateSharedHand(next);
+            }
+            return next;
+          });
+        }
+        onComplete?.(result);
       });
     },
     [tableId]

@@ -3,17 +3,13 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import type { Card, Rank } from '@poker/core-cards';
-import { RANKS } from '@poker/core-cards';
 
 import { GameTable, type GameTableProps } from './GameTable';
 import type { CardRowSelectionMode } from '@poker/ui-cards';
 import stageStyles from './GameTableStage.module.css';
 
-type HandGrouping = 'byColor' | 'bySuit';
-
 export type GameTableStageProps = GameTableProps & {
   handCards?: Card[];
-  handGrouping?: HandGrouping;
   onLeave?: () => void;
   leaveConfirmMessage?: string;
   leaveLabel?: string;
@@ -29,73 +25,54 @@ export type GameTableStageProps = GameTableProps & {
   onHandSelectionChange?: (ids: number[]) => void;
 };
 
-const SUIT_DISPLAY_ORDER: Array<'S' | 'H' | 'D' | 'C'> = ['S', 'H', 'D', 'C'];
-const RANK_ORDER: Record<Rank, number> = Object.fromEntries(
-  RANKS.map((rank, index) => [rank, index])
+// Dou Dizhu display order, highest to lowest
+const HAND_RANK_DISPLAY_ORDER: Rank[] = [
+  'Joker',
+  '2',
+  'A',
+  'K',
+  'Q',
+  'J',
+  '10',
+  '9',
+  '8',
+  '7',
+  '6',
+  '5',
+  '4',
+  '3'
+];
+const HAND_RANK_ORDER: Record<Rank, number> = Object.fromEntries(
+  HAND_RANK_DISPLAY_ORDER.map((rank, index) => [rank, index])
 ) as Record<Rank, number>;
+const HAND_SUIT_ORDER: Record<Card['suit'], number> = {
+  JR: 0, // red joker first
+  JB: 1,
+  S: 0,
+  H: 1,
+  D: 2,
+  C: 3
+};
 
-function sortRow(row: Card[]) {
-  return row.slice().sort((a, b) => {
-    const aOrder = RANK_ORDER[a.rank] ?? 0;
-    const bOrder = RANK_ORDER[b.rank] ?? 0;
-    return aOrder - bOrder;
+function sortHandRow(cards: Card[]) {
+  return [...cards].sort((a, b) => {
+    const rankDiff = (HAND_RANK_ORDER[a.rank] ?? Number.MAX_SAFE_INTEGER) - (HAND_RANK_ORDER[b.rank] ?? Number.MAX_SAFE_INTEGER);
+    if (rankDiff !== 0) {
+      return rankDiff;
+    }
+    return (HAND_SUIT_ORDER[a.suit] ?? 0) - (HAND_SUIT_ORDER[b.suit] ?? 0);
   });
 }
 
-function groupHandBySuit(cards: Card[]) {
-  const suits: Record<'S' | 'H' | 'D' | 'C' | 'J', Card[]> = {
-    S: [],
-    H: [],
-    D: [],
-    C: [],
-    J: []
-  };
-  for (const card of cards) {
-    if (card.rank === 'Joker' || card.suit === 'JB' || card.suit === 'JR') {
-      suits.J.push(card);
-      continue;
-    }
-    if (suits[card.suit as 'S' | 'H' | 'D' | 'C']) {
-      suits[card.suit as 'S' | 'H' | 'D' | 'C'].push(card);
-    }
-  }
-  const rows: Card[][] = [];
-  for (const suit of SUIT_DISPLAY_ORDER) {
-    if (suits[suit].length > 0) {
-      rows.push(sortRow(suits[suit]));
-    }
-  }
-  if (suits.J.length > 0) {
-    rows.push(sortRow(suits.J));
-  }
-  return rows;
-}
-
-function groupHandByColor(cards: Card[]) {
-  const rows: Card[][] = [[], []];
-  for (const card of cards) {
-    const { suit } = card;
-    const isRed = suit === 'H' || suit === 'D' || suit === 'JR';
-    const isBlack = suit === 'S' || suit === 'C' || suit === 'JB';
-    if (isRed) {
-      rows[0].push(card);
-    } else if (isBlack) {
-      rows[1].push(card);
-    }
-  }
-  return rows.map(sortRow).filter(row => row.length > 0);
-}
-
-function deriveHandRows(handCards: Card[] | undefined, handGrouping: HandGrouping) {
+function deriveHandRows(handCards: Card[] | undefined) {
   if (!handCards || handCards.length === 0) {
     return [];
   }
-  return handGrouping === 'bySuit' ? groupHandBySuit(handCards) : groupHandByColor(handCards);
+  return [sortHandRow(handCards)];
 }
 
 export function GameTableStage({
   handCards,
-  handGrouping = 'byColor',
   handCardRows,
   handCardRowGap = 0,
   handCardRowOverlap = 40,
@@ -116,8 +93,8 @@ export function GameTableStage({
   ...gameTableProps
 }: GameTableStageProps) {
   const resolvedHandCardRows = useMemo(
-    () => handCardRows ?? deriveHandRows(handCards, handGrouping),
-    [handCardRows, handCards, handGrouping]
+    () => handCardRows ?? deriveHandRows(handCards),
+    [handCardRows, handCards]
   );
 
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);

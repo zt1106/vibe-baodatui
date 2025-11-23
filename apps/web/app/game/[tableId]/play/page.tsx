@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { GameTableStage } from '../../../../components/poker/GameTableStage';
@@ -60,6 +60,14 @@ export default function PlayPage({ params }: PlayPageProps) {
       onGameEnded: handleGameEnded,
       onKicked: handleKicked
     });
+
+  useEffect(() => {
+    setSelectedHandIds(ids => {
+      if (!ids.length) return ids;
+      const available = new Set(selfHand.map(card => card.id));
+      return ids.filter(id => available.has(id));
+    });
+  }, [selfHand]);
 
   const currentTurnSeatId = useMemo(() => {
     if (!snapshot) return null;
