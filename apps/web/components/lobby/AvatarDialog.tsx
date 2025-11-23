@@ -24,8 +24,7 @@ export function AvatarDialog({
   onSelectAvatar
 }: AvatarDialogProps) {
   if (!isOpen) return null;
-  const isConfirmDisabled =
-    isUpdating || !selectedAvatar || (currentAvatar && selectedAvatar === currentAvatar);
+  const isConfirmDisabled = isUpdating || !selectedAvatar || selectedAvatar === currentAvatar;
 
   return (
     <div role="presentation" className={styles.overlay}>

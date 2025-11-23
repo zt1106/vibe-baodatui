@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
 import type { Card } from '@poker/core-cards';
 import { createCardId } from '@poker/core-cards';
@@ -23,6 +24,7 @@ import { useApiBaseUrl } from './useApiBaseUrl';
 import { useStoredNickname } from './useStoredNickname';
 
 type AsyncState = 'idle' | 'loading' | 'ready' | 'error';
+type AckResult = { ok: boolean; message?: string };
 
 type UsePlaySessionOptions = {
   onGameEnded?: (tableId: string) => void;
@@ -32,29 +34,138 @@ type UsePlaySessionOptions = {
 export function usePlaySession(tableId: string, options: UsePlaySessionOptions = {}) {
   const apiBaseUrl = useApiBaseUrl();
   const { persistNickname } = useStoredNickname();
+  const { user, authStatus, authError } = usePlaySessionAuth({ apiBaseUrl, persistNickname, tableId });
+  const [gameError, setGameError] = useState<string | null>(null);
+  const { tablePhase, tablePhaseStatus, syncPhaseFromSnapshot, resetPhase } = useTablePhaseController(tableId);
+  const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null);
+  const { selfHand, setSelfHand } = useSelfHandState(tableId);
+
+  useEffect(() => {
+    setGameError(null);
+    setSnapshot(null);
+    resetPhase();
+  }, [resetPhase, tableId]);
+
+  const { socketRef, releaseSocket } = useTableSocketLifecycle({
+    apiBaseUrl,
+    tableId,
+    user,
+    authStatus,
+    syncPhaseFromSnapshot,
+    setSnapshot,
+    setSelfHand,
+    setGameError,
+    onGameEnded: options.onGameEnded,
+    onKicked: options.onKicked,
+    resetPhase
+  });
+
+  const selfSeatId = useMemo(() => {
+    if (!snapshot || !user) return null;
+    const seat = snapshot.seats.find(entry => entry.userId === user.id);
+    return seat?.seatId ?? null;
+  }, [snapshot, user?.id]);
+
+  const { dealingFlights, handleDealingComplete } = useDealingFlights({
+    resetKey: tableId,
+    selfSeatId,
+    snapshot
+  });
+
+  useSelfHandComboPruner({
+    resetKey: tableId,
+    selfSeatId,
+    snapshot,
+    setSelfHand
+  });
+
+  const emitWithAck = useSocketEmitWithAck(socketRef, tableId, setGameError);
+  const exitGame = useExitGame({ socketRef, tableId, userId: user?.id, releaseSocket });
+
+  const sendBid = useCallback(
+    (bid: number, onComplete?: (result: AckResult) => void) => {
+      emitWithAck('game:bid', { tableId, bid }, undefined, onComplete);
+    },
+    [emitWithAck, tableId]
+  );
+
+  const sendDouble = useCallback(
+    (double: boolean, onComplete?: (result: AckResult) => void) => {
+      emitWithAck('game:double', { tableId, double }, undefined, onComplete);
+    },
+    [emitWithAck, tableId]
+  );
+
+  const sendPlay = useCallback(
+    (cardIds: number[], onComplete?: (result: AckResult) => void) => {
+      emitWithAck(
+        'game:play',
+        { tableId, cardIds },
+        result => {
+          if (!result.ok || cardIds.length === 0) {
+            return;
+          }
+          const played = new Set(cardIds);
+          setSelfHand(prev => {
+            if (prev.length === 0) return prev;
+            const next = prev.filter(card => !played.has(card.id));
+            if (next.length !== prev.length) {
+              hydrateSharedHand(next);
+            }
+            return next;
+          });
+        },
+        onComplete
+      );
+    },
+    [emitWithAck, setSelfHand, tableId]
+  );
+
+  return {
+    apiBaseUrl,
+    user,
+    authStatus,
+    authError,
+    gameError,
+    snapshot,
+    tablePhase,
+    tablePhaseStatus,
+    selfHand,
+    selfSeatId,
+    dealingFlights,
+    handleDealingComplete,
+    exitGame,
+    sendBid,
+    sendDouble,
+    sendPlay,
+    setGameError
+  };
+}
+
+function normalizeAck(response?: AckResult): AckResult {
+  if (response && typeof response.ok === 'boolean') {
+    return response;
+  }
+  return { ok: false, message: '未知错误' };
+}
+
+function usePlaySessionAuth({
+  apiBaseUrl,
+  persistNickname,
+  tableId
+}: {
+  apiBaseUrl: string;
+  persistNickname: (nickname: string) => void;
+  tableId: string;
+}) {
   const [user, setUser] = useState<StoredUser | null>(null);
   const [authStatus, setAuthStatus] = useState<AsyncState>('idle');
   const [authError, setAuthError] = useState<string | null>(null);
-  const [gameError, setGameError] = useState<string | null>(null);
-  const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null);
-  const [selfHand, setSelfHand] = useState<Card[]>([]);
-  const [dealingFlights, setDealingFlights] = useState<DealingCardFlight[]>([]);
-  const [tablePhase, dispatchTablePhase] = useReducer(tablePhaseReducer, initialTablePhase);
-  const socketRef = useRef<ReturnType<typeof acquireTableSocket> | null>(null);
-  const cleanupReleasedRef = useRef(false);
-  const lastSnapshotRef = useRef<GameSnapshot | null>(null);
-  const processedSelfCombosRef = useRef<Set<string>>(new Set());
-  const dealSeqRef = useRef(0);
 
   useEffect(() => {
-    setSnapshot(null);
-    setSelfHand([]);
-    setGameError(null);
-    setDealingFlights([]);
-    dispatchTablePhase({ type: 'reset' });
-    lastSnapshotRef.current = null;
-    processedSelfCombosRef.current = new Set();
-    dealSeqRef.current = 0;
+    setUser(null);
+    setAuthStatus('idle');
+    setAuthError(null);
   }, [tableId]);
 
   useEffect(() => {
@@ -92,7 +203,17 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     };
   }, [apiBaseUrl, persistNickname, tableId]);
 
-  useEffect(() => subscribeToHandUpdates(cards => setSelfHand(cards)), []);
+  return { user, authStatus, authError };
+}
+
+function useTablePhaseController(resetKey: string) {
+  const [tablePhase, dispatchTablePhase] = useReducer(tablePhaseReducer, initialTablePhase);
+
+  const resetPhase = useCallback(() => dispatchTablePhase({ type: 'reset' }), []);
+
+  useEffect(() => {
+    resetPhase();
+  }, [resetKey, resetPhase]);
 
   const syncPhaseFromSnapshot = useCallback(
     (phase: GameSnapshot['phase']) => {
@@ -120,6 +241,191 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     },
     []
   );
+
+  const tablePhaseStatus = useMemo(() => derivePhaseStatus(tablePhase), [tablePhase]);
+
+  return { tablePhase, tablePhaseStatus, syncPhaseFromSnapshot, resetPhase };
+}
+
+function useSelfHandState(resetKey: string) {
+  const [selfHand, setSelfHand] = useState<Card[]>([]);
+
+  useEffect(() => subscribeToHandUpdates(cards => setSelfHand(cards)), []);
+
+  useEffect(() => {
+    setSelfHand([]);
+  }, [resetKey]);
+
+  return { selfHand, setSelfHand };
+}
+
+function useDealingFlights({
+  resetKey,
+  selfSeatId,
+  snapshot
+}: {
+  resetKey: string;
+  selfSeatId: string | null;
+  snapshot: GameSnapshot | null;
+}) {
+  const [dealingFlights, setDealingFlights] = useState<DealingCardFlight[]>([]);
+  const lastSnapshotRef = useRef<GameSnapshot | null>(null);
+  const dealSeqRef = useRef(0);
+
+  const dealingCardIds = useMemo(
+    () => [
+      createCardId('A', 'S'),
+      createCardId('K', 'H'),
+      createCardId('Q', 'C'),
+      createCardId('J', 'D'),
+      createCardId('10', 'S'),
+      createCardId('9', 'H')
+    ],
+    []
+  );
+
+  useEffect(() => {
+    setDealingFlights([]);
+    lastSnapshotRef.current = null;
+    dealSeqRef.current = 0;
+  }, [resetKey]);
+
+  useEffect(() => {
+    if (!snapshot) {
+      lastSnapshotRef.current = snapshot;
+      setDealingFlights([]);
+      dealSeqRef.current = 0;
+      return;
+    }
+    const prev = lastSnapshotRef.current;
+    if (!prev) {
+      lastSnapshotRef.current = snapshot;
+      return;
+    }
+    const prevHandCounts = new Map(prev.seats.map(seat => [seat.seatId, seat.handCount]));
+    const updates: DealingCardFlight[] = [];
+    for (const seat of snapshot.seats) {
+      if (seat.seatId === selfSeatId) {
+        continue;
+      }
+      const prevCount = prevHandCounts.get(seat.seatId) ?? 0;
+      const delta = seat.handCount - prevCount;
+      if (delta <= 0) {
+        continue;
+      }
+      for (let i = 0; i < delta; i += 1) {
+        const seq = dealSeqRef.current++;
+        const cardId = dealingCardIds[seq % dealingCardIds.length];
+        updates.push({
+          id: `deal-${seq}-${seat.seatId}`,
+          seatId: seat.seatId,
+          cardId,
+          faceUp: false
+        });
+      }
+    }
+    if (updates.length) {
+      setDealingFlights(prevFlights => [...prevFlights, ...updates]);
+    }
+    lastSnapshotRef.current = snapshot;
+  }, [dealingCardIds, selfSeatId, snapshot]);
+
+  const handleDealingComplete = useCallback((flightId: string) => {
+    setDealingFlights(prev => prev.filter(flight => flight.id !== flightId));
+  }, []);
+
+  return { dealingFlights, handleDealingComplete };
+}
+
+function useSelfHandComboPruner({
+  resetKey,
+  selfSeatId,
+  snapshot,
+  setSelfHand
+}: {
+  resetKey: string;
+  selfSeatId: string | null;
+  snapshot: GameSnapshot | null;
+  setSelfHand: Dispatch<SetStateAction<Card[]>>;
+}) {
+  const processedSelfCombosRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    processedSelfCombosRef.current = new Set();
+  }, [resetKey]);
+
+  useEffect(() => {
+    if (!snapshot || !selfSeatId) {
+      return;
+    }
+    const toProcess: Array<{ seatId: string; cardIds: number[] }> = [];
+
+    const maybeQueueCombo = (combo?: { seatId: string; cards: Array<{ id: number }> } | null) => {
+      if (!combo || combo.seatId !== selfSeatId) return;
+      if (!combo.cards?.length) return;
+      const key = `${combo.seatId}-${combo.cards.map(card => card.id).sort((a, b) => a - b).join('-')}`;
+      if (processedSelfCombosRef.current.has(key)) return;
+      processedSelfCombosRef.current.add(key);
+      toProcess.push({ seatId: combo.seatId, cardIds: combo.cards.map(card => card.id) });
+    };
+
+    maybeQueueCombo(snapshot.lastCombo);
+    if (snapshot.trickCombos && snapshot.trickCombos[selfSeatId]) {
+      maybeQueueCombo(snapshot.trickCombos[selfSeatId]);
+    }
+
+    if (!toProcess.length) return;
+
+    const idsToRemove = new Set<number>(toProcess.flatMap(entry => entry.cardIds));
+    setSelfHand(prev => {
+      if (prev.length === 0) return prev;
+      const next = prev.filter(card => !idsToRemove.has(card.id));
+      if (next.length !== prev.length) {
+        hydrateSharedHand(next);
+      }
+      return next;
+    });
+  }, [selfSeatId, setSelfHand, snapshot]);
+}
+
+function useTableSocketLifecycle({
+  apiBaseUrl,
+  tableId,
+  user,
+  authStatus,
+  syncPhaseFromSnapshot,
+  setSnapshot,
+  setSelfHand,
+  setGameError,
+  onGameEnded,
+  onKicked,
+  resetPhase
+}: {
+  apiBaseUrl: string;
+  tableId: string;
+  user: StoredUser | null;
+  authStatus: AsyncState;
+  syncPhaseFromSnapshot: (phase: GameSnapshot['phase']) => void;
+  setSnapshot: (snapshot: GameSnapshot) => void;
+  setSelfHand: (hand: Card[]) => void;
+  setGameError: (message: string | null) => void;
+  onGameEnded?: (tableId: string) => void;
+  onKicked?: (tableId: string) => void;
+  resetPhase: () => void;
+}) {
+  const socketRef = useRef<ReturnType<typeof acquireTableSocket> | null>(null);
+  const cleanupReleasedRef = useRef(false);
+
+  const releaseSocket = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || cleanupReleasedRef.current) {
+      return;
+    }
+    releaseTableSocket(socket);
+    clearTableSocketJoin(tableId);
+    cleanupReleasedRef.current = true;
+    socketRef.current = null;
+  }, [tableId]);
 
   useEffect(() => {
     if (authStatus !== 'ready' || !user || !tableId) {
@@ -188,8 +494,8 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
       if (!active) return;
       if (payload?.tableId && payload.tableId !== tableId) return;
       setGameError('有玩家离开，牌局已结束，返回准备房间。');
-      dispatchTablePhase({ type: 'reset' });
-      options.onGameEnded?.(tableId);
+      resetPhase();
+      onGameEnded?.(tableId);
     };
 
     const handleServerError = (payload: { message?: string }) => {
@@ -200,7 +506,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     const handleKicked = (payload: { tableId?: string }) => {
       if (!active || payload?.tableId !== tableId) return;
       setGameError('你已被房主移出房间。');
-      options.onKicked?.(tableId);
+      onKicked?.(tableId);
     };
 
     socket.on('connect', handleConnect);
@@ -225,141 +531,84 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
       socket.off('game:ended', handleGameEnded);
       socket.off('errorMessage', handleServerError);
       socket.off('kicked', handleKicked);
-      if (!cleanupReleasedRef.current) {
-        releaseTableSocket(socket);
-        clearTableSocketJoin(tableId);
-        cleanupReleasedRef.current = true;
-        socketRef.current = null;
-      }
+      releaseSocket();
     };
   }, [
     apiBaseUrl,
     authStatus,
-    options.onGameEnded,
-    options.onKicked,
+    onGameEnded,
+    onKicked,
+    releaseSocket,
+    setGameError,
+    setSelfHand,
+    setSnapshot,
     syncPhaseFromSnapshot,
     tableId,
+    resetPhase,
     user?.id,
     user?.nickname
   ]);
 
-  const tablePhaseStatus = useMemo(() => derivePhaseStatus(tablePhase), [tablePhase]);
+  return { socketRef, releaseSocket };
+}
 
-  const selfSeatId = useMemo(() => {
-    if (!snapshot || !user) return null;
-    const seat = snapshot.seats.find(entry => entry.userId === user.id);
-    return seat?.seatId ?? null;
-  }, [snapshot, user?.id]);
-
-  const dealingCardIds = useMemo(
-    () => [
-      createCardId('A', 'S'),
-      createCardId('K', 'H'),
-      createCardId('Q', 'C'),
-      createCardId('J', 'D'),
-      createCardId('10', 'S'),
-      createCardId('9', 'H')
-    ],
-    []
+function useSocketEmitWithAck(
+  socketRef: MutableRefObject<ReturnType<typeof acquireTableSocket> | null>,
+  tableId: string,
+  setGameError: (message: string | null) => void
+) {
+  return useCallback(
+    <Payload>(
+      event: string,
+      payload: Payload,
+      onSuccess?: (result: AckResult) => void,
+      onComplete?: (result: AckResult) => void
+    ) => {
+      const socket = socketRef.current;
+      if (!socket || !tableId) {
+        const fallback = { ok: false, message: '未连接到牌桌' };
+        onComplete?.(fallback);
+        return;
+      }
+      socket.emit(event, payload, (response?: AckResult) => {
+        const result = normalizeAck(response);
+        if (!result.ok && result.message) {
+          setGameError(result.message);
+        }
+        onSuccess?.(result);
+        onComplete?.(result);
+      });
+    },
+    [setGameError, socketRef, tableId]
   );
+}
 
-  useEffect(() => {
-    if (!snapshot) {
-      lastSnapshotRef.current = snapshot;
-      setDealingFlights([]);
-      dealSeqRef.current = 0;
-      return;
-    }
-    const prev = lastSnapshotRef.current;
-    if (!prev) {
-      lastSnapshotRef.current = snapshot;
-      return;
-    }
-    const prevHandCounts = new Map(prev.seats.map(seat => [seat.seatId, seat.handCount]));
-    const updates: DealingCardFlight[] = [];
-    for (const seat of snapshot.seats) {
-      if (seat.seatId === selfSeatId) {
-        continue;
-      }
-      const prevCount = prevHandCounts.get(seat.seatId) ?? 0;
-      const delta = seat.handCount - prevCount;
-      if (delta <= 0) {
-        continue;
-      }
-      for (let i = 0; i < delta; i += 1) {
-        const seq = dealSeqRef.current++;
-        const cardId = dealingCardIds[seq % dealingCardIds.length];
-        updates.push({
-          id: `deal-${seq}-${seat.seatId}`,
-          seatId: seat.seatId,
-          cardId,
-          faceUp: false
-        });
-      }
-    }
-    if (updates.length) {
-      setDealingFlights(prevFlights => [...prevFlights, ...updates]);
-    }
-    lastSnapshotRef.current = snapshot;
-  }, [dealingCardIds, selfSeatId, snapshot]);
-
-  useEffect(() => {
-    if (!snapshot || !selfSeatId) {
-      return;
-    }
-    const toProcess: Array<{ seatId: string; cardIds: number[] }> = [];
-
-    const maybeQueueCombo = (combo?: { seatId: string; cards: Array<{ id: number }> } | null) => {
-      if (!combo || combo.seatId !== selfSeatId) return;
-      if (!combo.cards?.length) return;
-      const key = `${combo.seatId}-${combo.cards.map(card => card.id).sort((a, b) => a - b).join('-')}`;
-      if (processedSelfCombosRef.current.has(key)) return;
-      processedSelfCombosRef.current.add(key);
-      toProcess.push({ seatId: combo.seatId, cardIds: combo.cards.map(card => card.id) });
-    };
-
-    maybeQueueCombo(snapshot.lastCombo);
-    if (snapshot.trickCombos && snapshot.trickCombos[selfSeatId]) {
-      maybeQueueCombo(snapshot.trickCombos[selfSeatId]);
-    }
-
-    if (!toProcess.length) return;
-
-    const idsToRemove = new Set<number>(toProcess.flatMap(entry => entry.cardIds));
-    setSelfHand(prev => {
-      if (prev.length === 0) return prev;
-      const next = prev.filter(card => !idsToRemove.has(card.id));
-      if (next.length !== prev.length) {
-        hydrateSharedHand(next);
-      }
-      return next;
-    });
-  }, [selfSeatId, snapshot]);
-
-  const handleDealingComplete = useCallback((flightId: string) => {
-    setDealingFlights(prev => prev.filter(flight => flight.id !== flightId));
-  }, []);
-
-  const exitGame = useCallback(
+function useExitGame({
+  socketRef,
+  tableId,
+  userId,
+  releaseSocket
+}: {
+  socketRef: MutableRefObject<ReturnType<typeof acquireTableSocket> | null>;
+  tableId: string;
+  userId?: number;
+  releaseSocket: () => void;
+}) {
+  return useCallback(
     (onFinished?: () => void) => {
       const socket = socketRef.current;
       const finish = () => {
-        if (socket) {
-          releaseTableSocket(socket);
-          clearTableSocketJoin(tableId);
-          cleanupReleasedRef.current = true;
-          socketRef.current = null;
-        }
+        releaseSocket();
         onFinished?.();
       };
-      if (socket && tableId && user?.id) {
+      if (socket && tableId && userId) {
         let settled = false;
         const timeout = setTimeout(() => {
           if (settled) return;
           settled = true;
           finish();
         }, 600);
-        socket.emit('game:leave', { tableId, userId: user.id }, () => {
+        socket.emit('game:leave', { tableId, userId }, () => {
           if (settled) return;
           settled = true;
           clearTimeout(timeout);
@@ -369,91 +618,6 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
       }
       finish();
     },
-    [tableId, user?.id]
+    [releaseSocket, socketRef, tableId, userId]
   );
-
-  const sendBid = useCallback(
-    (bid: number, onComplete?: (result: { ok: boolean; message?: string }) => void) => {
-      const socket = socketRef.current;
-      if (!socket || !tableId) {
-        onComplete?.({ ok: false, message: '未连接到牌桌' });
-        return;
-      }
-      socket.emit('game:bid', { tableId, bid }, (response?: { ok: boolean; message?: string }) => {
-        if (!response?.ok && response?.message) {
-          setGameError(response.message);
-        }
-        onComplete?.(response ?? { ok: false, message: '未知错误' });
-      });
-    },
-    [tableId]
-  );
-
-  const sendDouble = useCallback(
-    (double: boolean, onComplete?: (result: { ok: boolean; message?: string }) => void) => {
-      const socket = socketRef.current;
-      if (!socket || !tableId) {
-        onComplete?.({ ok: false, message: '未连接到牌桌' });
-        return;
-      }
-      socket.emit('game:double', { tableId, double }, (response?: { ok: boolean; message?: string }) => {
-        if (!response?.ok && response?.message) {
-          setGameError(response.message);
-        }
-        onComplete?.(response ?? { ok: false, message: '未知错误' });
-      });
-    },
-    [tableId]
-  );
-
-  const sendPlay = useCallback(
-    (cardIds: number[], onComplete?: (result: { ok: boolean; message?: string }) => void) => {
-      const socket = socketRef.current;
-      if (!socket || !tableId) {
-        onComplete?.({ ok: false, message: '未连接到牌桌' });
-        return;
-      }
-      socket.emit('game:play', { tableId, cardIds }, (response?: { ok: boolean; message?: string }) => {
-        const result = response ?? { ok: false, message: '未知错误' };
-        if (!result.ok && result.message) {
-          setGameError(result.message);
-          onComplete?.(result);
-          return;
-        }
-        if (result.ok && cardIds.length > 0) {
-          const played = new Set(cardIds);
-          setSelfHand(prev => {
-            if (prev.length === 0) return prev;
-            const next = prev.filter(card => !played.has(card.id));
-            if (next.length !== prev.length) {
-              hydrateSharedHand(next);
-            }
-            return next;
-          });
-        }
-        onComplete?.(result);
-      });
-    },
-    [tableId]
-  );
-
-  return {
-    apiBaseUrl,
-    user,
-    authStatus,
-    authError,
-    gameError,
-    snapshot,
-    tablePhase,
-    tablePhaseStatus,
-    selfHand,
-    selfSeatId,
-    dealingFlights,
-    handleDealingComplete,
-    exitGame,
-    sendBid,
-    sendDouble,
-    sendPlay,
-    setGameError
-  };
 }
