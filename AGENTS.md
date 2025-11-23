@@ -1,36 +1,82 @@
-# Repository Guidelines
+# AGENTS.md – Repository agent guide
 
-## Project Structure & Module Organization
-This workspace is managed by pnpm (`pnpm-workspace.yaml`) with applications and shared packages grouped at the root.
-- `apps/web`: Next.js client in `app/`; Playwright specs live under `tests/e2e`.
-- `apps/server`: Express + Socket.IO API; Prisma schema in `prisma/schema.prisma`; Vitest suites in `src/__tests__`.
-- `packages/game-core`: Pure game state utilities with no I/O dependencies.
-- `packages/shared`: Shared env loader and Zod message contracts.
-- `packages/test-utils`: Helpers reused across Vitest suites.
+## Project overview
+- TypeScript/React 18 monorepo managed by pnpm 9; Node.js 20+ recommended.
+- Frontend: Next.js 14 app in `apps/web` with Storybook and Playwright for UI coverage.
+- Backend: Express + Socket.IO API in `apps/server`; Prisma present for future persistence (currently in-memory).
+- Shared packages: `packages/game-core` (pure poker state), `packages/core-cards` + `packages/ui-cards` (card assets/components), `packages/shared` (env + Zod contracts), `packages/test-utils` (Vitest helpers).
+- Nested instructions: follow `apps/server/AGENTS.md` when touching backend code; other packages inherit these rules.
 
-## Build, Test, and Development Commands
-Run commands from the repository root unless noted.
-- `pnpm install`: hoist workspace dependencies.
-- `pnpm dev`: start the server (`PORT` defaults to 3001) and web app (3000) concurrently.
-- `pnpm build`: build every workspace package for production output.
-- `pnpm test`: execute all Vitest suites across apps and packages.
-- `pnpm typecheck`: run the TypeScript project references.
-- `pnpm e2e`: launch Playwright end-to-end specs for the web experience.
-  - First-time setup in CI or fresh containers requires Playwright browsers. Run `pnpm -C apps/web exec playwright install --with-deps` once to provision Chromium/Firefox/WebKit and system deps before executing the suite.
-  - The Playwright specs assume the Next.js client and Express API are already running. Start them with `pnpm dev` in another terminal and keep the process alive while `pnpm e2e` runs.
-Target individual scripts with `pnpm -C apps/<name> <script>` (for example, `pnpm -C apps/server prisma:generate`).
+## Commands (run from repo root unless noted)
+- Install deps: `pnpm install`
+- Dev servers (web 3000 + api 3001): `pnpm dev`
+- Build all packages: `pnpm build`
+- Run all tests (Vitest): `pnpm test`
+- Typecheck all projects: `pnpm typecheck`
+- Playwright e2e (web): `pnpm e2e` (requires `pnpm dev` already running)
+- Storybook: `pnpm sb` (dev), `pnpm sb:build` (static build)
+- Per-package script: `pnpm -C apps/<name> <cmd>` or `pnpm -C packages/<name> <cmd>`
 
-## Coding Style & Naming Conventions
-TypeScript is standard with ES module syntax. Use two-space indentation and `camelCase` for variables, functions, and file names; reserve `UPPER_SNAKE_CASE` for shared constants. Prefer named exports and keep feature logic small and composable (see `packages/game-core`). Document non-obvious business rules with brief comments. There is no lint script yet, so rely on TypeScript checks and Vitest to enforce structure.
+### Fast / file-scoped commands (preferred)
+- Web typecheck: `pnpm -C apps/web typecheck`
+- Web unit test single file: `pnpm -C apps/web test -- path/to/file.test.ts[x]`
+- Server typecheck: `pnpm -C apps/server typecheck`
+- Server unit test single file: `pnpm -C apps/server test -- src/__tests__/file.test.ts`
+- Playwright browser install (one-time): `pnpm -C apps/web exec playwright install --with-deps`
+- Prisma client after schema edits: `pnpm -C apps/server prisma:generate`
+> No repo-wide lint script yet; rely on typechecks + tests for feedback.
 
-## Testing Guidelines
-Vitest drives unit coverage; place specs in `__tests__` folders with a `*.test.ts` suffix. Reuse factories from `packages/test-utils` for socket scenarios. Playwright powers end-to-end coverage in `apps/web/tests/e2e`; group scenarios by table size or flow (`2players.spec.ts`). Before pushing, run `pnpm test && pnpm e2e`; during iteration, narrow scope with `pnpm -C apps/server test` or `pnpm -C apps/web test`.
+## Testing expectations
+- Unit tests: Vitest suites in `apps/server/src/__tests__`, `apps/web/tests`, and package-level `__tests__`/`*.test.ts`. Add or adjust tests with any behavior change.
+- Shared helpers: reuse factories from `packages/test-utils` for socket scenarios.
+- E2E: Playwright specs in `apps/web/tests/e2e`; keep `pnpm dev` running while executing `pnpm e2e`. Use `pnpm -C apps/web test:e2e:coverage` when coverage is needed.
+- Coverage/unit: `pnpm -C apps/web test:unit:coverage` for web; server/package coverage via `vitest --coverage` if needed.
+- Prefer targeted file-scoped runs during iteration; run `pnpm test` before opening PRs.
 
-## Commit & Pull Request Guidelines
-Existing history uses concise, imperative subject lines (“Add initial README…”). Follow `type optional-scope: subject` when it clarifies intent (`feat: support side pots`). Reference issue IDs and describe noteworthy design choices, schema changes, or env additions in the body. Pull requests should include: a behaviour summary, screenshots or terminal captures for user-facing changes, test results (Vitest/Playwright), and any follow-up TODOs.
+## Project structure & key paths
+- `apps/web/app/` — Next.js client; Storybook and Playwright live in `apps/web`.
+- `apps/server/src/` — Express + Socket.IO API; see `apps/server/backend-architecture.md` for module boundaries. Copy `apps/server/.env.example` to `.env` and set `DATABASE_URL`/`WEB_ORIGINS` before running.
+- `packages/game-core/` — poker state machine (pure, deterministic); extend rules here first.
+- `packages/core-cards/` — shared card metadata; `packages/ui-cards/` — card UI components.
+- `packages/shared/` — env loader + Zod message contracts.
+- `packages/test-utils/` — Vitest helpers for socket/IO scenarios.
 
-## Environment & Configuration
-Copy `apps/server/.env.example` to `.env` before running the backend; Prisma expects a valid `DATABASE_URL`. After schema edits run `pnpm -C apps/server prisma:generate` and apply migrations with `pnpm -C apps/server prisma:migrate`. Keep secrets out of source control and update the deployment secret store instead.
+## Code style
+- TypeScript + ES modules; 2-space indentation. `camelCase` for variables/functions, `PascalCase` for React components, `UPPER_SNAKE_CASE` for constants.
+- Prefer named exports and small, composable modules; keep I/O out of `packages/game-core`.
+- Document non-obvious business rules with brief comments; keep comments terse.
 
-## Playwright UI Testing Workflow
-When you need to reproduce a UI issue, start the relevant host (`pnpm -C apps/web dev` or `pnpm -C apps/web storybook`). If the desired port (6006 for Storybook) is already occupied, Storybook will prompt for another port—note it and re-run the process with `-p` if necessary. Use `ps -ef | grep storybook` or similar to identify lingering servers and `kill <pid>` to stop them before restarting. The UI lives inside Storybook’s iframe (`/iframe.html?id=...`), so point Playwright directly there (e.g., `http://127.0.0.1:6006/iframe.html?id=table-gametable--fulltable&args=sceneHeight:120px`). In automation scripts launched via `pnpm -C apps/web exec node - <<'NODE' ...`, wrap your logic in an async IIFE that imports `chromium` from `@playwright/test`, launches a browser, creates a page, and navigates with `waitUntil: 'load'` or `'domcontentloaded'`. Always follow navigation with `frame.waitForSelector` (target `#storybook-preview-iframe` when using the classic UI) and then interact with elements using frame locators; this avoids timing issues. Log computed styles or bounding boxes via `page.$eval`/`frame.locator().evaluate` to inspect positioning, and close the browser when done. These steps recreate the investigation we just performed (handling port conflicts, identifying the iframe element, and writing repeatable probes) so other agents can debug UI layout problems the same way.
+### TypeScript examples
+```ts
+// ✅ Good: explicit types, guards, and pure state updates
+export function assignSeat(table: TableState, userId: number, seat: number): TableState {
+  if (table.seats[seat]) throw new Error("Seat already taken");
+  return { ...table, seats: { ...table.seats, [seat]: { userId } } };
+}
+
+// ❌ Bad: vague names, mutates shared state, no validation
+export function seat(t: any, s, u) {
+  t.seats[s] = { userId: u };
+  return t;
+}
+```
+
+## Git & workflow
+- Base branch: `main`. Keep diffs small and focused.
+- Commit style: `type optional-scope: summary` (e.g., `feat: support side pots`).
+- For multi-file or risky changes, propose a short plan before editing.
+- Update tests/docs (including relevant AGENTS.md files) when behavior changes.
+
+## Safety & boundaries
+- ✅ Allowed: read/list files; run file-scoped typecheck/test commands; edit source/tests/docs within this repo (not generated artifacts).
+- ⚠️ Ask first: adding/removing dependencies; changing database schemas or Prisma migrations; modifying CI/CD or deployment configs; altering Playwright/Storybook configs beyond test needs.
+- 🚫 Never: commit secrets or credentials; edit `node_modules/`, `dist/`, coverage, or generated files; run destructive commands (`rm -rf`, `chmod` on arbitrary paths); invent new external services without a request.
+
+## Task guidance
+- Small fixes: pinpoint the minimal file, implement targeted change, update/extend nearby tests, run focused checks.
+- Refactors: write a brief plan, keep steps reviewable, preserve behavior unless requested, rerun typecheck + affected tests.
+- When stuck: ask clarifying questions or suggest a plan instead of broad speculative edits.
+
+## Nested instructions
+- Frontend-specific rules: `apps/web/AGENTS.md` (Next.js/Playwright/Storybook guidance).
+- Backend-specific rules: `apps/server/AGENTS.md` (Express/Socket.IO/Prisma guidance).
