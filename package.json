@@ -11,6 +11,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint --if-present",
     "e2e": "pnpm -C apps/web test:e2e",
     "e2e:bootstrap-game": "pnpm -C apps/web e2e:bootstrap-game",
     "sb": "pnpm -C apps/web storybook",
