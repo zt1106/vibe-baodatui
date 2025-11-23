@@ -6,7 +6,8 @@ import {
   TablePreparedRequest,
   TableStartRequest,
   GameBidRequest,
-  GameDoubleRequest
+  GameDoubleRequest,
+  GamePlayRequest
 } from '@shared/messages';
 import { TableManager } from '../domain/tableManager';
 import { createHeartbeatPublisher } from '../infrastructure/heartbeat';
@@ -74,6 +75,15 @@ export function registerTableSocketHandlers(
         return;
       }
       tableManager.handleDouble(socket, parsed.data, ack);
+    });
+
+    socket.on('game:play', (payload, ack) => {
+      const parsed = GamePlayRequest.safeParse(payload);
+      if (!parsed.success) {
+        ack?.({ ok: false, message: 'invalid play payload' });
+        return;
+      }
+      tableManager.handlePlay(socket, parsed.data, ack);
     });
 
     socket.on('disconnect', () => {

@@ -6,6 +6,7 @@ import type { Card, Rank } from '@poker/core-cards';
 import { RANKS } from '@poker/core-cards';
 
 import { GameTable, type GameTableProps } from './GameTable';
+import type { CardRowSelectionMode } from '@poker/ui-cards';
 import stageStyles from './GameTableStage.module.css';
 
 type HandGrouping = 'byColor' | 'bySuit';
@@ -22,6 +23,10 @@ export type GameTableStageProps = GameTableProps & {
   callScoreLabel?: string;
   deckCountLabel?: string;
   currentTurnLabel?: string;
+  landlordSeatId?: string;
+  handSelectionMode?: CardRowSelectionMode;
+  selectedHandIds?: number[];
+  onHandSelectionChange?: (ids: number[]) => void;
 };
 
 const SUIT_DISPLAY_ORDER: Array<'S' | 'H' | 'D' | 'C'> = ['S', 'H', 'D', 'C'];
@@ -98,6 +103,10 @@ export function GameTableStage({
   callScoreLabel,
   deckCountLabel,
   currentTurnLabel,
+  landlordSeatId,
+  handSelectionMode,
+  selectedHandIds,
+  onHandSelectionChange,
   onLeave,
   leaveConfirmMessage = '确定要离开牌局吗？',
   leaveLabel = '离开牌局',
@@ -236,6 +245,10 @@ export function GameTableStage({
       callScoreLabel={callScoreLabel}
       deckCountLabel={deckCountLabel}
       currentTurnLabel={currentTurnLabel}
+      landlordSeatId={landlordSeatId}
+      handSelectionMode={handSelectionMode}
+      selectedHandIds={selectedHandIds}
+      onHandSelectionChange={onHandSelectionChange}
       {...gameTableProps}
     />
   );

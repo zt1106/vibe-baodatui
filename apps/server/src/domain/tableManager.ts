@@ -11,6 +11,7 @@ import {
 } from '@shared/messages';
 import type { AppServer, AppServerSocket } from '@shared/events';
 import { createTable, joinTable, clearHands, resetDeck, drawCard } from '@game-core/engine';
+import { createPlayValidator, Combo, ComboType } from '@game-core/doudizhu';
 import { DEFAULT_AVATAR, type AvatarFilename } from '@shared/avatars';
 import {
   GAME_VARIANTS_BY_ID,
@@ -79,6 +80,13 @@ type DouDizhuVariantState = {
     landlordRedoubled: boolean;
     finished: boolean;
   };
+  play?: {
+    currentSeatId: string;
+    lastCombo: Combo | null;
+    lastSeatId: string | null;
+    passCount: number;
+    finished?: boolean;
+  };
 };
 
 export type TableManagerDeps = {
@@ -100,6 +108,7 @@ export class TableManager {
   private readonly socketTable = new Map<string, string>();
   private readonly socketUsers = new Map<string, number>();
   private readonly USER_AVATAR_FALLBACK: AvatarFilename = DEFAULT_AVATAR;
+  private readonly ddzValidator = createPlayValidator();
 
   constructor(deps: TableManagerDeps) {
     this.io = deps.io;
@@ -251,6 +260,8 @@ export class TableManager {
     }
     if (table.phase.status === 'playing') {
       const ddz = table.variant.id === 'dou-dizhu' ? this.getDouDizhuState(table) : null;
+      const playSeat = ddz?.play?.currentSeatId;
+      if (playSeat) return playSeat;
       const landlordSeat = ddz?.landlordSeatId;
       if (landlordSeat && table.state.seats.includes(landlordSeat)) {
         return landlordSeat;
@@ -320,6 +331,59 @@ export class TableManager {
     this.emitGameSnapshot(table);
   }
 
+  private startPlayingPhase(table: ManagedTable) {
+    const ddz = this.getDouDizhuState(table);
+    const landlordSeatId = ddz.landlordSeatId ?? table.state.seats[0];
+    ddz.play = {
+      currentSeatId: landlordSeatId,
+      lastCombo: null,
+      lastSeatId: null,
+      passCount: 0,
+      finished: false
+    };
+    this.transitionPhase(table, { type: 'start-playing', reason: 'doubling-complete' });
+    this.emitGameSnapshot(table);
+  }
+
+  private extractCardsById(hand: GameCard[], cardIds: number[]) {
+    const counts = new Map<number, number>();
+    for (const card of hand) {
+      counts.set(card.id, (counts.get(card.id) ?? 0) + 1);
+    }
+    const selected: GameCard[] = [];
+    const missing: number[] = [];
+    for (const id of cardIds) {
+      const remaining = (counts.get(id) ?? 0) - 1;
+      if (remaining < 0) {
+        missing.push(id);
+        continue;
+      }
+      counts.set(id, remaining);
+      const card = hand.find(c => c.id === id);
+      if (card) {
+        selected.push(card);
+      }
+    }
+    return { selectedCards: selected, missing };
+  }
+
+  private removeCards(hand: GameCard[], toRemove: GameCard[]) {
+    const removeCounts = new Map<number, number>();
+    for (const card of toRemove) {
+      removeCounts.set(card.id, (removeCounts.get(card.id) ?? 0) + 1);
+    }
+    const kept: GameCard[] = [];
+    for (const card of hand) {
+      const remaining = (removeCounts.get(card.id) ?? 0) - 1;
+      if (remaining >= 0) {
+        removeCounts.set(card.id, remaining);
+        continue;
+      }
+      kept.push(card);
+    }
+    return kept;
+  }
+
   private buildGameSnapshot(table: ManagedTable, lastDealtSeatId?: string): GameSnapshot {
     const ddz = table.variant.id === 'dou-dizhu' ? this.getDouDizhuState(table) : null;
     const deckCount =
@@ -343,6 +407,16 @@ export class TableManager {
               defenderDoubles: ddz.doubling.defenderDoubles,
               landlordRedoubled: ddz.doubling.landlordRedoubled,
               finished: ddz.doubling.finished
+            }
+          : undefined,
+      lastCombo:
+        ddz?.play?.lastCombo && ddz.play.lastSeatId
+          ? {
+              seatId: ddz.play.lastSeatId,
+              type: ddz.play.lastCombo.type,
+              cards: ddz.play.lastCombo.cards.map(card => ({ ...card })),
+              mainRank: ddz.play.lastCombo.mainRank,
+              length: ddz.play.lastCombo.length
             }
           : undefined,
       callScore: ddz?.callScore,
@@ -519,7 +593,7 @@ export class TableManager {
     resetDeck(table.state, { seed: dealSeed, packs: table.variant.deck.packs });
     clearHands(table.state);
     this.setAllPrepared(table, false);
-    table.variantState = { bottomCards: [], bidding: null, doubling: undefined };
+    table.variantState = { bottomCards: [], bidding: null, doubling: undefined, play: undefined };
     this.updateLobbyFromState(table.id);
     this.emitState(table.id);
     this.startDouDizhuDealing(table);
@@ -1011,11 +1085,99 @@ export class TableManager {
     doubling.turnIndex += 1;
     if (doubling.turnIndex >= doubling.order.length) {
       doubling.finished = true;
-      this.transitionPhase(managed, { type: 'start-playing', reason: 'doubling-complete' });
+      this.startPlayingPhase(managed);
+      ack?.({ ok: true });
+      return;
+    }
+    this.emitGameSnapshot(managed);
+    ack?.({ ok: true });
+  }
+
+  handlePlay(
+    socket: AppServerSocket,
+    payload: { tableId: string; cardIds: number[] },
+    ack?: (result: { ok: boolean; message?: string }) => void
+  ) {
+    const tableId = normalizeTableId(payload.tableId ?? '');
+    const managed = this.tables.get(tableId);
+    if (!managed) {
+      ack?.({ ok: false, message: 'Unknown table' });
+      return;
+    }
+    if (managed.variant.id !== 'dou-dizhu') {
+      ack?.({ ok: false, message: '当前牌桌不支持出牌' });
+      return;
+    }
+    if (!managed.hasStarted || derivePhaseStatus(managed.phase) !== 'playing') {
+      ack?.({ ok: false, message: '当前阶段不可出牌' });
+      return;
+    }
+    const seatId = socket.id;
+    if (!managed.state.seats.includes(seatId)) {
+      ack?.({ ok: false, message: '未在牌桌中' });
+      return;
+    }
+    const ddz = this.getDouDizhuState(managed);
+    const play = ddz.play;
+    if (!play || play.finished) {
+      ack?.({ ok: false, message: '本局已结束' });
+      return;
+    }
+    if (play.currentSeatId !== seatId) {
+      ack?.({ ok: false, message: '未轮到你出牌' });
+      return;
+    }
+    const player = managed.state.players[seatId];
+    if (!player) {
+      ack?.({ ok: false, message: '玩家不存在' });
+      return;
+    }
+    const { selectedCards, missing } = this.extractCardsById(player.hand, payload.cardIds ?? []);
+    if (missing.length > 0 || selectedCards.length !== payload.cardIds.length) {
+      ack?.({ ok: false, message: '手牌不足以出这些牌' });
+      return;
+    }
+
+    const hasPrev = play.lastCombo != null;
+    const validation = hasPrev
+      ? this.ddzValidator.validateFollow(selectedCards, play.lastCombo as Combo)
+      : this.ddzValidator.validateLead(selectedCards);
+
+    if (!validation.ok || !validation.combo) {
+      ack?.({ ok: false, message: validation.reason ?? '非法出牌' });
+      return;
+    }
+
+    const combo = validation.combo;
+    if (combo.type !== ComboType.PASS) {
+      player.hand = this.removeCards(player.hand, combo.cards);
+      play.lastCombo = combo;
+      play.lastSeatId = seatId;
+      play.passCount = 0;
+    } else {
+      if (!hasPrev) {
+        ack?.({ ok: false, message: '首家不可过牌' });
+        return;
+      }
+      play.passCount += 1;
+    }
+
+    if (player.hand.length === 0 && combo.type !== ComboType.PASS) {
+      play.finished = true;
+      this.transitionPhase(managed, { type: 'complete', reason: 'stopped' });
       this.emitGameSnapshot(managed);
       ack?.({ ok: true });
       return;
     }
+
+    if (play.passCount >= 2 && play.lastSeatId) {
+      play.currentSeatId = play.lastSeatId;
+      play.lastCombo = null;
+      play.passCount = 0;
+    } else {
+      play.currentSeatId = this.nextSeatId(managed, seatId);
+    }
+
     this.emitGameSnapshot(managed);
     ack?.({ ok: true });
   }

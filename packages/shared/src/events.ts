@@ -8,6 +8,7 @@ import {
   Heartbeat,
   GameBidRequest,
   GameDoubleRequest,
+  GamePlayRequest,
   JoinTable,
   ServerState,
   TableConfigUpdateRequest,
@@ -52,7 +53,8 @@ const clientToServerEvents = {
   'table:setPrepared': { payload: TablePreparedRequest },
   'game:leave': { payload: LeaveTablePayload, ack: LeaveTableAck },
   'game:bid': { payload: GameBidRequest, ack: LeaveTableAck },
-  'game:double': { payload: GameDoubleRequest, ack: LeaveTableAck }
+  'game:double': { payload: GameDoubleRequest, ack: LeaveTableAck },
+  'game:play': { payload: GamePlayRequest, ack: LeaveTableAck }
 } satisfies Record<string, EventSchema>;
 
 const serverToClientEvents = {

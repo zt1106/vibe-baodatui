@@ -12,7 +12,7 @@ import {
 
 import type { Card, CardId } from '@poker/core-cards';
 import { CardRow, MultiCardRow } from '@poker/ui-cards';
-import type { CardRowOverlap, CardRowSize } from '@poker/ui-cards';
+import type { CardRowOverlap, CardRowSelectionMode, CardRowSize } from '@poker/ui-cards';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { PlayerAvatar } from './PlayerAvatar';
@@ -50,6 +50,9 @@ export type GameTableProps = {
   handCardAngle?: number;
   handCardCurveVerticalOffset?: number;
   handCardSize?: CardRowSize;
+  handSelectionMode?: CardRowSelectionMode;
+  selectedHandIds?: number[];
+  onHandSelectionChange?: (ids: number[]) => void;
   avatarRingScale?: number;
   cardRingScale?: number;
   communityCardSize?: CardRowSize;
@@ -103,6 +106,9 @@ export function GameTable({
   handCardAngle = -12,
   handCardCurveVerticalOffset = 18,
   handCardSize = 'md',
+  handSelectionMode = 'none',
+  selectedHandIds,
+  onHandSelectionChange,
   avatarRingScale = 1.08,
   cardRingScale = 0.66,
   communityCardSize = 'md',
@@ -444,7 +450,9 @@ export function GameTable({
               angle={handCardAngle}
               curveVerticalOffset={handCardCurveVerticalOffset}
               size={handCardSize}
-              selectionMode="none"
+              selectionMode={handSelectionMode}
+              selectedIds={selectedHandIds}
+              onSelectionChange={onHandSelectionChange}
             />
           </div>
         </div>

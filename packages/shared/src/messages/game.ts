@@ -34,6 +34,34 @@ export const GameSeatState = PlayerIdentity.extend({
 });
 export type GameSeatState = z.infer<typeof GameSeatState>;
 
+export const ComboTypeEnum = z.enum([
+  'PASS',
+  'SINGLE',
+  'PAIR',
+  'TRIPLE',
+  'TRIPLE_WITH_SINGLE',
+  'TRIPLE_WITH_PAIR',
+  'SEQUENCE',
+  'SEQUENCE_OF_PAIRS',
+  'PLANE',
+  'PLANE_WITH_SINGLES',
+  'PLANE_WITH_PAIRS',
+  'FOUR_WITH_TWO_SINGLES',
+  'FOUR_WITH_TWO_PAIRS',
+  'BOMB',
+  'ROCKET'
+]);
+export type ComboTypeEnum = z.infer<typeof ComboTypeEnum>;
+
+export const GameCombo = z.object({
+  seatId: SeatId,
+  type: ComboTypeEnum,
+  cards: z.array(GameCard),
+  mainRank: z.number().int().optional(),
+  length: z.number().int().optional()
+});
+export type GameCombo = z.infer<typeof GameCombo>;
+
 export const BiddingState = z.object({
   currentSeatId: SeatId,
   startingSeatId: SeatId,
@@ -64,6 +92,7 @@ export const GameSnapshot = z.object({
   bidding: BiddingState.optional(),
   doubling: DoublingState.optional(),
   callScore: z.number().int().min(0).max(3).optional(),
+  lastCombo: GameCombo.optional(),
   variant: GameVariantSummary,
   seats: z.array(GameSeatState)
 });
@@ -93,5 +122,11 @@ export const GameDoubleRequest = z.object({
   double: z.boolean()
 });
 export type GameDoubleRequest = z.infer<typeof GameDoubleRequest>;
+
+export const GamePlayRequest = z.object({
+  tableId: TableId,
+  cardIds: z.array(z.number().int().nonnegative())
+});
+export type GamePlayRequest = z.infer<typeof GamePlayRequest>;
 
 export { CardRank, CardSuit };

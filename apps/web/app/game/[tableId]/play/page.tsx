@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { GameTableStage } from '../../../../components/poker/GameTableStage';
 import { type GameTableSeat } from '../../../../components/poker/GameTable';
 import { usePlaySession } from '../../../../hooks/usePlaySession';
 import stageStyles from '../../../../components/poker/GameTableStage.module.css';
+import { createPlayValidator, ComboType, type Combo } from '@game-core/doudizhu';
 
 type PlayPageProps = {
   params: { tableId: string };
@@ -40,6 +41,9 @@ export default function PlayPage({ params }: PlayPageProps) {
     }, 1200);
   }, [router]);
 
+  const [selectedHandIds, setSelectedHandIds] = useState<number[]>([]);
+  const validator = useMemo(() => createPlayValidator(), []);
+
   const {
     snapshot,
     selfHand,
@@ -49,7 +53,8 @@ export default function PlayPage({ params }: PlayPageProps) {
     handleDealingComplete,
     exitGame,
     sendBid,
-    sendDouble
+    sendDouble,
+    sendPlay
   } =
     usePlaySession(tableId, {
       onGameEnded: handleGameEnded,
@@ -72,9 +77,14 @@ export default function PlayPage({ params }: PlayPageProps) {
   const isDoublingPhase = tablePhaseStatus === 'doubling';
   const isMyTurn = !!selfSeatId && currentTurnSeatId === selfSeatId;
   const isLandlord = selfSeatId && snapshot?.landlordSeatId === selfSeatId;
+  const selectedCards = useMemo(() => {
+    const idSet = new Set(selectedHandIds);
+    return selfHand.filter(card => idSet.has(card.id));
+  }, [selectedHandIds, selfHand]);
 
   const tablePlayers = useMemo(() => {
     if (!snapshot) return [];
+    const lastCombo = snapshot.lastCombo;
     return rotateSeats(
       snapshot.seats.map(seat => {
         const status =
@@ -94,6 +104,7 @@ export default function PlayPage({ params }: PlayPageProps) {
           nickname: seat.nickname,
           avatar: seat.avatar,
           avatarUrl: `/avatars/${seat.avatar}`,
+          cards: lastCombo && lastCombo.seatId === seat.seatId ? lastCombo.cards : undefined,
           status: [
             seat.isHost ? `${status} · 房主` : status,
             isCurrentTurn ? '当前行动' : null,
@@ -127,6 +138,33 @@ export default function PlayPage({ params }: PlayPageProps) {
         return '等待开始';
     }
   }, [tablePhaseStatus]);
+
+  const prevCombo = useMemo(() => {
+    if (!snapshot?.lastCombo) return null;
+    return {
+      type: snapshot.lastCombo.type as ComboType,
+      cards: snapshot.lastCombo.cards,
+      mainRank: snapshot.lastCombo.mainRank as number | undefined,
+      length: snapshot.lastCombo.length
+    } as Combo;
+  }, [snapshot?.lastCombo]);
+
+  const selectedValidation = useMemo(() => {
+    if (!selectedCards.length) return { ok: false, reason: 'no-cards', combo: null };
+    if (tablePhaseStatus !== 'playing') {
+      return { ok: false, reason: 'not-playing', combo: null };
+    }
+    const classified = validator.classify(selectedCards);
+    if (!classified) {
+      return { ok: false, reason: 'invalid-combo', combo: null };
+    }
+    if (prevCombo) {
+      const follow = validator.validateFollow(selectedCards, prevCombo);
+      return follow.ok ? { ok: true, reason: null, combo: classified } : { ok: false, reason: follow.reason ?? 'does-not-beat', combo: classified };
+    }
+    const lead = validator.validateLead(selectedCards);
+    return lead.ok ? { ok: true, reason: null, combo: classified } : { ok: false, reason: lead.reason ?? 'invalid-combo', combo: classified };
+  }, [prevCombo, selectedCards, tablePhaseStatus, validator]);
 
   const handActionButton = useMemo(() => {
     if (tablePhaseStatus === 'dealing') {
@@ -206,19 +244,67 @@ export default function PlayPage({ params }: PlayPageProps) {
         </div>
       );
     }
+    if (tablePhaseStatus === 'playing') {
+      if (!isMyTurn) {
+        return null;
+      }
+      const canPass = Boolean(prevCombo);
+      const canPlay = selectedValidation.ok;
+      const comboLabel = selectedValidation.combo?.type
+        ? `已选牌型：${selectedValidation.combo.type}`
+        : '请选择合法牌型';
+      return (
+        <div className={stageStyles.actionGroup} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+          <div style={{ color: '#e2e8f0', fontWeight: 700, textAlign: 'center', marginBottom: 6, minHeight: 20 }}>
+            {comboLabel}
+          </div>
+          <div className={stageStyles.actionGroup}>
+            {canPass ? (
+              <button
+                type="button"
+                className={`${stageStyles.actionButton} ${stageStyles.ghostAction}`}
+                onClick={() => sendPlay([])}
+              >
+                <span className={stageStyles.actionButtonLabel}>不出</span>
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={stageStyles.actionButton}
+              disabled={!canPlay}
+              onClick={() => sendPlay(selectedHandIds)}
+            >
+              <span className={stageStyles.actionButtonLabel}>出牌</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     const label =
-      tablePhaseStatus === 'playing'
-        ? '出牌'
-        : tablePhaseStatus === 'complete'
+      tablePhaseStatus === 'complete'
         ? '等待下一局'
         : '等待开始';
-    const disabled = tablePhaseStatus !== 'playing';
     return (
-      <button type="button" className={stageStyles.actionButton} disabled={disabled}>
+      <button type="button" className={stageStyles.actionButton} disabled>
         <span className={stageStyles.actionButtonLabel}>{label}</span>
       </button>
     );
-  }, [highestBid, isBiddingPhase, isDoublingPhase, isMyTurn, sendBid, sendDouble, snapshot?.landlordSeatId, selfSeatId, tablePhaseStatus]);
+  }, [
+    highestBid,
+    isBiddingPhase,
+    isDoublingPhase,
+    isMyTurn,
+    prevCombo,
+    selectedHandIds,
+    selectedValidation.combo?.type,
+    selectedValidation.ok,
+    sendBid,
+    sendDouble,
+    sendPlay,
+    snapshot?.landlordSeatId,
+    tablePhaseStatus
+  ]);
 
   return (
     <GameTableStage
@@ -233,6 +319,9 @@ export default function PlayPage({ params }: PlayPageProps) {
       deckCountLabel={snapshot ? String(snapshot.deckCount) : undefined}
       currentTurnLabel={currentTurnSeat?.nickname}
       landlordSeatId={snapshot?.landlordSeatId ?? undefined}
+      handSelectionMode={tablePhaseStatus === 'playing' ? 'multiple' : 'none'}
+      selectedHandIds={selectedHandIds}
+      onHandSelectionChange={setSelectedHandIds}
     />
   );
 }

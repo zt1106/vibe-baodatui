@@ -371,6 +371,23 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     [tableId]
   );
 
+  const sendPlay = useCallback(
+    (cardIds: number[], onComplete?: (result: { ok: boolean; message?: string }) => void) => {
+      const socket = socketRef.current;
+      if (!socket || !tableId) {
+        onComplete?.({ ok: false, message: '未连接到牌桌' });
+        return;
+      }
+      socket.emit('game:play', { tableId, cardIds }, (response?: { ok: boolean; message?: string }) => {
+        if (!response?.ok && response?.message) {
+          setGameError(response.message);
+        }
+        onComplete?.(response ?? { ok: false, message: '未知错误' });
+      });
+    },
+    [tableId]
+  );
+
   return {
     apiBaseUrl,
     user,
@@ -387,6 +404,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     exitGame,
     sendBid,
     sendDouble,
+    sendPlay,
     setGameError
   };
 }
