@@ -24,7 +24,7 @@
   width: var(--player-avatar-size, 64px);
   height: var(--player-avatar-size, 64px);
   border-radius: 50%;
-  overflow: hidden;
+  overflow: visible;
   border: 2px solid rgba(148, 163, 184, 0.4);
   position: relative;
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(14, 165, 233, 0.45));
@@ -33,11 +33,27 @@
   justify-content: center;
 }
 
+.landlordMark {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  padding: 0.2rem 0.4rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  color: #0f172a;
+  font-size: 0.7rem;
+  font-weight: 800;
+  border: 1px solid rgba(15, 23, 42, 0.4);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+
 .avatarImage img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: 50%;
 }
 
 .avatarFallback {

@@ -18,6 +18,10 @@ export type GameTableStageProps = GameTableProps & {
   leaveLabel?: string;
   onUserAction?: () => void;
   userActionLabel?: string;
+  phaseLabel?: string;
+  callScoreLabel?: string;
+  deckCountLabel?: string;
+  currentTurnLabel?: string;
 };
 
 const SUIT_DISPLAY_ORDER: Array<'S' | 'H' | 'D' | 'C'> = ['S', 'H', 'D', 'C'];
@@ -90,6 +94,10 @@ export function GameTableStage({
   handCardRows,
   handCardRowGap = 0,
   handCardRowOverlap = 40,
+  phaseLabel,
+  callScoreLabel,
+  deckCountLabel,
+  currentTurnLabel,
   onLeave,
   leaveConfirmMessage = '确定要离开牌局吗？',
   leaveLabel = '离开牌局',
@@ -206,15 +214,16 @@ export function GameTableStage({
     );
   }, [handleLeaveCancel, handleLeaveConfirm, handleLeaveRequest, leaveConfirmMessage, leaveLabel, onLeave, showLeaveConfirm]);
 
-  const resolvedHandActionButton = useMemo(
-    () =>
-      handActionButton ?? (
-        <button type="button" onClick={onUserAction} className={stageStyles.actionButton}>
-          <span className={stageStyles.actionButtonLabel}>{userActionLabel}</span>
-        </button>
-      ),
-    [handActionButton, onUserAction, userActionLabel]
-  );
+  const resolvedHandActionButton = useMemo(() => {
+    if (handActionButton !== undefined) {
+      return handActionButton;
+    }
+    return (
+      <button type="button" onClick={onUserAction} className={stageStyles.actionButton}>
+        <span className={stageStyles.actionButtonLabel}>{userActionLabel}</span>
+      </button>
+    );
+  }, [handActionButton, onUserAction, userActionLabel]);
 
   return (
     <GameTable
@@ -223,6 +232,10 @@ export function GameTableStage({
       handCardRows={resolvedHandCardRows}
       topBarActions={topBarActions}
       handActionButton={resolvedHandActionButton}
+      phaseLabel={phaseLabel}
+      callScoreLabel={callScoreLabel}
+      deckCountLabel={deckCountLabel}
+      currentTurnLabel={currentTurnLabel}
       {...gameTableProps}
     />
   );

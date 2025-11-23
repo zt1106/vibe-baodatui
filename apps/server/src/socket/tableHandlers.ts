@@ -4,7 +4,9 @@ import {
   TableConfigUpdateRequest,
   TableKickRequest,
   TablePreparedRequest,
-  TableStartRequest
+  TableStartRequest,
+  GameBidRequest,
+  GameDoubleRequest
 } from '@shared/messages';
 import { TableManager } from '../domain/tableManager';
 import { createHeartbeatPublisher } from '../infrastructure/heartbeat';
@@ -54,6 +56,24 @@ export function registerTableSocketHandlers(
 
     socket.on('game:leave', (payload: { tableId?: string; userId?: number }, ack?: (result: { ok: boolean }) => void) => {
       tableManager.handleLeave(socket, payload, ack);
+    });
+
+    socket.on('game:bid', (payload, ack) => {
+      const parsed = GameBidRequest.safeParse(payload);
+      if (!parsed.success) {
+        ack?.({ ok: false, message: 'invalid bid payload' });
+        return;
+      }
+      tableManager.handleBid(socket, parsed.data, ack);
+    });
+
+    socket.on('game:double', (payload, ack) => {
+      const parsed = GameDoubleRequest.safeParse(payload);
+      if (!parsed.success) {
+        ack?.({ ok: false, message: 'invalid double payload' });
+        return;
+      }
+      tableManager.handleDouble(socket, parsed.data, ack);
     });
 
     socket.on('disconnect', () => {

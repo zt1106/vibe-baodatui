@@ -6,6 +6,8 @@ import {
   GameDealCardEvent,
   GameSnapshot,
   Heartbeat,
+  GameBidRequest,
+  GameDoubleRequest,
   JoinTable,
   ServerState,
   TableConfigUpdateRequest,
@@ -26,7 +28,7 @@ const LeaveTablePayload = z.object({
   tableId: TableId.optional(),
   userId: UserId.optional()
 });
-const LeaveTableAck = z.object({ ok: z.boolean() });
+const LeaveTableAck = z.object({ ok: z.boolean(), message: z.string().optional() });
 
 const GameEndedPayload = z.object({
   tableId: TableId,
@@ -48,7 +50,9 @@ const clientToServerEvents = {
   'table:kick': { payload: TableKickRequest },
   'table:updateConfig': { payload: TableConfigUpdateRequest },
   'table:setPrepared': { payload: TablePreparedRequest },
-  'game:leave': { payload: LeaveTablePayload, ack: LeaveTableAck }
+  'game:leave': { payload: LeaveTablePayload, ack: LeaveTableAck },
+  'game:bid': { payload: GameBidRequest, ack: LeaveTableAck },
+  'game:double': { payload: GameDoubleRequest, ack: LeaveTableAck }
 } satisfies Record<string, EventSchema>;
 
 const serverToClientEvents = {
@@ -111,28 +115,4 @@ export type SocketEventMap = typeof socketEvents;
 
 export type AppServer = Server<ClientToServerEvents, ServerToClientEvents>;
 export type AppServerSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
-export type AppClientSocket = ClientSocket<ServerToClientEvents, ClientToServerEvents>;
-
-export function createServerSocketHelpers(socket: AppServerSocket) {
-  return {
-    emit<E extends keyof ServerToClientEmitArgs>(event: E, ...args: ServerToClientEmitArgs[E]) {
-      socket.emit(event, ...args);
-    },
-    on<E extends keyof ClientToServerEvents>(event: E, handler: ClientToServerEvents[E]) {
-      socket.on(event, handler);
-      return () => socket.off(event, handler);
-    }
-  };
-}
-
-export function createClientSocketHelpers(socket: AppClientSocket) {
-  return {
-    emit<E extends keyof ClientToServerEmitArgs>(event: E, ...args: ClientToServerEmitArgs[E]) {
-      socket.emit(event, ...args);
-    },
-    on<E extends keyof ServerToClientEvents>(event: E, handler: ServerToClientEvents[E]) {
-      socket.on(event, handler);
-      return () => socket.off(event, handler);
-    }
-  };
-}
+export type AppClientSocket = ClientSocket;

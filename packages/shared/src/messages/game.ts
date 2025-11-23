@@ -34,11 +34,36 @@ export const GameSeatState = PlayerIdentity.extend({
 });
 export type GameSeatState = z.infer<typeof GameSeatState>;
 
+export const BiddingState = z.object({
+  currentSeatId: SeatId,
+  startingSeatId: SeatId,
+  highestBid: z.number().int().min(0).max(3),
+  highestBidderSeatId: SeatId.nullable(),
+  bidsTaken: nonNegativeIntSchema,
+  consecutivePasses: nonNegativeIntSchema,
+  finished: z.boolean(),
+  redealRequired: z.boolean().optional()
+});
+export type BiddingState = z.infer<typeof BiddingState>;
+
+export const DoublingState = z.object({
+  currentSeatId: SeatId,
+  defenderDoubles: z.record(SeatId, z.boolean().optional()),
+  landlordRedoubled: z.boolean().optional(),
+  finished: z.boolean()
+});
+export type DoublingState = z.infer<typeof DoublingState>;
+
 export const GameSnapshot = z.object({
   tableId: TableId,
   phase: GamePhase,
   deckCount: nonNegativeIntSchema,
   lastDealtSeatId: SeatId.optional(),
+  currentTurnSeatId: SeatId.optional(),
+  landlordSeatId: SeatId.optional(),
+  bidding: BiddingState.optional(),
+  doubling: DoublingState.optional(),
+  callScore: z.number().int().min(0).max(3).optional(),
   variant: GameVariantSummary,
   seats: z.array(GameSeatState)
 });
@@ -56,5 +81,17 @@ export const TablePlayStateResponse = z.object({
   hand: z.array(GameCard)
 });
 export type TablePlayStateResponse = z.infer<typeof TablePlayStateResponse>;
+
+export const GameBidRequest = z.object({
+  tableId: TableId,
+  bid: z.number().int().min(0).max(3)
+});
+export type GameBidRequest = z.infer<typeof GameBidRequest>;
+
+export const GameDoubleRequest = z.object({
+  tableId: TableId,
+  double: z.boolean()
+});
+export type GameDoubleRequest = z.infer<typeof GameDoubleRequest>;
 
 export { CardRank, CardSuit };

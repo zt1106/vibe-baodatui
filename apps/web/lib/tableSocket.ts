@@ -1,9 +1,10 @@
 'use client';
 
 import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import type { Card } from '@poker/core-cards';
 import type { GameDealCardEvent } from '@shared/messages';
-import type { AppClientSocket, ClientToServerEvents, ServerToClientEvents } from '@shared/events';
+import type { AppClientSocket } from '@shared/events';
 
 type HandListener = (cards: Card[]) => void;
 
@@ -88,7 +89,7 @@ export function acquireTableSocket(baseUrl: string, tableId: string) {
     sharedTableId = null;
   }
   if (!sharedSocket) {
-    sharedSocket = io<ServerToClientEvents, ClientToServerEvents>(baseUrl, SOCKET_OPTIONS);
+    sharedSocket = io(baseUrl, SOCKET_OPTIONS);
     sharedTableId = tableId;
     attachBaseListeners(sharedSocket);
   }

@@ -55,6 +55,32 @@ export type ManagedTable = {
   variantState: Record<string, unknown>;
 };
 
+type BidValue = 0 | 1 | 2 | 3;
+type DouDizhuBiddingState = {
+  currentSeatId: string;
+  startingSeatId: string;
+  highestBid: BidValue;
+  highestBidderSeatId: string | null;
+  bidsTaken: number;
+  consecutivePasses: number;
+  finished: boolean;
+  redealRequired?: boolean;
+};
+
+type DouDizhuVariantState = {
+  bottomCards: GameDealCardEvent['card'][];
+  bidding: DouDizhuBiddingState | null;
+  landlordSeatId?: string;
+  callScore?: BidValue;
+  doubling?: {
+    order: string[];
+    turnIndex: number;
+    defenderDoubles: Record<string, boolean>;
+    landlordRedoubled: boolean;
+    finished: boolean;
+  };
+};
+
 export type TableManagerDeps = {
   io: AppServer;
   lobby: ReturnType<typeof createLobbyRegistry>;
@@ -81,8 +107,36 @@ export class TableManager {
     this.users = deps.users;
   }
 
+  private getDouDizhuState(table: ManagedTable): DouDizhuVariantState {
+    const current = table.variantState ?? {};
+    if (
+      current &&
+      typeof current === 'object' &&
+      'bottomCards' in current &&
+      Array.isArray((current as DouDizhuVariantState).bottomCards)
+    ) {
+      return current as DouDizhuVariantState;
+    }
+    const fresh: DouDizhuVariantState = { bottomCards: [], bidding: null };
+    table.variantState = fresh;
+    return fresh;
+  }
+
   private transitionPhase(table: ManagedTable, action: Parameters<typeof tablePhaseReducer>[1]) {
+    const previous = table.phase;
     table.phase = tablePhaseReducer(table.phase, action);
+    if (
+      previous.status !== table.phase.status ||
+      ('reason' in previous && 'reason' in table.phase && previous.reason !== (table.phase as any).reason)
+    ) {
+      this.logStructured('phase:change', {
+        tableId: table.id,
+        from: previous.status,
+        to: table.phase.status,
+        reason: 'reason' in table.phase ? (table.phase as any).reason : undefined,
+        traceId: table.phase.traceId ?? ('traceId' in action ? (action as any).traceId : undefined)
+      });
+    }
     return table.phase;
   }
 
@@ -177,12 +231,121 @@ export class TableManager {
     table.dealingState = null;
   }
 
+  private resolveCurrentTurnSeatId(table: ManagedTable, lastDealtSeatId?: string) {
+    if (table.phase.status === 'dealing') {
+      const seats = table.state.seats;
+      if (seats.length === 0) return undefined;
+      const seatIndex = table.dealingState?.seatIndex ?? 0;
+      const normalized = seatIndex % seats.length;
+      return seats[normalized];
+    }
+    if (table.phase.status === 'bidding') {
+      const ddz = this.getDouDizhuState(table);
+      return ddz.bidding?.currentSeatId;
+    }
+    if (table.phase.status === 'doubling') {
+      const ddz = this.getDouDizhuState(table);
+      const order = ddz.doubling?.order ?? [];
+      const turnIndex = ddz.doubling?.turnIndex ?? 0;
+      return order[turnIndex];
+    }
+    if (table.phase.status === 'playing') {
+      const ddz = table.variant.id === 'dou-dizhu' ? this.getDouDizhuState(table) : null;
+      const landlordSeat = ddz?.landlordSeatId;
+      if (landlordSeat && table.state.seats.includes(landlordSeat)) {
+        return landlordSeat;
+      }
+      const hostSeat = table.state.seats.find(id => table.state.players[id]?.userId === table.host.userId);
+      return hostSeat ?? table.state.seats[0];
+    }
+    // Future: wire in active play turn from game engine.
+    return lastDealtSeatId;
+  }
+
+  private createInitialBiddingState(table: ManagedTable): DouDizhuBiddingState {
+    const seats = table.state.seats;
+    const startingSeatId = seats[0];
+    return {
+      currentSeatId: startingSeatId,
+      startingSeatId,
+      highestBid: 0,
+      highestBidderSeatId: null,
+      bidsTaken: 0,
+      consecutivePasses: 0,
+      finished: false
+    };
+  }
+
+  private nextSeatId(table: ManagedTable, seatId: string) {
+    const seats = table.state.seats;
+    if (seats.length === 0) return seatId;
+    const currentIndex = seats.indexOf(seatId);
+    if (currentIndex === -1) {
+      return seats[0];
+    }
+    return seats[(currentIndex + 1) % seats.length];
+  }
+
+  private finalizeBidding(table: ManagedTable) {
+    const ddz = this.getDouDizhuState(table);
+    const bidding = ddz.bidding;
+    if (!bidding) return;
+    bidding.finished = true;
+    if (!bidding.highestBidderSeatId) {
+      bidding.redealRequired = true;
+      this.logStructured('bidding:redeal', {
+        tableId: table.id,
+        traceId: table.phase.traceId,
+        reason: 'all-pass'
+      });
+      this.startDouDizhuVariant(table);
+      return;
+    }
+    const landlordSeatId = bidding.highestBidderSeatId;
+    ddz.landlordSeatId = landlordSeatId;
+    ddz.callScore = bidding.highestBid;
+    const landlord = table.state.players[landlordSeatId];
+    if (landlord) {
+      landlord.hand.push(...ddz.bottomCards);
+    }
+    ddz.bottomCards = [];
+    ddz.doubling = {
+      order: table.state.seats.filter(id => id !== landlordSeatId).concat([landlordSeatId]),
+      turnIndex: 0,
+      defenderDoubles: {},
+      landlordRedoubled: false,
+      finished: false
+    };
+    this.transitionPhase(table, { type: 'start-doubling', reason: 'bidding-complete' });
+    this.emitGameSnapshot(table);
+  }
+
   private buildGameSnapshot(table: ManagedTable, lastDealtSeatId?: string): GameSnapshot {
+    const ddz = table.variant.id === 'dou-dizhu' ? this.getDouDizhuState(table) : null;
+    const deckCount =
+      table.variant.id === 'dou-dizhu' && ddz
+        ? table.state.deck.length + (ddz.bottomCards?.length ?? 0)
+        : table.state.deck.length;
     return {
       tableId: table.id,
       phase: derivePhaseStatus(table.phase),
-      deckCount: table.state.deck.length,
+      deckCount,
       lastDealtSeatId,
+      currentTurnSeatId: this.resolveCurrentTurnSeatId(table, lastDealtSeatId),
+      landlordSeatId: ddz?.landlordSeatId,
+      bidding: ddz?.bidding ?? undefined,
+      doubling:
+        ddz?.doubling && ddz.landlordSeatId
+          ? {
+              currentSeatId: ddz.doubling.finished
+                ? undefined
+                : ddz.doubling.order[ddz.doubling.turnIndex] ?? ddz.landlordSeatId,
+              defenderDoubles: ddz.doubling.defenderDoubles,
+              landlordRedoubled: ddz.doubling.landlordRedoubled,
+              finished: ddz.doubling.finished
+            }
+          : undefined,
+      callScore: ddz?.callScore,
       variant: table.config.variant,
       seats: table.state.seats
         .map(seatId => {
@@ -209,17 +372,20 @@ export class TableManager {
 
   private finishDealing(table: ManagedTable) {
     this.stopDealing(table);
-    this.transitionPhase(table, { type: 'complete', reason: 'deck-depleted' });
+    this.transitionPhase(table, { type: 'start-playing', reason: 'deck-depleted' });
     this.emitGameSnapshot(table);
   }
 
   private finishDouDizhuDealing(table: ManagedTable) {
     this.stopDealing(table);
-    table.variantState = {
-      ...table.variantState,
-      bottomCards: table.state.deck.map(card => ({ ...card }))
-    };
-    this.transitionPhase(table, { type: 'complete', reason: 'bottom-cards' });
+    const bottomCards = table.state.deck.map(card => ({ ...card }));
+    table.state.deck = [];
+    const state = this.getDouDizhuState(table);
+    state.bottomCards = bottomCards;
+    state.bidding = this.createInitialBiddingState(table);
+    state.landlordSeatId = undefined;
+    state.callScore = undefined;
+    this.transitionPhase(table, { type: 'start-bidding', reason: 'bottom-cards' });
     this.emitGameSnapshot(table);
   }
 
@@ -353,7 +519,7 @@ export class TableManager {
     resetDeck(table.state, { seed: dealSeed, packs: table.variant.deck.packs });
     clearHands(table.state);
     this.setAllPrepared(table, false);
-    table.variantState = {};
+    table.variantState = { bottomCards: [], bidding: null, doubling: undefined };
     this.updateLobbyFromState(table.id);
     this.emitState(table.id);
     this.startDouDizhuDealing(table);
@@ -736,6 +902,122 @@ export class TableManager {
       return;
     }
     this.startVariantGame(managed);
+  }
+
+  handleBid(socket: AppServerSocket, payload: { tableId: string; bid: number }, ack?: (result: { ok: boolean; message?: string }) => void) {
+    const tableId = normalizeTableId(payload.tableId ?? '');
+    const managed = this.tables.get(tableId);
+    if (!managed) {
+      ack?.({ ok: false, message: 'Unknown table' });
+      return;
+    }
+    if (managed.variant.id !== 'dou-dizhu') {
+      ack?.({ ok: false, message: '当前牌桌不支持叫分' });
+      return;
+    }
+    if (!managed.hasStarted || derivePhaseStatus(managed.phase) !== 'bidding') {
+      ack?.({ ok: false, message: '当前阶段不可叫分' });
+      return;
+    }
+    const seatId = socket.id;
+    if (!managed.state.seats.includes(seatId)) {
+      ack?.({ ok: false, message: '未在牌桌中' });
+      return;
+    }
+    const bid = Number(payload.bid);
+    if (!Number.isFinite(bid) || bid < 0 || bid > 3) {
+      ack?.({ ok: false, message: '无效叫分' });
+      return;
+    }
+
+    const ddz = this.getDouDizhuState(managed);
+    const bidding = ddz.bidding;
+    if (!bidding || bidding.finished) {
+      ack?.({ ok: false, message: '叫分已结束' });
+      return;
+    }
+    if (bidding.currentSeatId !== seatId) {
+      ack?.({ ok: false, message: '未轮到你叫分' });
+      return;
+    }
+    if (bid > 0 && bid <= bidding.highestBid) {
+      ack?.({ ok: false, message: '必须叫更高的分数' });
+      return;
+    }
+
+    bidding.bidsTaken += 1;
+    if (bid === 0) {
+      bidding.consecutivePasses += 1;
+    } else {
+      bidding.highestBid = bid as BidValue;
+      bidding.highestBidderSeatId = seatId;
+      bidding.consecutivePasses = 0;
+    }
+
+    const seats = managed.state.seats;
+    const needStop =
+      bid === 3 ||
+      (bidding.bidsTaken >= seats.length && bidding.highestBidderSeatId !== null && bidding.consecutivePasses >= 2) ||
+      (bidding.bidsTaken >= seats.length && bidding.highestBidderSeatId === null);
+
+    if (!needStop) {
+      bidding.currentSeatId = this.nextSeatId(managed, seatId);
+      this.emitGameSnapshot(managed);
+      ack?.({ ok: true });
+      return;
+    }
+
+    this.finalizeBidding(managed);
+    ack?.({ ok: true });
+  }
+
+  handleDouble(socket: AppServerSocket, payload: { tableId: string; double: boolean }, ack?: (result: { ok: boolean; message?: string }) => void) {
+    const tableId = normalizeTableId(payload.tableId ?? '');
+    const managed = this.tables.get(tableId);
+    if (!managed) {
+      ack?.({ ok: false, message: 'Unknown table' });
+      return;
+    }
+    if (managed.variant.id !== 'dou-dizhu') {
+      ack?.({ ok: false, message: '当前牌桌不支持加倍' });
+      return;
+    }
+    if (!managed.hasStarted || derivePhaseStatus(managed.phase) !== 'doubling') {
+      ack?.({ ok: false, message: '当前阶段不可加倍' });
+      return;
+    }
+    const seatId = socket.id;
+    if (!managed.state.seats.includes(seatId)) {
+      ack?.({ ok: false, message: '未在牌桌中' });
+      return;
+    }
+    const ddz = this.getDouDizhuState(managed);
+    const doubling = ddz.doubling;
+    if (!doubling || doubling.finished) {
+      ack?.({ ok: false, message: '加倍已结束' });
+      return;
+    }
+    const orderSeat = doubling.order[doubling.turnIndex];
+    if (orderSeat !== seatId) {
+      ack?.({ ok: false, message: '未轮到你加倍' });
+      return;
+    }
+    const landlordSeat = ddz.landlordSeatId;
+    if (landlordSeat && seatId === landlordSeat) {
+      doubling.landlordRedoubled = payload.double;
+    } else {
+      doubling.defenderDoubles[seatId] = payload.double;
+    }
+    doubling.turnIndex += 1;
+    if (doubling.turnIndex >= doubling.order.length) {
+      doubling.finished = true;
+      this.transitionPhase(managed, { type: 'start-playing', reason: 'doubling-complete' });
+      this.emitGameSnapshot(managed);
+      ack?.({ ok: true });
+      return;
+    }
+    this.emitGameSnapshot(managed);
+    ack?.({ ok: true });
   }
 
   handleKick(socket: AppServerSocket, payload: { tableId?: string; userId?: number }) {

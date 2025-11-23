@@ -5,13 +5,13 @@ import { shuffle } from '../shuffle';
 import { createTable, joinTable, deal, resetDeck, clearHands, drawCard, reduceTable } from '../engine';
 
 describe('deck + shuffle', () => {
-  it('builds two packs (108 cards with jokers)', () => {
+  it('builds one pack (54 cards with jokers)', () => {
     const deck = makeDeck();
-    expect(deck).toHaveLength(108);
+    expect(deck).toHaveLength(54);
     const ids = new Set(deck.map(card => card.id));
-    expect(ids.size).toBe(108);
+    expect(ids.size).toBe(54);
     const jokers = deck.filter(card => card.rank === 'Joker');
-    expect(jokers).toHaveLength(4);
+    expect(jokers).toHaveLength(2);
   });
 
   it('deterministic shuffle by seed', () => {

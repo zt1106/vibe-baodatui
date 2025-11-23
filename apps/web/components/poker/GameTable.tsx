@@ -33,8 +33,13 @@ export type GameTableSeat = {
 
 export type GameTableProps = {
   players: GameTableSeat[];
+  landlordSeatId?: string;
   communityCards?: Card[];
   dealerSeatId?: string;
+  phaseLabel?: string;
+  callScoreLabel?: string;
+  deckCountLabel?: string;
+  currentTurnLabel?: string;
   sceneWidth?: string;
   sceneHeight?: string;
   sceneAlign?: 'flex-start' | 'center' | 'flex-end';
@@ -81,8 +86,13 @@ function formatPlayerName(name: string, maxLength = MAX_PLAYER_NAME_CHARS) {
 
 export function GameTable({
   players,
+  landlordSeatId,
   communityCards = [],
   dealerSeatId,
+  phaseLabel = '等待开始',
+  callScoreLabel,
+  deckCountLabel,
+  currentTurnLabel,
   sceneWidth,
   sceneHeight,
   sceneAlign,
@@ -293,9 +303,13 @@ export function GameTable({
       <div className={styles.tableBody}>
         <div className={styles.tableScene} style={sceneStyle}>
           <div className={styles.topBar} aria-live="polite">
-            <span className={styles.topBarLeft}>示例牌局信息：小盲 25 / 大盲 50 · 经典模式</span>
+            <span className={styles.topBarLeft}>
+              阶段：{phaseLabel}
+              {callScoreLabel ? ` · 底分 ${callScoreLabel}` : ''}
+              {deckCountLabel ? ` · 余牌 ${deckCountLabel}` : ''}
+            </span>
             <div className={styles.topBarRight}>
-              <span className={styles.topBarRightText}>底池 1,250</span>
+              <span className={styles.topBarRightText}>当前行动：{currentTurnLabel ?? '—'}</span>
               {topBarActions ? <div className={styles.topBarActions}>{topBarActions}</div> : null}
             </div>
           </div>
@@ -360,6 +374,7 @@ export function GameTable({
               const cardAreaClass = hasCards
                 ? `${styles.cardArea} ${styles.cardAreaActive}`
                 : styles.cardArea;
+              const isLandlord = landlordSeatId === seat.player.id;
               return (
                 <Fragment key={seat.player.id}>
                   <div
@@ -394,6 +409,7 @@ export function GameTable({
                         avatarUrl={seat.player.avatarUrl ?? `/avatars/${seat.player.avatar}`}
                         size={avatarSize}
                         className={styles.tableAvatar}
+                        isLandlord={isLandlord}
                       />
                     )}
                   </div>

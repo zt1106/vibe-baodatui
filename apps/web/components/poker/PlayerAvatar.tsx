@@ -10,6 +10,7 @@ export type PlayerAvatarProps = {
   avatarUrl?: string;
   size?: number | string;
   className?: string;
+  isLandlord?: boolean;
 };
 
 function normalizeSize(size: number | string | undefined) {
@@ -27,7 +28,8 @@ export function PlayerAvatar({
   displayName,
   avatarUrl,
   size = 64,
-  className
+  className,
+  isLandlord = false
 }: PlayerAvatarProps) {
   const resolvedSize = normalizeSize(size);
   const rootStyle = { '--player-avatar-size': resolvedSize } as CSSProperties;
@@ -44,6 +46,7 @@ export function PlayerAvatar({
           ) : (
             <span className={styles.avatarFallback}>{initials}</span>
           )}
+          {isLandlord ? <span className={styles.landlordMark} title="地主">地主</span> : null}
         </div>
         <div className={styles.nameBlock}>
           <p className={styles.playerName}>{labelText}</p>

@@ -88,7 +88,7 @@ export type TableReducerResult<A extends TableAction = TableAction> =
 const DEFAULT_DEAL_COUNT = 2;
 
 export function createTable(id: TableId, seed: string): TableState {
-  const deck = shuffle(makeDeck({ packs: 2 }), seed);
+  const deck = shuffle(makeDeck(), seed);
   return { id, seed, deck, players: {}, seats: [] };
 }
 
@@ -193,7 +193,7 @@ function applyResetDeck(
   state: TableState,
   options: ResetDeckOptions | undefined
 ): Extract<TableActionResult, { type: 'deck/reset' }> {
-  const packs = options?.packs ?? 2;
+  const packs = options?.packs ?? 1;
   const seed = options?.seed ?? state.seed;
   state.seed = seed;
   state.deck = shuffle(makeDeck({ packs }), seed);

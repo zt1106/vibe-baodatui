@@ -120,3 +120,19 @@
     font-size: 0.9rem;
   }
 }
+
+.actionGroup {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.secondaryAction {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+}
+
+.ghostAction {
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.35), rgba(51, 65, 85, 0.55));
+  color: #e2e8f0;
+}

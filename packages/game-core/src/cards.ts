@@ -9,6 +9,6 @@ export interface GameDeckOptions {
 }
 
 export function makeDeck(options: GameDeckOptions = {}): GameCard[] {
-  const { packs = 2, faceUp = false } = options;
+  const { packs = 1, faceUp = false } = options;
   return makeCoreDeck({ packs, faceUp });
 }

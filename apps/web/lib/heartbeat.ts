@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import type { Heartbeat } from '@shared/messages';
-import type { AppClientSocket, ClientToServerEvents, ServerToClientEvents } from '@shared/events';
+import type { AppClientSocket } from '@shared/events';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
 const STALE_THRESHOLD_MS = 12_000;
@@ -32,7 +32,7 @@ export function useHeartbeat() {
 
   useEffect(() => {
     let active = true;
-    const socket = io<ServerToClientEvents, ClientToServerEvents>(SOCKET_URL, {
+    const socket = io(SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionDelayMax: 2_000

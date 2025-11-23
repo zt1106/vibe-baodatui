@@ -11,6 +11,7 @@ export default defineConfig({
     alias: {
       // Point to source to avoid stale built output in workspace dependencies.
       '@poker/core-cards': resolveFromRoot('../core-cards/src/index.ts'),
+      '@core-cards': resolveFromRoot('../core-cards/src'),
     },
   },
 });

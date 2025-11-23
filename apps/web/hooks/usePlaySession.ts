@@ -102,6 +102,18 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
         dispatchTablePhase({ type: 'start-dealing' });
         return;
       }
+      if (phase === 'bidding') {
+        dispatchTablePhase({ type: 'start-bidding' });
+        return;
+      }
+      if (phase === 'doubling') {
+        dispatchTablePhase({ type: 'start-doubling' });
+        return;
+      }
+      if (phase === 'playing') {
+        dispatchTablePhase({ type: 'start-playing' });
+        return;
+      }
       dispatchTablePhase({ type: 'complete' });
     },
     []
@@ -325,6 +337,40 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     [tableId, user?.id]
   );
 
+  const sendBid = useCallback(
+    (bid: number, onComplete?: (result: { ok: boolean; message?: string }) => void) => {
+      const socket = socketRef.current;
+      if (!socket || !tableId) {
+        onComplete?.({ ok: false, message: '未连接到牌桌' });
+        return;
+      }
+      socket.emit('game:bid', { tableId, bid }, (response?: { ok: boolean; message?: string }) => {
+        if (!response?.ok && response?.message) {
+          setGameError(response.message);
+        }
+        onComplete?.(response ?? { ok: false, message: '未知错误' });
+      });
+    },
+    [tableId]
+  );
+
+  const sendDouble = useCallback(
+    (double: boolean, onComplete?: (result: { ok: boolean; message?: string }) => void) => {
+      const socket = socketRef.current;
+      if (!socket || !tableId) {
+        onComplete?.({ ok: false, message: '未连接到牌桌' });
+        return;
+      }
+      socket.emit('game:double', { tableId, double }, (response?: { ok: boolean; message?: string }) => {
+        if (!response?.ok && response?.message) {
+          setGameError(response.message);
+        }
+        onComplete?.(response ?? { ok: false, message: '未知错误' });
+      });
+    },
+    [tableId]
+  );
+
   return {
     apiBaseUrl,
     user,
@@ -339,6 +385,8 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     dealingFlights,
     handleDealingComplete,
     exitGame,
+    sendBid,
+    sendDouble,
     setGameError
   };
 }
