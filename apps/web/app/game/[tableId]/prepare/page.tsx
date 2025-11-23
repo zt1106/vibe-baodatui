@@ -4,9 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { TablePrepareResponse } from '@shared/messages';
 
-import { PreparePlayerList, type PrepareSeat } from '../../../../components/prepare/PreparePlayerList';
+import { HostControls } from '../../../../components/prepare/HostControls';
+import { ReadyPanel } from '../../../../components/prepare/ReadyPanel';
+import { SeatGrid, type PrepareSeat } from '../../../../components/prepare/SeatGrid';
+import { StatusBanner } from '../../../../components/prepare/StatusBanner';
 import { resetSharedHand } from '../../../../lib/tableSocket';
 import { usePrepareRoom } from '../../../../hooks/usePrepareRoom';
+import styles from './PreparePage.module.css';
 
 type PreparePageProps = {
   params: { tableId: string };
@@ -169,138 +173,25 @@ export default function PreparePage({ params }: PreparePageProps) {
   const statusTone = prepareState ? seatStatusTone(prepareState.status) : null;
 
   return (
-    <main
-      style={{
-        height: '100dvh',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '2rem',
-        gap: '1.5rem',
-        background:
-          'radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.08), transparent 50%), #020617',
-        color: '#e2e8f0',
-        boxSizing: 'border-box',
-        overflow: 'hidden'
-      }}
-    >
-      <header
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '1rem',
-          background: 'rgba(15, 23, 42, 0.85)',
-          borderRadius: 24,
-          border: '1px solid rgba(148, 163, 184, 0.28)',
-          padding: '1.25rem 1.5rem',
-          boxShadow: '0 24px 60px rgba(15, 23, 42, 0.4)'
-        }}
-      >
-        <div style={{ display: 'grid', gap: '0.4rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>牌局准备</h1>
-            {statusTone && (
-              <span
-                style={{
-                  padding: '0.3rem 0.9rem',
-                  borderRadius: 999,
-                  background: statusTone.background,
-                  color: statusTone.color,
-                  fontSize: '0.85rem',
-                  fontWeight: 600
-                }}
-              >
-                {statusTone.label}
-              </span>
-            )}
-          </div>
-          <span data-testid="room-code" style={{ opacity: 0.75 }}>
-            房间编号：{tableId || '未知'}
-          </span>
-          {variantConfig && (
-            <span style={{ fontSize: '0.95rem', opacity: 0.8 }}>
-              玩法：{variantConfig.name}（{variantConfig.description}）
-            </span>
-          )}
-          {user && (
-            <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>
-              当前用户：{user.nickname}（ID {user.id}）
-            </span>
-          )}
-          {prepareState?.host && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                  border: '1px solid rgba(148, 163, 184, 0.45)'
-                }}
-              >
-                <img
-                  src={`/avatars/${prepareState.host.avatar}`}
-                  alt={`${prepareState.host.nickname} 头像`}
-                  width={32}
-                  height={32}
-                  loading="lazy"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              </div>
-              <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>
-                房主：{prepareState.host.nickname}（ID {prepareState.host.userId}）
-              </span>
-            </div>
-          )}
-          {authStatus === 'loading' && <span style={{ opacity: 0.7 }}>正在验证用户身份…</span>}
-          {authStatus === 'error' && authError && (
-            <span style={{ color: '#fca5a5' }}>{authError}</span>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={handleLeaveRoom}
-            style={{
-              padding: '0.75rem 1.25rem',
-              borderRadius: 999,
-              border: '1px solid rgba(248, 113, 113, 0.5)',
-              background: 'rgba(248, 113, 113, 0.12)',
-              color: '#fecaca',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            离开房间
-          </button>
-        </div>
-      </header>
+    <main className={styles.page}>
+      <StatusBanner
+        tableId={tableId}
+        tone={statusTone}
+        variantName={variantConfig?.name ?? null}
+        variantDescription={variantConfig?.description ?? null}
+        user={user}
+        host={prepareState?.host ?? null}
+        authStatus={authStatus}
+        authError={authError}
+        onLeave={handleLeaveRoom}
+      />
 
       {!tableId && (
-        <section
-          style={{
-            background: 'rgba(15, 23, 42, 0.78)',
-            border: '1px solid rgba(248, 113, 113, 0.35)',
-            borderRadius: 18,
-            padding: '1.5rem',
-            color: '#fecaca'
-          }}
-        >
-          无效的房间地址，请返回大厅重新选择。
-        </section>
+        <section className={styles.warning}>无效的房间地址，请返回大厅重新选择。</section>
       )}
 
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)',
-          gap: '1.5rem',
-          flex: 1,
-          minHeight: 0
-        }}
-      >
-        <PreparePlayerList
+      <section className={styles.content}>
+        <SeatGrid
           seats={seats}
           playerCount={playerCount}
           capacity={resolvedCapacity || null}
@@ -312,200 +203,41 @@ export default function PreparePage({ params }: PreparePageProps) {
           onKickPlayer={handleKickPlayer}
         />
 
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1.25rem'
-          }}
-        >
+        <div className={styles.sidebar}>
           {isHost && (
-            <section
-              style={{
-                background: 'rgba(15, 23, 42, 0.9)',
-                borderRadius: 24,
-                border: '1px solid rgba(34, 197, 94, 0.25)',
-                padding: '1.5rem',
-                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.4)',
-                display: 'grid',
-                gap: '1rem'
-              }}
-            >
-              <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 style={{ margin: 0 }}>房主控制台</h2>
-                <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
-                  当前人数：{playerCount} / {resolvedCapacity || '—'}
-                </span>
-              </header>
-              <button
-                data-testid="start-game-button"
-                type="button"
-                onClick={handleStartGame}
-                disabled={!canHostStart}
-                style={{
-                  padding: '0.9rem 1.25rem',
-                  borderRadius: 18,
-                  border: 'none',
-                  background: canHostStart
-                    ? 'linear-gradient(135deg, #22c55e, #16a34a)'
-                    : 'rgba(148, 163, 184, 0.25)',
-                  color: canHostStart ? '#022c22' : '#94a3b8',
-                  fontWeight: 700,
-                  cursor: canHostStart ? 'pointer' : 'not-allowed',
-                  boxShadow: canHostStart ? '0 20px 40px rgba(34, 197, 94, 0.25)' : 'none'
-                }}
-              >
-                开始对局
-              </button>
-                <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  <span style={{ fontWeight: 600 }}>最多玩家数</span>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                      data-testid="capacity-decrement"
-                      type="button"
-                      onClick={() => handleAdjustCapacity(-1)}
-                      disabled={!canAdjustCapacity}
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 12,
-                        border: '1px solid rgba(148, 163, 184, 0.4)',
-                        background: 'rgba(15, 23, 42, 0.6)',
-                        color: canAdjustCapacity ? '#e2e8f0' : '#475569',
-                        fontSize: '1.25rem',
-                        cursor: canAdjustCapacity ? 'pointer' : 'not-allowed',
-                        opacity: canAdjustCapacity ? 1 : 0.5
-                      }}
-                    >
-                      −
-                    </button>
-                  <strong
-                    data-testid="capacity-value"
-                    style={{ fontSize: '1.4rem', minWidth: 40, textAlign: 'center' }}
-                  >
-                    {configDraft ?? resolvedCapacity}
-                  </strong>
-                  <button
-                    data-testid="capacity-increment"
-                    type="button"
-                    onClick={() => handleAdjustCapacity(1)}
-                    disabled={!canAdjustCapacity}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 12,
-                      border: '1px solid rgba(148, 163, 184, 0.4)',
-                      background: 'rgba(15, 23, 42, 0.6)',
-                      color: canAdjustCapacity ? '#e2e8f0' : '#475569',
-                      fontSize: '1.25rem',
-                      cursor: canAdjustCapacity ? 'pointer' : 'not-allowed',
-                      opacity: canAdjustCapacity ? 1 : 0.5
-                    }}
-                  >
-                    ＋
-                  </button>
-                  <button
-                    data-testid="capacity-save-button"
-                    type="button"
-                    onClick={handleSaveConfig}
-                    disabled={!configIsDirty}
-                    style={{
-                      padding: '0.65rem 1.1rem',
-                      borderRadius: 12,
-                      border: 'none',
-                      background: configIsDirty
-                        ? 'linear-gradient(135deg, #38bdf8, #6366f1)'
-                        : 'rgba(148, 163, 184, 0.25)',
-                      color: configIsDirty ? '#0f172a' : '#94a3b8',
-                      fontWeight: 600,
-                      cursor: configIsDirty ? 'pointer' : 'not-allowed'
-                    }}
-                  >
-                    保存配置
-                  </button>
-                </div>
-                {capacityLockedValue && (
-                  <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>
-                    当前玩法固定 {capacityLockedValue} 人，无法调整。
-                  </span>
-                )}
-              </div>
-            </section>
+            <HostControls
+              playerCount={playerCount}
+              capacity={resolvedCapacity || null}
+              canStart={canHostStart}
+              canAdjustCapacity={canAdjustCapacity}
+              configDraft={configDraft}
+              capacityDisplay={resolvedCapacity || null}
+              capacityLockedValue={capacityLockedValue}
+              configIsDirty={configIsDirty}
+              onStart={handleStartGame}
+              onAdjustCapacity={handleAdjustCapacity}
+              onSaveCapacity={handleSaveConfig}
+            />
           )}
 
-          <section
-            style={{
-              background: 'rgba(15, 23, 42, 0.85)',
-              borderRadius: 24,
-              border: '1px solid rgba(148, 163, 184, 0.28)',
-              padding: '1.5rem',
-              boxShadow: '0 24px 60px rgba(15, 23, 42, 0.4)',
-              display: 'grid',
-              gap: '1rem'
-            }}
-          >
-            <header>
-              <h2 style={{ margin: 0 }}>牌桌配置</h2>
-              <p style={{ margin: '0.35rem 0 0', opacity: 0.75 }}>更多选项即将上线</p>
-            </header>
-            <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'grid', gap: '0.5rem' }}>
-              <li>最多玩家：{resolvedCapacity || '—'} 名</li>
-              <li>当前人数：{playerCount} 名</li>
-            </ul>
-            <button
-              data-testid="ready-button"
-              type="button"
-              onClick={handleTogglePrepared}
-              disabled={!canTogglePrepared}
-              style={{
-                padding: '0.9rem 1.25rem',
-                borderRadius: 18,
-                border: 'none',
-                background: selfPrepared
-                  ? 'linear-gradient(135deg, #22c55e, #16a34a)'
-                  : 'linear-gradient(135deg, #38bdf8, #6366f1)',
-                color: selfPrepared ? '#022c22' : '#0f172a',
-                fontWeight: 700,
-                cursor: canTogglePrepared ? 'pointer' : 'not-allowed',
-                opacity: canTogglePrepared ? 1 : 0.6,
-                boxShadow: selfPrepared ? '0 20px 40px rgba(34, 197, 94, 0.25)' : '0 20px 40px rgba(56, 189, 248, 0.25)'
-              }}
-            >
-              {preparedButtonLabel}
-            </button>
-            <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>
-              {isSelfSeated
-                ? selfPrepared
-                  ? '已准备，等待房主开始对局。'
-                  : '点击准备后，等待房主操作。'
-                : '加入座位后即可准备。'}
-            </span>
+          <ReadyPanel
+            capacity={resolvedCapacity || null}
+            playerCount={playerCount}
+            isSelfSeated={isSelfSeated}
+            selfPrepared={selfPrepared}
+            canTogglePrepared={canTogglePrepared}
+            preparedButtonLabel={preparedButtonLabel}
+            onTogglePrepared={handleTogglePrepared}
+          />
+
+          <section className={styles.placeholder}>
+            <h3 className={styles.placeholderTitle}>上一局战报</h3>
+            <p className={styles.placeholderText}>战报整理中，敬请期待。</p>
           </section>
 
-          <section
-            style={{
-              background: 'rgba(15, 23, 42, 0.78)',
-              borderRadius: 24,
-              border: '1px dashed rgba(148, 163, 184, 0.35)',
-              padding: '1.25rem',
-              minHeight: 140
-            }}
-          >
-            <h3 style={{ margin: 0 }}>上一局战报</h3>
-            <p style={{ margin: '0.5rem 0 0', opacity: 0.65 }}>战报整理中，敬请期待。</p>
-          </section>
-
-          <section
-            style={{
-              background: 'rgba(15, 23, 42, 0.78)',
-              borderRadius: 24,
-              border: '1px dashed rgba(148, 163, 184, 0.35)',
-              padding: '1.25rem',
-              minHeight: 180
-            }}
-          >
-            <h3 style={{ margin: 0 }}>聊天室</h3>
-            <p style={{ margin: '0.5rem 0 0', opacity: 0.65 }}>聊天面板开发中，稍后开放。</p>
+          <section className={`${styles.placeholder} ${styles.placeholderTall}`}>
+            <h3 className={styles.placeholderTitle}>聊天室</h3>
+            <p className={styles.placeholderText}>聊天面板开发中，稍后开放。</p>
           </section>
         </div>
       </section>

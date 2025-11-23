@@ -1,0 +1,54 @@
+.page {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  gap: 1.5rem;
+  background: radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.08), transparent 50%), #020617;
+  color: #e2e8f0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.warning {
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 18px;
+  padding: 1.5rem;
+  color: #fecaca;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.placeholder {
+  background: rgba(15, 23, 42, 0.78);
+  border-radius: 24px;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  padding: 1.25rem;
+  min-height: 140px;
+}
+
+.placeholderTall {
+  min-height: 180px;
+}
+
+.placeholderTitle {
+  margin: 0;
+}
+
+.placeholderText {
+  margin: 0.5rem 0 0;
+  opacity: 0.65;
+}

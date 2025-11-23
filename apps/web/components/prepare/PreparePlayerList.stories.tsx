@@ -3,7 +3,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 
-import { PreparePlayerList, type PrepareSeat } from './PreparePlayerList';
+import { SeatGrid, type PrepareSeat } from './SeatGrid';
 
 const seatPlayers = [
   { userId: 11, nickname: '晨星', avatar: '1F42D.png', prepared: true },
@@ -21,9 +21,9 @@ const filledSeats: PrepareSeat[] = Array.from({ length: totalSeats }, (_, index)
 const hostId = seatPlayers[0].userId;
 const playerCount = seatPlayers.length;
 
-const meta: Meta<typeof PreparePlayerList> = {
-  title: 'Prepare/PreparePlayerList',
-  component: PreparePlayerList,
+const meta: Meta<typeof SeatGrid> = {
+  title: 'Prepare/SeatGrid',
+  component: SeatGrid,
   tags: ['autodocs'],
   args: {
     seats: filledSeats,

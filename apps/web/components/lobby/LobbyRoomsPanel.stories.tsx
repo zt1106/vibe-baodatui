@@ -7,12 +7,26 @@ import type { LobbyRoom } from '@shared/messages';
 
 import { LobbyRoomsPanel } from './LobbyRoomsPanel';
 
+const classicVariant: LobbyRoom['variant'] = {
+  id: 'classic',
+  name: '经典德州扑克',
+  description: '无限注，标准桌',
+  capacity: { min: 2, max: 8 }
+};
+
+const shortDeckVariant: LobbyRoom['variant'] = {
+  id: 'short-deck',
+  name: '短牌极速',
+  description: '36 张短牌，快节奏',
+  capacity: { min: 2, max: 6 }
+};
+
 const sampleRooms: LobbyRoom[] = [
-  { id: '1024', status: 'waiting', players: 2, capacity: 6 },
-  { id: '2048', status: 'in-progress', players: 4, capacity: 6 },
-  { id: '4096', status: 'waiting', players: 1, capacity: 8 },
-  { id: '8192', status: 'full', players: 8, capacity: 8 },
-  { id: '16384', status: 'waiting', players: 5, capacity: 8 }
+  { id: '1024', status: 'waiting', players: 2, capacity: 6, variant: shortDeckVariant },
+  { id: '2048', status: 'in-progress', players: 4, capacity: 6, variant: shortDeckVariant },
+  { id: '4096', status: 'waiting', players: 1, capacity: 8, variant: classicVariant },
+  { id: '8192', status: 'full', players: 8, capacity: 8, variant: classicVariant },
+  { id: '16384', status: 'waiting', players: 5, capacity: 8, variant: classicVariant }
 ];
 
 const meta: Meta<typeof LobbyRoomsPanel> = {
