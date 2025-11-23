@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { TablePrepareResponse as TablePrepareResponseSchema, type ServerState, type TablePrepareResponse } from '@shared/messages';
+import type { ClientToServerEmitArgs } from '@shared/events';
 
 import { ensureUser, loadStoredUser, persistStoredUser, NICKNAME_STORAGE_KEY, type StoredUser } from '../lib/auth';
 import { fetchJson } from '../lib/api';
@@ -187,13 +188,13 @@ export function usePrepareRoom(tableId: string) {
   }, []);
 
   const sendTableEvent = useCallback(
-    (event: string, payload: Record<string, unknown>) => {
+    <E extends keyof ClientToServerEmitArgs>(event: E, ...args: ClientToServerEmitArgs[E]) => {
       const socket = socketLeaseRef.current?.socket;
       if (!socket) {
         setPrepareError('连接未建立，稍后再试。');
         return false;
       }
-      socket.emit(event, payload);
+      socket.emit(event, ...args);
       return true;
     },
     []

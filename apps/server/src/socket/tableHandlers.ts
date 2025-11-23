@@ -1,4 +1,4 @@
-import { type Server, type Socket } from 'socket.io';
+import type { AppServer, AppServerSocket } from '@shared/events';
 import {
   JoinTable,
   TableConfigUpdateRequest,
@@ -12,11 +12,11 @@ import { createHeartbeatPublisher } from '../infrastructure/heartbeat';
 type Heartbeat = ReturnType<typeof createHeartbeatPublisher>;
 
 export function registerTableSocketHandlers(
-  io: Server,
+  io: AppServer,
   tableManager: TableManager,
   heartbeat: Heartbeat
 ) {
-  io.on('connection', (socket: Socket) => {
+  io.on('connection', (socket: AppServerSocket) => {
     heartbeat.handleConnection(socket);
     heartbeat.publish();
 

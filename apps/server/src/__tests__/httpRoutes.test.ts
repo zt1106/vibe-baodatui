@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import http from 'http';
-import type { Server, Socket } from 'socket.io';
+import type { AppServer, AppServerSocket } from '@shared/events';
 import { buildAllowedOrigins, createHttpApp } from '../http/app';
 import { registerLobbyRoutes } from '../http/routes/lobby';
 import { registerTableRoutes } from '../http/routes/tables';
@@ -34,7 +34,7 @@ describe('HTTP routes', () => {
     lobby = createLobbyRegistry();
     users = createUserRegistry();
     tableManager = new TableManager({
-      io: new StubIo() as unknown as Server,
+      io: new StubIo() as unknown as AppServer,
       lobby,
       users
     });
@@ -117,7 +117,7 @@ describe('HTTP routes', () => {
     expect(notSeated.status).toBe(404);
 
     const hostSocket = new FakeSocket('socket-host');
-    tableManager.handleJoin(hostSocket as unknown as Socket, {
+    tableManager.handleJoin(hostSocket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: host.nickname,
       userId: host.id

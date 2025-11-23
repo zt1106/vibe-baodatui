@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 import type { Heartbeat } from '@shared/messages';
+import type { AppClientSocket, ClientToServerEvents, ServerToClientEvents } from '@shared/events';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3001';
 const STALE_THRESHOLD_MS = 12_000;
@@ -20,7 +21,7 @@ type InternalState = {
 export type HeartbeatStatus = 'online' | 'connecting' | 'offline' | 'degraded';
 
 export function useHeartbeat() {
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<AppClientSocket | null>(null);
   const [tick, setTick] = useState(() => Date.now());
   const [state, setState] = useState<InternalState>({
     phase: 'connecting',
@@ -31,7 +32,7 @@ export function useHeartbeat() {
 
   useEffect(() => {
     let active = true;
-    const socket = io(SOCKET_URL, {
+    const socket = io<ServerToClientEvents, ClientToServerEvents>(SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionDelayMax: 2_000

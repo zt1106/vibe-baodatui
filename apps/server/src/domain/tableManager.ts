@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-import { Server, type Socket } from 'socket.io';
 import {
   GameDealCardEvent,
   deriveLobbyRoomStatus,
@@ -10,6 +9,7 @@ import {
   TablePlayStateResponse,
   TablePrepareResponse
 } from '@shared/messages';
+import type { AppServer, AppServerSocket } from '@shared/events';
 import { createTable, joinTable, clearHands, resetDeck, drawCard } from '@game-core/engine';
 import { DEFAULT_AVATAR, type AvatarFilename } from '@shared/avatars';
 import {
@@ -56,7 +56,7 @@ export type ManagedTable = {
 };
 
 export type TableManagerDeps = {
-  io: Server;
+  io: AppServer;
   lobby: ReturnType<typeof createLobbyRegistry>;
   users: ReturnType<typeof createUserRegistry>;
 };
@@ -67,7 +67,7 @@ const RECONNECT_GRACE_MS = 5_000;
 export const normalizeTableId = (id: string) => id.trim();
 
 export class TableManager {
-  private readonly io: Server;
+  private readonly io: AppServer;
   private readonly lobby: ReturnType<typeof createLobbyRegistry>;
   private readonly users: ReturnType<typeof createUserRegistry>;
   private readonly tables = new Map<string, ManagedTable>();
@@ -114,7 +114,7 @@ export class TableManager {
     return id;
   }
 
-  private ensureHostAction(socket: Socket, tableId: string) {
+  private ensureHostAction(socket: AppServerSocket, tableId: string) {
     const managed = this.tables.get(tableId);
     if (!managed) {
       socket.emit('errorMessage', { message: 'Unknown table' });
@@ -619,7 +619,7 @@ export class TableManager {
     this.tables.forEach((_table, tableId) => this.emitState(tableId));
   }
 
-  handleJoin(socket: Socket, payload: { tableId?: string; nickname?: string; userId?: number }) {
+  handleJoin(socket: AppServerSocket, payload: { tableId?: string; nickname?: string; userId?: number }) {
     const tableId = normalizeTableId(payload.tableId ?? '');
     const table = this.tables.get(tableId);
     if (!table) {
@@ -719,7 +719,7 @@ export class TableManager {
     this.emitGameSnapshot(table);
   }
 
-  handleStart(socket: Socket, payload: { tableId?: string }) {
+  handleStart(socket: AppServerSocket, payload: { tableId?: string }) {
     const tableId = normalizeTableId(payload.tableId ?? '');
     const managed = this.ensureHostAction(socket, tableId);
     if (!managed) return;
@@ -738,7 +738,7 @@ export class TableManager {
     this.startVariantGame(managed);
   }
 
-  handleKick(socket: Socket, payload: { tableId?: string; userId?: number }) {
+  handleKick(socket: AppServerSocket, payload: { tableId?: string; userId?: number }) {
     const tableId = normalizeTableId(payload.tableId ?? '');
     const managed = this.ensureHostAction(socket, tableId);
     if (!managed) return;
@@ -766,7 +766,7 @@ export class TableManager {
     this.emitGameSnapshot(managed);
   }
 
-  handleUpdateConfig(socket: Socket, payload: { tableId?: string; capacity: number; requestId?: string }) {
+  handleUpdateConfig(socket: AppServerSocket, payload: { tableId?: string; capacity: number; requestId?: string }) {
     const tableId = normalizeTableId(payload.tableId ?? '');
     const requestId = this.resolveRequestId(payload.requestId);
     const managed = this.ensureHostAction(socket, tableId);
@@ -800,7 +800,7 @@ export class TableManager {
     this.emitGameSnapshot(managed);
   }
 
-  handleSetPrepared(socket: Socket, payload: { tableId?: string; prepared: boolean; requestId?: string }) {
+  handleSetPrepared(socket: AppServerSocket, payload: { tableId?: string; prepared: boolean; requestId?: string }) {
     const tableId = normalizeTableId(payload.tableId ?? '');
     const requestId = this.resolveRequestId(payload.requestId);
     const managed = this.tables.get(tableId);
@@ -833,7 +833,11 @@ export class TableManager {
     this.emitGameSnapshot(managed);
   }
 
-  handleLeave(socket: Socket, payload: { tableId?: string; userId?: number }, ack?: (result: { ok: boolean }) => void) {
+  handleLeave(
+    socket: AppServerSocket,
+    payload: { tableId?: string; userId?: number },
+    ack?: (result: { ok: boolean }) => void
+  ) {
     const tableId = normalizeTableId(payload?.tableId ?? '');
     if (!tableId) return;
     const managed = this.tables.get(tableId);

@@ -3,6 +3,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import { io as createClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { ServerState } from '@shared/messages';
+import type { ClientToServerEvents, ServerToClientEvents } from '@shared/events';
 import { TableManager } from '../domain/tableManager';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import { createUserRegistry } from '../infrastructure/userRegistry';
@@ -22,7 +23,7 @@ function waitFor<T>(emitter: any, event: string, predicate?: (payload: T) => boo
 
 async function startSocketServer() {
   const httpServer = http.createServer();
-  const io = new Server(httpServer, { cors: { origin: '*' } });
+  const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { cors: { origin: '*' } });
   const lobby = createLobbyRegistry();
   const users = createUserRegistry();
   const tableManager = new TableManager({ io, lobby, users });
@@ -35,7 +36,7 @@ async function startSocketServer() {
 }
 
 describe('table socket handlers', () => {
-  const sockets: ClientSocket[] = [];
+  const sockets: ClientSocket<ServerToClientEvents, ClientToServerEvents>[] = [];
 
   afterEach(async () => {
     await Promise.all(
@@ -66,14 +67,14 @@ describe('table socket handlers', () => {
     const playerThree = users.register('Player Three');
     const table = tableManager.createTable(host, 'dou-dizhu');
 
-    const hostClient = createClient(`http://127.0.0.1:${port}`);
+    const hostClient = createClient<ServerToClientEvents, ClientToServerEvents>(`http://127.0.0.1:${port}`);
     sockets.push(hostClient);
     await waitFor(hostClient, 'connect');
     const hostJoined = waitFor<ServerState>(hostClient, 'state', state => state.seats.length === 1);
     hostClient.emit('joinTable', { tableId: table.tableId, nickname: host.nickname, userId: host.id });
     await hostJoined;
 
-    const p2Client = createClient(`http://127.0.0.1:${port}`);
+    const p2Client = createClient<ServerToClientEvents, ClientToServerEvents>(`http://127.0.0.1:${port}`);
     sockets.push(p2Client);
     await waitFor(p2Client, 'connect');
     const p2Joined = waitFor<ServerState>(hostClient, 'state', state => state.seats.length === 2);
@@ -84,7 +85,7 @@ describe('table socket handlers', () => {
     });
     await p2Joined;
 
-    const p3Client = createClient(`http://127.0.0.1:${port}`);
+    const p3Client = createClient<ServerToClientEvents, ClientToServerEvents>(`http://127.0.0.1:${port}`);
     sockets.push(p3Client);
     await waitFor(p3Client, 'connect');
     const p3Joined = waitFor<ServerState>(hostClient, 'state', state => state.seats.length === 3);

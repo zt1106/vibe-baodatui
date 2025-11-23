@@ -1,12 +1,13 @@
 'use client';
 
-import { io, type Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 import type { Card } from '@poker/core-cards';
 import type { GameDealCardEvent } from '@shared/messages';
+import type { AppClientSocket, ClientToServerEvents, ServerToClientEvents } from '@shared/events';
 
 type HandListener = (cards: Card[]) => void;
 
-let sharedSocket: Socket | null = null;
+let sharedSocket: AppClientSocket | null = null;
 let sharedTableId: string | null = null;
 let refCount = 0;
 let joinedTableId: string | null = null;
@@ -29,7 +30,7 @@ function notifyHand() {
   handListeners.forEach(listener => listener(snapshot));
 }
 
-function attachBaseListeners(socket: Socket) {
+function attachBaseListeners(socket: AppClientSocket) {
   const existing = (socket as never as { __tableHandlersAttached?: boolean }).__tableHandlersAttached;
   if (existing) {
     return;
@@ -55,7 +56,7 @@ function attachBaseListeners(socket: Socket) {
   });
 }
 
-function detachBaseListeners(socket: Socket) {
+function detachBaseListeners(socket: AppClientSocket) {
   const handlers = socket as never as {
     __tableHandlersAttached?: boolean;
     __tableDealHandler?: (payload: GameDealCardEvent) => void;
@@ -87,7 +88,7 @@ export function acquireTableSocket(baseUrl: string, tableId: string) {
     sharedTableId = null;
   }
   if (!sharedSocket) {
-    sharedSocket = io(baseUrl, SOCKET_OPTIONS);
+    sharedSocket = io<ServerToClientEvents, ClientToServerEvents>(baseUrl, SOCKET_OPTIONS);
     sharedTableId = tableId;
     attachBaseListeners(sharedSocket);
   }
@@ -95,7 +96,7 @@ export function acquireTableSocket(baseUrl: string, tableId: string) {
   return sharedSocket;
 }
 
-export function releaseTableSocket(socket: Socket) {
+export function releaseTableSocket(socket: AppClientSocket) {
   if (!sharedSocket || socket.id !== sharedSocket.id) {
     return;
   }
@@ -148,7 +149,7 @@ export function getSharedSocket() {
 }
 
 export type TableSocketLease = {
-  socket: Socket;
+  socket: AppClientSocket;
   release: () => void;
 };
 

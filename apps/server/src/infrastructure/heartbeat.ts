@@ -1,4 +1,4 @@
-import { Server, Socket } from 'socket.io';
+import type { AppServer, AppServerSocket } from '@shared/events';
 import { Heartbeat } from '@shared/messages';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
@@ -10,9 +10,9 @@ type Cleanup = () => void;
  * Also primes newly connected sockets with an immediate heartbeat so the UI
  * can reflect connection state without waiting for the next interval.
  */
-export function createHeartbeatPublisher(io: Server): {
+export function createHeartbeatPublisher(io: AppServer): {
   start: () => Cleanup;
-  handleConnection: (socket: Socket) => void;
+  handleConnection: (socket: AppServerSocket) => void;
   publish: () => void;
   snapshot: () => Heartbeat;
 } {
@@ -29,7 +29,7 @@ export function createHeartbeatPublisher(io: Server): {
     io.emit('heartbeat', snapshot());
   };
 
-  function handleConnection(socket: Socket) {
+  function handleConnection(socket: AppServerSocket) {
     socket.emit('heartbeat', snapshot());
     socket.on('heartbeat:request', () => socket.emit('heartbeat', snapshot()));
   }

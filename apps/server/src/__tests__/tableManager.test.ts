@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Server, Socket } from 'socket.io';
+import type { AppServer, AppServerSocket } from '@shared/events';
 import { derivePhaseStatus } from '@shared/tablePhases';
 import { TableManager } from '../domain/tableManager';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
@@ -49,7 +49,7 @@ const setupTableManager = () => {
   const io = new FakeIo();
   const lobby = createLobbyRegistry();
   const users = createUserRegistry();
-  const manager = new TableManager({ io: io as unknown as Server, lobby, users });
+  const manager = new TableManager({ io: io as unknown as AppServer, lobby, users });
   return { io, lobby, users, manager };
 };
 
@@ -65,19 +65,19 @@ describe('TableManager lifecycle', () => {
     const p2Socket = new FakeSocket('socket-2', playerTwo.nickname);
     const p3Socket = new FakeSocket('socket-3', playerThree.nickname);
 
-    manager.handleJoin(hostSocket as unknown as Socket, {
+    manager.handleJoin(hostSocket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: host.nickname,
       userId: host.id
     });
     expect(lobby.snapshot().rooms[0]).toMatchObject({ id: table.tableId, players: 1, status: 'waiting' });
 
-    manager.handleJoin(p2Socket as unknown as Socket, {
+    manager.handleJoin(p2Socket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: playerTwo.nickname,
       userId: playerTwo.id
     });
-    manager.handleJoin(p3Socket as unknown as Socket, {
+    manager.handleJoin(p3Socket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: playerThree.nickname,
       userId: playerThree.id
@@ -87,12 +87,12 @@ describe('TableManager lifecycle', () => {
     expect(filled.rooms[0]).toMatchObject({ players: 3, status: 'full' });
 
     const leaveAck = vi.fn();
-    manager.handleLeave(p2Socket as unknown as Socket, { tableId: table.tableId, userId: playerTwo.id }, leaveAck);
+    manager.handleLeave(p2Socket as unknown as AppServerSocket, { tableId: table.tableId, userId: playerTwo.id }, leaveAck);
     expect(leaveAck).toHaveBeenCalledWith({ ok: true });
     expect(lobby.snapshot().rooms[0].players).toBe(2);
 
-    manager.handleLeave(hostSocket as unknown as Socket, { tableId: table.tableId, userId: host.id });
-    manager.handleLeave(p3Socket as unknown as Socket, { tableId: table.tableId, userId: playerThree.id });
+    manager.handleLeave(hostSocket as unknown as AppServerSocket, { tableId: table.tableId, userId: host.id });
+    manager.handleLeave(p3Socket as unknown as AppServerSocket, { tableId: table.tableId, userId: playerThree.id });
 
     expect(lobby.snapshot().rooms).toHaveLength(0);
     expect(manager.getPrepareState(table.tableId)).toBeNull();
@@ -109,17 +109,17 @@ describe('TableManager lifecycle', () => {
     const p2Socket = new FakeSocket('socket-2', playerTwo.nickname);
     const p3Socket = new FakeSocket('socket-3', playerThree.nickname);
 
-    manager.handleJoin(hostSocket as unknown as Socket, {
+    manager.handleJoin(hostSocket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: host.nickname,
       userId: host.id
     });
-    manager.handleJoin(p2Socket as unknown as Socket, {
+    manager.handleJoin(p2Socket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: playerTwo.nickname,
       userId: playerTwo.id
     });
-    manager.handleJoin(p3Socket as unknown as Socket, {
+    manager.handleJoin(p3Socket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: playerThree.nickname,
       userId: playerThree.id
@@ -132,17 +132,17 @@ describe('TableManager lifecycle', () => {
         tableState.phase = { status: 'dealing' };
       });
 
-    manager.handleStart(p2Socket as unknown as Socket, { tableId: table.tableId });
+    manager.handleStart(p2Socket as unknown as AppServerSocket, { tableId: table.tableId });
     expect(p2Socket.emitted.errorMessage?.[0]?.message).toBe('Only the host can perform this action');
 
-    manager.handleStart(hostSocket as unknown as Socket, { tableId: table.tableId });
+    manager.handleStart(hostSocket as unknown as AppServerSocket, { tableId: table.tableId });
     expect(hostSocket.emitted.errorMessage?.at(-1)?.message).toBe('仍有玩家未准备');
 
-    manager.handleSetPrepared(hostSocket as unknown as Socket, { tableId: table.tableId, prepared: true });
-    manager.handleSetPrepared(p2Socket as unknown as Socket, { tableId: table.tableId, prepared: true });
-    manager.handleSetPrepared(p3Socket as unknown as Socket, { tableId: table.tableId, prepared: true });
+    manager.handleSetPrepared(hostSocket as unknown as AppServerSocket, { tableId: table.tableId, prepared: true });
+    manager.handleSetPrepared(p2Socket as unknown as AppServerSocket, { tableId: table.tableId, prepared: true });
+    manager.handleSetPrepared(p3Socket as unknown as AppServerSocket, { tableId: table.tableId, prepared: true });
 
-    manager.handleStart(hostSocket as unknown as Socket, { tableId: table.tableId });
+    manager.handleStart(hostSocket as unknown as AppServerSocket, { tableId: table.tableId });
 
     const managed = (manager as any).tables.get(table.tableId);
     expect(managed.hasStarted).toBe(true);
@@ -165,17 +165,17 @@ describe('TableManager lifecycle', () => {
     const p2Socket = new FakeSocket('socket-2', playerTwo.nickname);
     const p3Socket = new FakeSocket('socket-3', playerThree.nickname);
 
-    manager.handleJoin(hostSocket as unknown as Socket, {
+    manager.handleJoin(hostSocket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: host.nickname,
       userId: host.id
     });
-    manager.handleJoin(p2Socket as unknown as Socket, {
+    manager.handleJoin(p2Socket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: playerTwo.nickname,
       userId: playerTwo.id
     });
-    manager.handleJoin(p3Socket as unknown as Socket, {
+    manager.handleJoin(p3Socket as unknown as AppServerSocket, {
       tableId: table.tableId,
       nickname: playerThree.nickname,
       userId: playerThree.id

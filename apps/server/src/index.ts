@@ -2,6 +2,7 @@ import 'dotenv/config';
 import http from 'http';
 import { Server } from 'socket.io';
 import { loadServerEnv } from '@shared/env';
+import type { ClientToServerEvents, ServerToClientEvents } from '@shared/events';
 import { createHeartbeatPublisher } from './infrastructure/heartbeat';
 import { createLobbyRegistry } from './infrastructure/lobbyRegistry';
 import { createUserRegistry } from './infrastructure/userRegistry';
@@ -18,7 +19,7 @@ const allowedOrigins = buildAllowedOrigins(env.WEB_ORIGINS);
 
 const app = createHttpApp(allowedOrigins);
 const server = http.createServer(app);
-const io = new Server(server, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
   cors: { origin: Array.from(allowedOrigins), credentials: true }
 });
 
