@@ -43,6 +43,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
   const socketRef = useRef<ReturnType<typeof acquireTableSocket> | null>(null);
   const cleanupReleasedRef = useRef(false);
   const lastSnapshotRef = useRef<GameSnapshot | null>(null);
+  const processedSelfCombosRef = useRef<Set<string>>(new Set());
   const dealSeqRef = useRef(0);
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     setDealingFlights([]);
     dispatchTablePhase({ type: 'reset' });
     lastSnapshotRef.current = null;
+    processedSelfCombosRef.current = new Set();
     dealSeqRef.current = 0;
   }, [tableId]);
 
@@ -300,6 +302,39 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     }
     lastSnapshotRef.current = snapshot;
   }, [dealingCardIds, selfSeatId, snapshot]);
+
+  useEffect(() => {
+    if (!snapshot || !selfSeatId) {
+      return;
+    }
+    const toProcess: Array<{ seatId: string; cardIds: number[] }> = [];
+
+    const maybeQueueCombo = (combo?: { seatId: string; cards: Array<{ id: number }> } | null) => {
+      if (!combo || combo.seatId !== selfSeatId) return;
+      if (!combo.cards?.length) return;
+      const key = `${combo.seatId}-${combo.cards.map(card => card.id).sort((a, b) => a - b).join('-')}`;
+      if (processedSelfCombosRef.current.has(key)) return;
+      processedSelfCombosRef.current.add(key);
+      toProcess.push({ seatId: combo.seatId, cardIds: combo.cards.map(card => card.id) });
+    };
+
+    maybeQueueCombo(snapshot.lastCombo);
+    if (snapshot.trickCombos && snapshot.trickCombos[selfSeatId]) {
+      maybeQueueCombo(snapshot.trickCombos[selfSeatId]);
+    }
+
+    if (!toProcess.length) return;
+
+    const idsToRemove = new Set<number>(toProcess.flatMap(entry => entry.cardIds));
+    setSelfHand(prev => {
+      if (prev.length === 0) return prev;
+      const next = prev.filter(card => !idsToRemove.has(card.id));
+      if (next.length !== prev.length) {
+        hydrateSharedHand(next);
+      }
+      return next;
+    });
+  }, [selfSeatId, snapshot]);
 
   const handleDealingComplete = useCallback((flightId: string) => {
     setDealingFlights(prev => prev.filter(flight => flight.id !== flightId));

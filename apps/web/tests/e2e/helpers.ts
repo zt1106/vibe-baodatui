@@ -3,11 +3,15 @@ import type { BrowserContext, Page } from '@playwright/test';
 import type { GameVariantId } from '@shared/messages';
 import { DEFAULT_VARIANT_ID } from '@shared/variants';
 
-const BASE_URL = (process.env.E2E_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+let baseUrl = (process.env.E2E_BASE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const urlFor = (path: string) => {
   const normalized = path.startsWith('/') ? path : `/${path}`;
-  return `${BASE_URL}${normalized}`;
+  return `${baseUrl}${normalized}`;
 };
+
+export function setE2eBaseUrl(url: string) {
+  baseUrl = url.replace(/\/$/, '');
+}
 
 export async function loginAndEnterLobby(page: Page, nickname: string, label: string) {
   await page.goto(urlFor('/'));

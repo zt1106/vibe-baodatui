@@ -69,7 +69,7 @@ type DouDizhuBiddingState = {
   redealRequired?: boolean;
 };
 
-type DouDizhuVariantState = {
+export type DouDizhuVariantState = {
   bottomCards: GameDealCardEvent['card'][];
   bidding: DouDizhuBiddingState | null;
   landlordSeatId?: string;
@@ -111,6 +111,7 @@ export class TableManager {
   private readonly socketUsers = new Map<string, number>();
   private readonly USER_AVATAR_FALLBACK: AvatarFilename = DEFAULT_AVATAR;
   private readonly ddzValidator = createPlayValidator();
+  private readonly snapshotListeners = new Set<(table: ManagedTable, snapshot: GameSnapshot) => void>();
 
   constructor(deps: TableManagerDeps) {
     this.io = deps.io;
@@ -168,9 +169,26 @@ export class TableManager {
     return Array.from(this.tables.keys());
   }
 
+  getSnapshot(tableId: string) {
+    const table = this.getManagedTable(tableId);
+    if (!table) return null;
+    return this.buildGameSnapshot(table);
+  }
+
   private resolveUserAvatar(userId: number): AvatarFilename {
     const record = this.users.findById(userId);
     return record?.avatar ?? this.USER_AVATAR_FALLBACK;
+  }
+
+  onSnapshot(listener: (table: ManagedTable, snapshot: GameSnapshot) => void) {
+    this.snapshotListeners.add(listener);
+    return () => this.snapshotListeners.delete(listener);
+  }
+
+  getManagedTable(tableId: string) {
+    const normalized = normalizeTableId(tableId);
+    if (!normalized) return null;
+    return this.tables.get(normalized) ?? null;
   }
 
   private generateTableId() {
@@ -461,6 +479,13 @@ export class TableManager {
   private emitGameSnapshot(table: ManagedTable, lastDealtSeatId?: string) {
     const snapshot = this.buildGameSnapshot(table, lastDealtSeatId);
     this.io.to(table.id).emit('game:snapshot', snapshot);
+    for (const listener of this.snapshotListeners) {
+      try {
+        listener(table, snapshot);
+      } catch (error) {
+        console.error('[table] snapshot listener failed', error);
+      }
+    }
     return snapshot;
   }
 

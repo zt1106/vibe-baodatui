@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit --pretty false",
     "test:e2e": "playwright test",
     "test:e2e:coverage": "ISTANBUL_COVERAGE=1 nyc playwright test",
-    "e2e:bootstrap-game": "E2E_INCLUDE_MANUAL=true playwright test tests/e2e/multi-player-bootstrap.spec.ts --project=chromium --headed",
+    "e2e:bootstrap-game": "E2E_INCLUDE_MANUAL=true E2E_BASE_URL=http://127.0.0.1:0 playwright test tests/e2e/multi-player-bootstrap.spec.ts --project=chromium --headed",
+    "e2e:bootstrap-game:manual": "E2E_INCLUDE_MANUAL=true playwright test tests/e2e/multi-player-bootstrap-manual.spec.ts --project=chromium --headed",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
