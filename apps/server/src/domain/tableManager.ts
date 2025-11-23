@@ -44,6 +44,7 @@ export type ManagedTable = {
   dealingState: {
     timer: NodeJS.Timeout | null;
     seatIndex: number;
+    traceId?: string;
   } | null;
   pendingDisconnects: Map<number, NodeJS.Timeout>;
   variantState: Record<string, unknown>;
@@ -73,6 +74,17 @@ export class TableManager {
     this.io = deps.io;
     this.lobby = deps.lobby;
     this.users = deps.users;
+  }
+
+  private resolveRequestId(requestId?: string) {
+    if (typeof requestId === 'string' && requestId.trim()) {
+      return requestId.trim();
+    }
+    return randomUUID();
+  }
+
+  private logStructured(event: string, context: Record<string, unknown>) {
+    console.info('[table]', { event, ...context });
   }
 
   getActiveTableIds() {
@@ -207,7 +219,17 @@ export class TableManager {
     }
     this.stopDealing(table);
     table.gamePhase = 'dealing';
-    table.dealingState = { timer: null, seatIndex: 0 };
+    const traceId = this.resolveRequestId();
+    table.dealingState = { timer: null, seatIndex: 0, traceId };
+    this.logStructured('deal:start', {
+      traceId,
+      tableId: table.id,
+      hostUserId: table.host.userId,
+      variant: table.variant.id,
+      mode: 'dou-dizhu',
+      seats: table.state.seats.length,
+      deckCount: table.state.deck.length
+    });
     this.emitGameSnapshot(table);
     const tick = () => {
       if (!table.dealingState) {
@@ -253,7 +275,17 @@ export class TableManager {
     }
     this.stopDealing(table);
     table.gamePhase = 'dealing';
-    table.dealingState = { timer: null, seatIndex: 0 };
+    const traceId = this.resolveRequestId();
+    table.dealingState = { timer: null, seatIndex: 0, traceId };
+    this.logStructured('deal:start', {
+      traceId,
+      tableId: table.id,
+      hostUserId: table.host.userId,
+      variant: table.variant.id,
+      mode: 'classic',
+      seats: table.state.seats.length,
+      deckCount: table.state.deck.length
+    });
     this.emitGameSnapshot(table);
     const tick = () => {
       if (!table.dealingState) {
@@ -726,8 +758,9 @@ export class TableManager {
     this.emitGameSnapshot(managed);
   }
 
-  handleUpdateConfig(socket: Socket, payload: { tableId?: string; capacity: number }) {
+  handleUpdateConfig(socket: Socket, payload: { tableId?: string; capacity: number; requestId?: string }) {
     const tableId = normalizeTableId(payload.tableId ?? '');
+    const requestId = this.resolveRequestId(payload.requestId);
     const managed = this.ensureHostAction(socket, tableId);
     if (!managed) return;
     if (managed.variant.capacity.locked) {
@@ -744,14 +777,24 @@ export class TableManager {
     }
     managed.config.capacity = requestedCapacity;
     managed.config.variant = getVariantSummary(managed.variant.id);
+    const hostUserId = this.socketUsers.get(socket.id);
+    this.logStructured('table:updateConfig', {
+      requestId,
+      tableId,
+      hostUserId,
+      variantId: managed.variant.id,
+      requestedCapacity: payload.capacity,
+      appliedCapacity: requestedCapacity
+    });
     this.resetTablePhaseIfNeeded(managed);
     this.updateLobbyFromState(tableId);
     this.emitState(tableId);
     this.emitGameSnapshot(managed);
   }
 
-  handleSetPrepared(socket: Socket, payload: { tableId?: string; prepared: boolean }) {
+  handleSetPrepared(socket: Socket, payload: { tableId?: string; prepared: boolean; requestId?: string }) {
     const tableId = normalizeTableId(payload.tableId ?? '');
+    const requestId = this.resolveRequestId(payload.requestId);
     const managed = this.tables.get(tableId);
     if (!managed) {
       socket.emit('errorMessage', { message: 'Unknown table' });
@@ -772,6 +815,12 @@ export class TableManager {
       return;
     }
     managed.prepared.set(userId, payload.prepared);
+    this.logStructured('table:setPrepared', {
+      requestId,
+      tableId,
+      userId,
+      prepared: payload.prepared
+    });
     this.emitState(tableId);
     this.emitGameSnapshot(managed);
   }

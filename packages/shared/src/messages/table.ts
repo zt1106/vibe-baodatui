@@ -76,7 +76,8 @@ export type TableKickRequest = z.infer<typeof TableKickRequest>;
 
 export const TableConfigUpdateRequest = z.object({
   tableId: TableId,
-  capacity: z.number().int().min(2)
+  capacity: z.number().int().min(2),
+  requestId: z.string().min(1).optional()
 });
 export type TableConfigUpdateRequest = z.infer<typeof TableConfigUpdateRequest>;
 
@@ -91,6 +92,7 @@ export type ServerState = z.infer<typeof ServerState>;
 
 export const TablePreparedRequest = z.object({
   tableId: TableId,
-  prepared: z.boolean()
+  prepared: z.boolean(),
+  requestId: z.string().min(1).optional()
 });
 export type TablePreparedRequest = z.infer<typeof TablePreparedRequest>;
