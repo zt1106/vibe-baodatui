@@ -8,6 +8,7 @@ import { type GameTableSeat } from '../../../../components/poker/GameTable';
 import { usePlaySession } from '../../../../hooks/usePlaySession';
 import stageStyles from '../../../../components/poker/GameTableStage.module.css';
 import { createPlayValidator, ComboType, type Combo } from '@game-core/doudizhu';
+import type { Card } from '@poker/core-cards';
 
 type PlayPageProps = {
   params: { tableId: string };
@@ -69,6 +70,16 @@ export default function PlayPage({ params }: PlayPageProps) {
     });
   }, [selfHand]);
 
+  const trickCombosBySeat = useMemo(() => {
+    const combos = snapshot?.trickCombos;
+    if (!combos || snapshot?.phase !== 'playing') {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(combos).map(([seatId, combo]) => [seatId, combo.cards.map(card => ({ ...card, faceUp: true }))])
+    );
+  }, [snapshot?.phase, snapshot?.trickCombos]);
+
   const currentTurnSeatId = useMemo(() => {
     if (!snapshot) return null;
     return snapshot.currentTurnSeatId ?? snapshot.bidding?.currentSeatId ?? snapshot.lastDealtSeatId ?? null;
@@ -112,7 +123,7 @@ export default function PlayPage({ params }: PlayPageProps) {
           nickname: seat.nickname,
           avatar: seat.avatar,
           avatarUrl: `/avatars/${seat.avatar}`,
-          cards: lastCombo && lastCombo.seatId === seat.seatId ? lastCombo.cards : undefined,
+          cards: trickCombosBySeat[seat.seatId] ?? undefined,
           status: [
             seat.isHost ? `${status} · 房主` : status,
             isCurrentTurn ? '当前行动' : null,

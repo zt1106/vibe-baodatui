@@ -93,6 +93,7 @@ export const GameSnapshot = z.object({
   doubling: DoublingState.optional(),
   callScore: z.number().int().min(0).max(3).optional(),
   lastCombo: GameCombo.optional(),
+  trickCombos: z.record(SeatId, GameCombo).optional(),
   variant: GameVariantSummary,
   seats: z.array(GameSeatState)
 });

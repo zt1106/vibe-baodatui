@@ -7,11 +7,12 @@ import {
   GameVariantSummary,
   ServerState,
   TablePlayStateResponse,
-  TablePrepareResponse
+  TablePrepareResponse,
+  type GameCard
 } from '@shared/messages';
 import type { AppServer, AppServerSocket } from '@shared/events';
 import { createTable, joinTable, clearHands, resetDeck, drawCard } from '@game-core/engine';
-import { createPlayValidator, Combo, ComboType } from '@game-core/doudizhu';
+import { advanceTrick, Combo, ComboType, createPlayValidator } from '@game-core/doudizhu';
 import { DEFAULT_AVATAR, type AvatarFilename } from '@shared/avatars';
 import {
   GAME_VARIANTS_BY_ID,
@@ -86,6 +87,7 @@ type DouDizhuVariantState = {
     lastSeatId: string | null;
     passCount: number;
     finished?: boolean;
+    trickCombos: Record<string, Combo>;
   };
 };
 
@@ -143,7 +145,9 @@ export class TableManager {
         from: previous.status,
         to: table.phase.status,
         reason: 'reason' in table.phase ? (table.phase as any).reason : undefined,
-        traceId: table.phase.traceId ?? ('traceId' in action ? (action as any).traceId : undefined)
+        traceId:
+          ('traceId' in table.phase ? (table.phase as any).traceId : undefined) ??
+          ('traceId' in action ? (action as any).traceId : undefined)
       });
     }
     return table.phase;
@@ -306,7 +310,7 @@ export class TableManager {
       bidding.redealRequired = true;
       this.logStructured('bidding:redeal', {
         tableId: table.id,
-        traceId: table.phase.traceId,
+        traceId: 'traceId' in table.phase ? (table.phase as any).traceId : undefined,
         reason: 'all-pass'
       });
       this.startDouDizhuVariant(table);
@@ -339,7 +343,8 @@ export class TableManager {
       lastCombo: null,
       lastSeatId: null,
       passCount: 0,
-      finished: false
+      finished: false,
+      trickCombos: {}
     };
     this.transitionPhase(table, { type: 'start-playing', reason: 'doubling-complete' });
     this.emitGameSnapshot(table);
@@ -402,7 +407,7 @@ export class TableManager {
         ddz?.doubling && ddz.landlordSeatId
           ? {
               currentSeatId: ddz.doubling.finished
-                ? undefined
+                ? ddz.landlordSeatId
                 : ddz.doubling.order[ddz.doubling.turnIndex] ?? ddz.landlordSeatId,
               defenderDoubles: ddz.doubling.defenderDoubles,
               landlordRedoubled: ddz.doubling.landlordRedoubled,
@@ -418,6 +423,21 @@ export class TableManager {
               mainRank: ddz.play.lastCombo.mainRank,
               length: ddz.play.lastCombo.length
             }
+          : undefined,
+      trickCombos:
+        ddz?.play?.trickCombos && Object.keys(ddz.play.trickCombos).length > 0
+          ? Object.fromEntries(
+              Object.entries(ddz.play.trickCombos).map(([seatId, combo]) => [
+                seatId,
+                {
+                  seatId,
+                  type: combo.type,
+                  cards: combo.cards.map(card => ({ ...card, faceUp: true })),
+                  mainRank: combo.mainRank,
+                  length: combo.length
+                }
+              ])
+            )
           : undefined,
       callScore: ddz?.callScore,
       variant: table.config.variant,
@@ -1149,17 +1169,33 @@ export class TableManager {
     }
 
     const combo = validation.combo;
+    const trickAdvance = advanceTrick({
+      combo,
+      seatId,
+      state: {
+        lastCombo: play.lastCombo,
+        lastSeatId: play.lastSeatId,
+        passCountSinceLastPlay: play.passCount
+      },
+      getNextSeat: (id: string) => this.nextSeatId(managed, id)
+    });
+
+    if (!trickAdvance.ok) {
+      const reason = trickAdvance.reason === 'cannot-pass-when-leading' ? '首家不可过牌' : '非法出牌';
+      ack?.({ ok: false, message: reason });
+      return;
+    }
+
     if (combo.type !== ComboType.PASS) {
       player.hand = this.removeCards(player.hand, combo.cards);
-      play.lastCombo = combo;
-      play.lastSeatId = seatId;
-      play.passCount = 0;
-    } else {
-      if (!hasPrev) {
-        ack?.({ ok: false, message: '首家不可过牌' });
-        return;
-      }
-      play.passCount += 1;
+      play.trickCombos[seatId] = combo;
+    }
+
+    play.lastCombo = trickAdvance.state.lastCombo;
+    play.lastSeatId = trickAdvance.state.lastSeatId;
+    play.passCount = trickAdvance.state.passCountSinceLastPlay;
+    if (trickAdvance.trickEnded) {
+      play.trickCombos = {};
     }
 
     if (player.hand.length === 0 && combo.type !== ComboType.PASS) {
@@ -1170,13 +1206,7 @@ export class TableManager {
       return;
     }
 
-    if (play.passCount >= 2 && play.lastSeatId) {
-      play.currentSeatId = play.lastSeatId;
-      play.lastCombo = null;
-      play.passCount = 0;
-    } else {
-      play.currentSeatId = this.nextSeatId(managed, seatId);
-    }
+    play.currentSeatId = trickAdvance.nextSeatId;
 
     this.emitGameSnapshot(managed);
     ack?.({ ok: true });

@@ -3,16 +3,8 @@ import type { GameCard } from '@shared/messages';
 import { makeDeck } from '../cards';
 import { shuffle } from '../shuffle';
 import { beats, classifyCombo } from './combo';
-import {
-  Combo,
-  ComboType,
-  DdzConfig,
-  Role,
-  Seat,
-  SEATS,
-  normalizeConfig,
-  nextSeat
-} from './types';
+import { Combo, ComboType, DdzConfig, Role, Seat, SEATS, normalizeConfig, nextSeat } from './types';
+import { advanceTrick } from './trick';
 
 export type BidValue = 0 | 1 | 2 | 3;
 
@@ -239,31 +231,40 @@ export function applyPlay(state: RoundState, seat: Seat, cards: GameCard[]): Act
     return { ok: false, reason: 'missing-player' };
   }
 
-  if (cards.length === 0) {
-    if (!state.play.lastNonPassCombo) {
-      return { ok: false, reason: 'cannot-pass-when-leading' };
-    }
-    state.play.passCountSinceLastPlay += 1;
-    let next = nextSeat(seat);
-    if (state.play.passCountSinceLastPlay >= 2 && state.play.lastNonPassSeat !== null) {
-      next = state.play.lastNonPassSeat;
-      state.play.lastNonPassCombo = null;
-      state.play.lastNonPassSeat = null;
-      state.play.passCountSinceLastPlay = 0;
-    }
-    state.play.currentSeat = next;
-    return { ok: true, finished: false };
-  }
-
-  const combo = classifyCombo(cards);
-  if (!combo || combo.type === ComboType.PASS) {
+  const isPass = cards.length === 0;
+  const combo = isPass ? ({ type: ComboType.PASS, cards: [] } as Combo) : classifyCombo(cards);
+  if (!combo) {
     return { ok: false, reason: 'invalid-combo' };
   }
-  if (!cardsInHand(player.hand, combo.cards)) {
+  if (!isPass && !cardsInHand(player.hand, combo.cards)) {
     return { ok: false, reason: 'cards-not-in-hand' };
   }
-  if (state.play.lastNonPassCombo && !beats(combo, state.play.lastNonPassCombo)) {
+
+  if (!isPass && state.play.lastNonPassCombo && !beats(combo, state.play.lastNonPassCombo)) {
     return { ok: false, reason: 'does-not-beat' };
+  }
+
+  const trickAdvance = advanceTrick({
+    combo,
+    seatId: seat,
+    state: {
+      lastCombo: state.play.lastNonPassCombo,
+      lastSeatId: state.play.lastNonPassSeat,
+      passCountSinceLastPlay: state.play.passCountSinceLastPlay
+    },
+    getNextSeat: nextSeat
+  });
+
+  if (!trickAdvance.ok) {
+    return { ok: false, reason: trickAdvance.reason };
+  }
+
+  if (combo.type === ComboType.PASS) {
+    state.play.lastNonPassCombo = trickAdvance.state.lastCombo;
+    state.play.lastNonPassSeat = trickAdvance.state.lastSeatId;
+    state.play.passCountSinceLastPlay = trickAdvance.state.passCountSinceLastPlay;
+    state.play.currentSeat = trickAdvance.nextSeatId;
+    return { ok: true, finished: false };
   }
 
   removeCards(player.hand, combo.cards);
@@ -274,16 +275,17 @@ export function applyPlay(state: RoundState, seat: Seat, cards: GameCard[]): Act
   }
   state.play.playedCombosBySeat[seat] += 1;
   state.play.history.push({ seat, combo });
-  state.play.lastNonPassCombo = combo;
-  state.play.lastNonPassSeat = seat;
-  state.play.passCountSinceLastPlay = 0;
+
+  state.play.lastNonPassCombo = trickAdvance.state.lastCombo;
+  state.play.lastNonPassSeat = trickAdvance.state.lastSeatId;
+  state.play.passCountSinceLastPlay = trickAdvance.state.passCountSinceLastPlay;
 
   if (player.hand.length === 0) {
     finishRound(state, seat);
     return { ok: true, finished: true };
   }
 
-  state.play.currentSeat = nextSeat(seat);
+  state.play.currentSeat = trickAdvance.nextSeatId;
   return { ok: true, finished: false };
 }
 

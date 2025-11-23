@@ -67,14 +67,14 @@ describe('table socket handlers', () => {
     const playerThree = users.register('Player Three');
     const table = tableManager.createTable(host, 'dou-dizhu');
 
-    const hostClient = createClient<ServerToClientEvents, ClientToServerEvents>(`http://127.0.0.1:${port}`);
+    const hostClient = createClient(`http://127.0.0.1:${port}`);
     sockets.push(hostClient);
     await waitFor(hostClient, 'connect');
     const hostJoined = waitFor<ServerState>(hostClient, 'state', state => state.seats.length === 1);
     hostClient.emit('joinTable', { tableId: table.tableId, nickname: host.nickname, userId: host.id });
     await hostJoined;
 
-    const p2Client = createClient<ServerToClientEvents, ClientToServerEvents>(`http://127.0.0.1:${port}`);
+    const p2Client = createClient(`http://127.0.0.1:${port}`);
     sockets.push(p2Client);
     await waitFor(p2Client, 'connect');
     const p2Joined = waitFor<ServerState>(hostClient, 'state', state => state.seats.length === 2);
@@ -85,7 +85,7 @@ describe('table socket handlers', () => {
     });
     await p2Joined;
 
-    const p3Client = createClient<ServerToClientEvents, ClientToServerEvents>(`http://127.0.0.1:${port}`);
+    const p3Client = createClient(`http://127.0.0.1:${port}`);
     sockets.push(p3Client);
     await waitFor(p3Client, 'connect');
     const p3Joined = waitFor<ServerState>(hostClient, 'state', state => state.seats.length === 3);
