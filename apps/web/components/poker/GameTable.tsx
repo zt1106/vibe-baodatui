@@ -12,7 +12,12 @@ import {
 
 import type { Card, CardId } from '@poker/core-cards';
 import { CardRow, MultiCardRow } from '@poker/ui-cards';
-import type { CardRowOverlap, CardRowSelectionMode, CardRowSize } from '@poker/ui-cards';
+import type {
+  CardAnimationOptions,
+  CardRowOverlap,
+  CardRowSelectionMode,
+  CardRowSize
+} from '@poker/ui-cards';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { PlayerAvatar } from './PlayerAvatar';
@@ -63,6 +68,7 @@ export type GameTableProps = {
   dealingCards?: DealingCardFlight[];
   dealingOrigin?: { x?: number; y?: number };
   onDealingCardComplete?: (flightId: string) => void;
+  handCardAnimation?: CardAnimationOptions;
 };
 
 type Dimensions = { width: number; height: number };
@@ -70,6 +76,15 @@ type Dimensions = { width: number; height: number };
 const TABLE_TILT_DEG = 24;
 const MAX_TABLE_PLAYERS = 8;
 const MAX_PLAYER_NAME_CHARS = 8;
+const SELF_HAND_ANIMATION: CardAnimationOptions = {
+  transition: {
+    type: 'spring',
+    stiffness: 150,
+    damping: 16,
+    mass: 1.2
+  },
+  entryYOffset: -96
+};
 
 export type DealingCardFlight = {
   id: string;
@@ -118,11 +133,13 @@ export function GameTable({
   topBarActions,
   dealingCards,
   dealingOrigin,
-  onDealingCardComplete
+  onDealingCardComplete,
+  handCardAnimation = SELF_HAND_ANIMATION
 }: GameTableProps) {
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
   const singleSeatCardSize = typeof seatCardSize === 'string' ? seatCardSize : 'sm';
+  const resolvedHandAnimation = handCardAnimation ?? SELF_HAND_ANIMATION;
 
   useEffect(() => {
     const element = tableRef.current;
@@ -453,6 +470,7 @@ export function GameTable({
               selectionMode={handSelectionMode}
               selectedIds={selectedHandIds}
               onSelectionChange={onHandSelectionChange}
+              animation={resolvedHandAnimation}
             />
           </div>
         </div>
