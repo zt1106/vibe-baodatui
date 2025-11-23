@@ -1,108 +1,35 @@
 import { randomUUID } from 'crypto';
 import {
-  GameDealCardEvent,
   deriveLobbyRoomStatus,
   GameSnapshot,
   GameVariantId,
-  GameVariantSummary,
   ServerState,
   TablePlayStateResponse,
-  TablePrepareResponse,
-  type GameCard
+  TablePrepareResponse
 } from '@shared/messages';
 import type { AppServer, AppServerSocket } from '@shared/events';
-import { createTable, joinTable, clearHands, resetDeck, drawCard } from '@game-core/engine';
-import { advanceTrick, Combo, ComboType, createPlayValidator } from '@game-core/doudizhu';
+import { createTable, joinTable, resetDeck } from '@game-core/engine';
 import { DEFAULT_AVATAR, type AvatarFilename } from '@shared/avatars';
-import {
-  GAME_VARIANTS_BY_ID,
-  getVariantDefinition,
-  getVariantSummary,
-  type GameVariantDefinition
-} from '@shared/variants';
-import {
-  derivePhaseStatus,
-  initialTablePhase,
-  tablePhaseReducer,
-  type TablePhase
-} from '@shared/tablePhases';
+import { GAME_VARIANTS_BY_ID, getVariantDefinition, getVariantSummary } from '@shared/variants';
+import { derivePhaseStatus, initialTablePhase, tablePhaseReducer } from '@shared/tablePhases';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
-import {
-  DuplicateNicknameError,
-  UserNotFoundError,
-  createUserRegistry
-} from '../infrastructure/userRegistry';
+import { DuplicateNicknameError, UserNotFoundError, createUserRegistry } from '../infrastructure/userRegistry';
+import { ClassicController } from './variants/classicController';
+import { DouDizhuController } from './variants/douDizhuController';
+import { TableDealingCoordinator } from './tableDealing';
+import { TableSeatManager } from './tableSeatManager';
+import type { VariantController, VariantSnapshot } from './variantController';
+import type { ManagedTable } from './tableTypes';
+import type { PhaseAction } from './types';
 
-export type ManagedTable = {
-  id: string;
-  state: ReturnType<typeof createTable>;
-  config: {
-    capacity: number;
-    variant: GameVariantSummary;
-  };
-  variant: GameVariantDefinition;
-  host: {
-    userId: number;
-    nickname: string;
-  };
-  hasStarted: boolean;
-  prepared: Map<number, boolean>;
-  phase: TablePhase;
-  dealingState: {
-    timer: NodeJS.Timeout | null;
-    seatIndex: number;
-    traceId?: string;
-  } | null;
-  pendingDisconnects: Map<number, NodeJS.Timeout>;
-  variantState: Record<string, unknown>;
-};
-
-type BidValue = 0 | 1 | 2 | 3;
-type DouDizhuBiddingState = {
-  currentSeatId: string;
-  startingSeatId: string;
-  highestBid: BidValue;
-  highestBidderSeatId: string | null;
-  bidsTaken: number;
-  consecutivePasses: number;
-  finished: boolean;
-  redealRequired?: boolean;
-};
-
-export type DouDizhuVariantState = {
-  bottomCards: GameDealCardEvent['card'][];
-  bidding: DouDizhuBiddingState | null;
-  landlordSeatId?: string;
-  callScore?: BidValue;
-  doubling?: {
-    order: string[];
-    turnIndex: number;
-    defenderDoubles: Record<string, boolean>;
-    landlordRedoubled: boolean;
-    finished: boolean;
-  };
-  play?: {
-    currentSeatId: string;
-    lastCombo: Combo | null;
-    lastSeatId: string | null;
-    passCount: number;
-    finished?: boolean;
-    trickCombos: Record<string, Combo>;
-  };
-};
+export { setDealDelayMs } from './tableDealing';
+export type { ManagedTable } from './tableTypes';
 
 export type TableManagerDeps = {
   io: AppServer;
   lobby: ReturnType<typeof createLobbyRegistry>;
   users: ReturnType<typeof createUserRegistry>;
 };
-
-let DEAL_DELAY_MS = 600;
-
-export function setDealDelayMs(delay: number) {
-  DEAL_DELAY_MS = Math.max(0, delay);
-}
-const RECONNECT_GRACE_MS = 5_000;
 
 export const normalizeTableId = (id: string) => id.trim();
 
@@ -114,33 +41,72 @@ export class TableManager {
   private readonly socketTable = new Map<string, string>();
   private readonly socketUsers = new Map<string, number>();
   private readonly USER_AVATAR_FALLBACK: AvatarFilename = DEFAULT_AVATAR;
-  private readonly ddzValidator = createPlayValidator();
   private readonly snapshotListeners = new Set<(table: ManagedTable, snapshot: GameSnapshot) => void>();
+  private readonly dealing: TableDealingCoordinator;
+  private readonly seatManager: TableSeatManager;
+  private readonly defaultVariantController: VariantController;
+  private readonly douDizhuController: DouDizhuController;
+  private readonly variantControllers: Partial<Record<GameVariantId, VariantController>>;
 
   constructor(deps: TableManagerDeps) {
     this.io = deps.io;
     this.lobby = deps.lobby;
     this.users = deps.users;
+
+    this.dealing = new TableDealingCoordinator({
+      io: this.io,
+      resolveRequestId: this.resolveRequestId.bind(this),
+      transitionPhase: (table, action) => this.transitionPhase(table, action),
+      emitState: tableId => this.emitState(tableId),
+      emitGameSnapshot: (table, lastDealtSeatId) => this.emitGameSnapshot(table, lastDealtSeatId),
+      logStructured: (event, context) => this.logStructured(event, context)
+    });
+
+    this.seatManager = new TableSeatManager({
+      io: this.io,
+      lobby: this.lobby,
+      tables: this.tables,
+      socketTable: this.socketTable,
+      socketUsers: this.socketUsers,
+      dealing: this.dealing,
+      transitionPhase: (table, action) => this.transitionPhase(table, action),
+      emitState: tableId => this.emitState(tableId),
+      emitGameSnapshot: table => this.emitGameSnapshot(table),
+      updateLobbyFromState: tableId => this.updateLobbyFromState(tableId)
+    });
+
+    this.defaultVariantController = new ClassicController({
+      dealing: this.dealing,
+      emitState: tableId => this.emitState(tableId),
+      emitGameSnapshot: table => this.emitGameSnapshot(table),
+      transitionPhase: (table, action) => this.transitionPhase(table, action),
+      updateLobbyFromState: tableId => this.updateLobbyFromState(tableId),
+      setAllPrepared: (table, prepared) => this.seatManager.setAllPrepared(table, prepared)
+    });
+
+    this.douDizhuController = new DouDizhuController({
+      dealing: this.dealing,
+      emitState: tableId => this.emitState(tableId),
+      emitGameSnapshot: (table, lastDealtSeatId) => this.emitGameSnapshot(table, lastDealtSeatId),
+      transitionPhase: (table, action) => this.transitionPhase(table, action),
+      updateLobbyFromState: tableId => this.updateLobbyFromState(tableId),
+      setAllPrepared: (table, prepared) => this.seatManager.setAllPrepared(table, prepared),
+      nextSeatId: (table, seatId) => this.nextSeatId(table, seatId),
+      logStructured: (event, context) => this.logStructured(event, context)
+    });
+
+    this.variantControllers = {
+      'dou-dizhu': this.douDizhuController
+    };
   }
 
-  private getDouDizhuState(table: ManagedTable): DouDizhuVariantState {
-    const current = table.variantState ?? {};
-    if (
-      current &&
-      typeof current === 'object' &&
-      'bottomCards' in current &&
-      Array.isArray((current as DouDizhuVariantState).bottomCards)
-    ) {
-      return current as DouDizhuVariantState;
-    }
-    const fresh: DouDizhuVariantState = { bottomCards: [], bidding: null };
-    table.variantState = fresh;
-    return fresh;
+  private getVariantController(table: ManagedTable) {
+    return this.variantControllers[table.variant.id] ?? this.defaultVariantController;
   }
 
-  private transitionPhase(table: ManagedTable, action: Parameters<typeof tablePhaseReducer>[1]) {
+  private transitionPhase(table: ManagedTable, action: PhaseAction) {
     const previous = table.phase;
-    table.phase = tablePhaseReducer(table.phase, action);
+    table.phase = tablePhaseReducer(table.phase, action as Parameters<typeof tablePhaseReducer>[1]);
     if (
       previous.status !== table.phase.status ||
       ('reason' in previous && 'reason' in table.phase && previous.reason !== (table.phase as any).reason)
@@ -217,102 +183,6 @@ export class TableManager {
     return managed;
   }
 
-  private resetTablePhaseIfNeeded(table: ManagedTable) {
-    const wasStarted = table.hasStarted;
-    if (table.state.seats.length < table.config.capacity) {
-      this.endGameAndReset(table, wasStarted ? 'player-left' : undefined);
-    }
-  }
-
-  private endGameAndReset(table: ManagedTable, reason: 'player-left' | 'manual-reset' | undefined) {
-    table.hasStarted = false;
-    this.transitionPhase(table, { type: 'reset' });
-    this.stopDealing(table);
-    clearHands(table.state);
-    resetDeck(table.state, { packs: table.variant.deck.packs });
-    this.setAllPrepared(table, false);
-    table.variantState = {};
-    this.emitGameSnapshot(table);
-    if (reason) {
-      this.io.to(table.id).emit('game:ended', { tableId: table.id, reason });
-    }
-  }
-
-  private setAllPrepared(table: ManagedTable, prepared: boolean) {
-    for (const seatId of table.state.seats) {
-      const player = table.state.players[seatId];
-      if (player) {
-        table.prepared.set(player.userId, prepared);
-      }
-    }
-  }
-
-  private allPlayersPrepared(table: ManagedTable) {
-    for (const seatId of table.state.seats) {
-      const player = table.state.players[seatId];
-      if (!player) continue;
-      if (!table.prepared.get(player.userId)) {
-        return false;
-      }
-    }
-    return table.state.seats.length > 0;
-  }
-
-  private stopDealing(table: ManagedTable) {
-    const timer = table.dealingState?.timer;
-    if (timer) {
-      clearTimeout(timer);
-    }
-    table.dealingState = null;
-  }
-
-  private resolveCurrentTurnSeatId(table: ManagedTable, lastDealtSeatId?: string) {
-    if (table.phase.status === 'dealing') {
-      const seats = table.state.seats;
-      if (seats.length === 0) return undefined;
-      const seatIndex = table.dealingState?.seatIndex ?? 0;
-      const normalized = seatIndex % seats.length;
-      return seats[normalized];
-    }
-    if (table.phase.status === 'bidding') {
-      const ddz = this.getDouDizhuState(table);
-      return ddz.bidding?.currentSeatId;
-    }
-    if (table.phase.status === 'doubling') {
-      const ddz = this.getDouDizhuState(table);
-      const order = ddz.doubling?.order ?? [];
-      const turnIndex = ddz.doubling?.turnIndex ?? 0;
-      return order[turnIndex];
-    }
-    if (table.phase.status === 'playing') {
-      const ddz = table.variant.id === 'dou-dizhu' ? this.getDouDizhuState(table) : null;
-      const playSeat = ddz?.play?.currentSeatId;
-      if (playSeat) return playSeat;
-      const landlordSeat = ddz?.landlordSeatId;
-      if (landlordSeat && table.state.seats.includes(landlordSeat)) {
-        return landlordSeat;
-      }
-      const hostSeat = table.state.seats.find(id => table.state.players[id]?.userId === table.host.userId);
-      return hostSeat ?? table.state.seats[0];
-    }
-    // Future: wire in active play turn from game engine.
-    return lastDealtSeatId;
-  }
-
-  private createInitialBiddingState(table: ManagedTable): DouDizhuBiddingState {
-    const seats = table.state.seats;
-    const startingSeatId = seats[0];
-    return {
-      currentSeatId: startingSeatId,
-      startingSeatId,
-      highestBid: 0,
-      highestBidderSeatId: null,
-      bidsTaken: 0,
-      consecutivePasses: 0,
-      finished: false
-    };
-  }
-
   private nextSeatId(table: ManagedTable, seatId: string) {
     const seats = table.state.seats;
     if (seats.length === 0) return seatId;
@@ -323,146 +193,44 @@ export class TableManager {
     return seats[(currentIndex + 1) % seats.length];
   }
 
-  private finalizeBidding(table: ManagedTable) {
-    const ddz = this.getDouDizhuState(table);
-    const bidding = ddz.bidding;
-    if (!bidding) return;
-    bidding.finished = true;
-    if (!bidding.highestBidderSeatId) {
-      bidding.redealRequired = true;
-      this.logStructured('bidding:redeal', {
-        tableId: table.id,
-        traceId: 'traceId' in table.phase ? (table.phase as any).traceId : undefined,
-        reason: 'all-pass'
-      });
-      this.startDouDizhuVariant(table);
-      return;
-    }
-    const landlordSeatId = bidding.highestBidderSeatId;
-    ddz.landlordSeatId = landlordSeatId;
-    ddz.callScore = bidding.highestBid;
-    const landlord = table.state.players[landlordSeatId];
-    if (landlord) {
-      landlord.hand.push(...ddz.bottomCards);
-    }
-    ddz.bottomCards = [];
-    ddz.doubling = {
-      order: table.state.seats.filter(id => id !== landlordSeatId).concat([landlordSeatId]),
-      turnIndex: 0,
-      defenderDoubles: {},
-      landlordRedoubled: false,
-      finished: false
-    };
-    this.transitionPhase(table, { type: 'start-doubling', reason: 'bidding-complete' });
-    this.emitGameSnapshot(table);
+  private getVariantSnapshot(table: ManagedTable): VariantSnapshot {
+    const controller = this.getVariantController(table);
+    return controller.buildSnapshot ? controller.buildSnapshot(table) : { deckCount: table.state.deck.length };
   }
 
-  private startPlayingPhase(table: ManagedTable) {
-    const ddz = this.getDouDizhuState(table);
-    const landlordSeatId = ddz.landlordSeatId ?? table.state.seats[0];
-    ddz.play = {
-      currentSeatId: landlordSeatId,
-      lastCombo: null,
-      lastSeatId: null,
-      passCount: 0,
-      finished: false,
-      trickCombos: {}
-    };
-    this.transitionPhase(table, { type: 'start-playing', reason: 'doubling-complete' });
-    this.emitGameSnapshot(table);
-  }
-
-  private extractCardsById(hand: GameCard[], cardIds: number[]) {
-    const counts = new Map<number, number>();
-    for (const card of hand) {
-      counts.set(card.id, (counts.get(card.id) ?? 0) + 1);
+  private resolveCurrentTurnSeatId(table: ManagedTable, lastDealtSeatId?: string) {
+    const variantSeatId = this.getVariantController(table).resolveCurrentTurnSeatId?.(table, lastDealtSeatId);
+    if (variantSeatId !== undefined) {
+      return variantSeatId;
     }
-    const selected: GameCard[] = [];
-    const missing: number[] = [];
-    for (const id of cardIds) {
-      const remaining = (counts.get(id) ?? 0) - 1;
-      if (remaining < 0) {
-        missing.push(id);
-        continue;
-      }
-      counts.set(id, remaining);
-      const card = hand.find(c => c.id === id);
-      if (card) {
-        selected.push(card);
-      }
+    if (table.phase.status === 'dealing') {
+      const seats = table.state.seats;
+      if (seats.length === 0) return undefined;
+      const seatIndex = table.dealingState?.seatIndex ?? 0;
+      const normalized = seatIndex % seats.length;
+      return seats[normalized];
     }
-    return { selectedCards: selected, missing };
-  }
-
-  private removeCards(hand: GameCard[], toRemove: GameCard[]) {
-    const removeCounts = new Map<number, number>();
-    for (const card of toRemove) {
-      removeCounts.set(card.id, (removeCounts.get(card.id) ?? 0) + 1);
+    if (table.phase.status === 'playing') {
+      const hostSeat = table.state.seats.find(id => table.state.players[id]?.userId === table.host.userId);
+      return hostSeat ?? table.state.seats[0];
     }
-    const kept: GameCard[] = [];
-    for (const card of hand) {
-      const remaining = (removeCounts.get(card.id) ?? 0) - 1;
-      if (remaining >= 0) {
-        removeCounts.set(card.id, remaining);
-        continue;
-      }
-      kept.push(card);
-    }
-    return kept;
+    return lastDealtSeatId;
   }
 
   private buildGameSnapshot(table: ManagedTable, lastDealtSeatId?: string): GameSnapshot {
-    const ddz = table.variant.id === 'dou-dizhu' ? this.getDouDizhuState(table) : null;
-    const deckCount =
-      table.variant.id === 'dou-dizhu' && ddz
-        ? table.state.deck.length + (ddz.bottomCards?.length ?? 0)
-        : table.state.deck.length;
+    const variantSnapshot = this.getVariantSnapshot(table);
+    const deckCount = variantSnapshot.deckCount ?? table.state.deck.length;
+    const currentTurnSeatId =
+      variantSnapshot.currentTurnSeatId ?? this.resolveCurrentTurnSeatId(table, lastDealtSeatId);
+    const { deckCount: _deckCount, currentTurnSeatId: _turnSeatId, ...restVariant } = variantSnapshot;
     return {
       tableId: table.id,
       phase: derivePhaseStatus(table.phase),
       deckCount,
       lastDealtSeatId,
-      currentTurnSeatId: this.resolveCurrentTurnSeatId(table, lastDealtSeatId),
-      landlordSeatId: ddz?.landlordSeatId,
-      bidding: ddz?.bidding ?? undefined,
-      doubling:
-        ddz?.doubling && ddz.landlordSeatId
-          ? {
-              currentSeatId: ddz.doubling.finished
-                ? ddz.landlordSeatId
-                : ddz.doubling.order[ddz.doubling.turnIndex] ?? ddz.landlordSeatId,
-              defenderDoubles: ddz.doubling.defenderDoubles,
-              landlordRedoubled: ddz.doubling.landlordRedoubled,
-              finished: ddz.doubling.finished
-            }
-          : undefined,
-      lastCombo:
-        ddz?.play?.lastCombo && ddz.play.lastSeatId
-          ? {
-              seatId: ddz.play.lastSeatId,
-              type: ddz.play.lastCombo.type,
-              cards: ddz.play.lastCombo.cards.map(card => ({ ...card })),
-              mainRank: ddz.play.lastCombo.mainRank,
-              length: ddz.play.lastCombo.length
-            }
-          : undefined,
-      trickCombos:
-        ddz?.play?.trickCombos && Object.keys(ddz.play.trickCombos).length > 0
-          ? Object.fromEntries(
-              Object.entries(ddz.play.trickCombos).map(([seatId, combo]) => [
-                seatId,
-                {
-                  seatId,
-                  type: combo.type,
-                  cards: combo.cards.map(card => ({ ...card, faceUp: true })),
-                  mainRank: combo.mainRank,
-                  length: combo.length
-                }
-              ])
-            )
-          : undefined,
-      callScore: ddz?.callScore,
+      currentTurnSeatId,
       variant: table.config.variant,
+      ...restVariant,
       seats: table.state.seats
         .map(seatId => {
           const player = table.state.players[seatId];
@@ -491,170 +259,6 @@ export class TableManager {
       }
     }
     return snapshot;
-  }
-
-  private finishDealing(table: ManagedTable) {
-    this.stopDealing(table);
-    this.transitionPhase(table, { type: 'start-playing', reason: 'deck-depleted' });
-    this.emitGameSnapshot(table);
-  }
-
-  private finishDouDizhuDealing(table: ManagedTable) {
-    this.stopDealing(table);
-    const bottomCards = table.state.deck.map(card => ({ ...card }));
-    table.state.deck = [];
-    const state = this.getDouDizhuState(table);
-    state.bottomCards = bottomCards;
-    state.bidding = this.createInitialBiddingState(table);
-    state.landlordSeatId = undefined;
-    state.callScore = undefined;
-    this.transitionPhase(table, { type: 'start-bidding', reason: 'bottom-cards' });
-    this.emitGameSnapshot(table);
-  }
-
-  private startDouDizhuDealing(table: ManagedTable) {
-    if (table.state.seats.length === 0) {
-      return;
-    }
-    this.stopDealing(table);
-    const traceId = this.resolveRequestId();
-    this.transitionPhase(table, { type: 'start-dealing', traceId });
-    table.dealingState = { timer: null, seatIndex: 0, traceId };
-    this.logStructured('deal:start', {
-      traceId,
-      tableId: table.id,
-      hostUserId: table.host.userId,
-      variant: table.variant.id,
-      mode: 'dou-dizhu',
-      seats: table.state.seats.length,
-      deckCount: table.state.deck.length
-    });
-    this.emitGameSnapshot(table);
-    const tick = () => {
-      if (!table.dealingState) {
-        return;
-      }
-      const seats = table.state.seats;
-      if (seats.length === 0) {
-        this.transitionPhase(table, { type: 'reset' });
-        this.stopDealing(table);
-        this.emitGameSnapshot(table);
-        return;
-      }
-      if (table.state.deck.length <= 3) {
-        this.finishDouDizhuDealing(table);
-        return;
-      }
-      const currentIndex = table.dealingState.seatIndex % seats.length;
-      const seatId = seats[currentIndex];
-      const card = drawCard(table.state, seatId);
-      if (!card) {
-        table.dealingState.seatIndex = (currentIndex + 1) % seats.length;
-        table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
-        return;
-      }
-      card.faceUp = true;
-      const payload: GameDealCardEvent = {
-        tableId: table.id,
-        seatId,
-        card
-      };
-      this.io.to(seatId).emit('game:deal', payload);
-      this.emitState(table.id);
-      this.emitGameSnapshot(table, seatId);
-      table.dealingState.seatIndex = (currentIndex + 1) % seats.length;
-      table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
-    };
-    table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
-  }
-
-  private startDealing(table: ManagedTable) {
-    if (table.state.seats.length === 0) {
-      return;
-    }
-    this.stopDealing(table);
-    const traceId = this.resolveRequestId();
-    this.transitionPhase(table, { type: 'start-dealing', traceId });
-    table.dealingState = { timer: null, seatIndex: 0, traceId };
-    this.logStructured('deal:start', {
-      traceId,
-      tableId: table.id,
-      hostUserId: table.host.userId,
-      variant: table.variant.id,
-      mode: 'classic',
-      seats: table.state.seats.length,
-      deckCount: table.state.deck.length
-    });
-    this.emitGameSnapshot(table);
-    const tick = () => {
-      if (!table.dealingState) {
-        return;
-      }
-      const seats = table.state.seats;
-      if (seats.length === 0) {
-        this.transitionPhase(table, { type: 'reset' });
-        this.stopDealing(table);
-        this.emitGameSnapshot(table);
-        return;
-      }
-      if (table.state.deck.length === 0) {
-        this.finishDealing(table);
-        return;
-      }
-      const currentIndex = table.dealingState.seatIndex % seats.length;
-      const seatId = seats[currentIndex];
-      const card = drawCard(table.state, seatId);
-      if (!card) {
-        table.dealingState.seatIndex = (currentIndex + 1) % seats.length;
-        table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
-        return;
-      }
-      card.faceUp = true;
-      const payload: GameDealCardEvent = {
-        tableId: table.id,
-        seatId,
-        card
-      };
-      this.io.to(seatId).emit('game:deal', payload);
-      this.emitState(table.id);
-      this.emitGameSnapshot(table, seatId);
-      table.dealingState.seatIndex = (currentIndex + 1) % seats.length;
-      table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
-    };
-    table.dealingState.timer = setTimeout(tick, DEAL_DELAY_MS);
-  }
-
-  private startClassicVariant(table: ManagedTable) {
-    table.hasStarted = true;
-    const dealSeed = `deal-${table.id}-${Date.now()}`;
-    resetDeck(table.state, { seed: dealSeed, packs: table.variant.deck.packs });
-    clearHands(table.state);
-    this.setAllPrepared(table, false);
-    table.variantState = {};
-    this.updateLobbyFromState(table.id);
-    this.emitState(table.id);
-    this.startDealing(table);
-  }
-
-  private startDouDizhuVariant(table: ManagedTable) {
-    table.hasStarted = true;
-    const dealSeed = `deal-${table.id}-${Date.now()}`;
-    resetDeck(table.state, { seed: dealSeed, packs: table.variant.deck.packs });
-    clearHands(table.state);
-    this.setAllPrepared(table, false);
-    table.variantState = { bottomCards: [], bidding: null, doubling: undefined, play: undefined };
-    this.updateLobbyFromState(table.id);
-    this.emitState(table.id);
-    this.startDouDizhuDealing(table);
-  }
-
-  private variantStartHandlers: Partial<Record<GameVariantId, (table: ManagedTable) => void>> = {
-    'dou-dizhu': (table) => this.startDouDizhuVariant(table)
-  };
-
-  private startVariantGame(table: ManagedTable) {
-    const handler = this.variantStartHandlers[table.variant.id] ?? ((t: ManagedTable) => this.startClassicVariant(t));
-    handler(table);
   }
 
   private getTableStatus(managed: ManagedTable) {
@@ -711,88 +315,6 @@ export class TableManager {
         variant: table.config.variant
       }
     });
-  }
-
-  private removePlayerSeat(table: ManagedTable, seatId: string, departingUserId?: number) {
-    const index = table.state.seats.indexOf(seatId);
-    if (index === -1) {
-      return;
-    }
-    table.state.seats.splice(index, 1);
-    delete table.state.players[seatId];
-    if (typeof departingUserId === 'number') {
-      table.prepared.delete(departingUserId);
-      const pendingTimer = table.pendingDisconnects.get(departingUserId);
-      if (pendingTimer) {
-        clearTimeout(pendingTimer);
-        table.pendingDisconnects.delete(departingUserId);
-      }
-    }
-    if (table.state.seats.length === 0) {
-      this.stopDealing(table);
-      this.tables.delete(table.id);
-      table.pendingDisconnects.forEach(timer => clearTimeout(timer));
-      table.pendingDisconnects.clear();
-      this.lobby.removeRoom(table.id);
-      return;
-    }
-    this.promoteNewHostIfNeeded(table, departingUserId);
-    this.resetTablePhaseIfNeeded(table);
-    this.updateLobbyFromState(table.id);
-    this.emitState(table.id);
-  }
-
-  private cleanupPlayerSocket(socketId: string) {
-    const tableId = this.socketTable.get(socketId);
-    const userId = this.socketUsers.get(socketId);
-    this.socketTable.delete(socketId);
-    this.socketUsers.delete(socketId);
-    if (!tableId) {
-      return;
-    }
-    const managed = this.tables.get(tableId);
-    if (!managed) {
-      return;
-    }
-    const seatIndex = managed.state.seats.indexOf(socketId);
-    if (seatIndex === -1) {
-      return;
-    }
-    const departingUserId = managed.state.players[socketId]?.userId ?? userId;
-    if (managed.hasStarted && typeof departingUserId === 'number') {
-      const existingTimer = managed.pendingDisconnects.get(departingUserId);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
-      }
-      const timer = setTimeout(() => {
-        managed.pendingDisconnects.delete(departingUserId);
-        const currentSeatId = managed.state.seats.find(
-          id => managed.state.players[id]?.userId === departingUserId
-        );
-        if (!currentSeatId || currentSeatId !== socketId) {
-          return;
-        }
-        this.removePlayerSeat(managed, socketId, departingUserId);
-      }, RECONNECT_GRACE_MS);
-      managed.pendingDisconnects.set(departingUserId, timer);
-      return;
-    }
-    this.removePlayerSeat(managed, socketId, departingUserId);
-  }
-
-  private promoteNewHostIfNeeded(table: ManagedTable, departingUserId?: number) {
-    if (table.state.seats.length === 0) {
-      return;
-    }
-    if (departingUserId == null || table.host.userId !== departingUserId) {
-      return;
-    }
-    const nextSeatId = table.state.seats[0];
-    const nextPlayer = table.state.players[nextSeatId];
-    if (!nextPlayer) {
-      return;
-    }
-    table.host = { userId: nextPlayer.userId, nickname: nextPlayer.nickname };
   }
 
   private createManagedTable(
@@ -1020,11 +542,11 @@ export class TableManager {
       socket.emit('errorMessage', { message: '房间未满，无法开始' });
       return;
     }
-    if (!this.allPlayersPrepared(managed)) {
+    if (!this.seatManager.allPlayersPrepared(managed)) {
       socket.emit('errorMessage', { message: '仍有玩家未准备' });
       return;
     }
-    this.startVariantGame(managed);
+    this.getVariantController(managed).start(managed);
   }
 
   handleBid(socket: AppServerSocket, payload: { tableId: string; bid: number }, ack?: (result: { ok: boolean; message?: string }) => void) {
@@ -1038,60 +560,7 @@ export class TableManager {
       ack?.({ ok: false, message: '当前牌桌不支持叫分' });
       return;
     }
-    if (!managed.hasStarted || derivePhaseStatus(managed.phase) !== 'bidding') {
-      ack?.({ ok: false, message: '当前阶段不可叫分' });
-      return;
-    }
-    const seatId = socket.id;
-    if (!managed.state.seats.includes(seatId)) {
-      ack?.({ ok: false, message: '未在牌桌中' });
-      return;
-    }
-    const bid = Number(payload.bid);
-    if (!Number.isFinite(bid) || bid < 0 || bid > 3) {
-      ack?.({ ok: false, message: '无效叫分' });
-      return;
-    }
-
-    const ddz = this.getDouDizhuState(managed);
-    const bidding = ddz.bidding;
-    if (!bidding || bidding.finished) {
-      ack?.({ ok: false, message: '叫分已结束' });
-      return;
-    }
-    if (bidding.currentSeatId !== seatId) {
-      ack?.({ ok: false, message: '未轮到你叫分' });
-      return;
-    }
-    if (bid > 0 && bid <= bidding.highestBid) {
-      ack?.({ ok: false, message: '必须叫更高的分数' });
-      return;
-    }
-
-    bidding.bidsTaken += 1;
-    if (bid === 0) {
-      bidding.consecutivePasses += 1;
-    } else {
-      bidding.highestBid = bid as BidValue;
-      bidding.highestBidderSeatId = seatId;
-      bidding.consecutivePasses = 0;
-    }
-
-    const seats = managed.state.seats;
-    const needStop =
-      bid === 3 ||
-      (bidding.bidsTaken >= seats.length && bidding.highestBidderSeatId !== null && bidding.consecutivePasses >= 2) ||
-      (bidding.bidsTaken >= seats.length && bidding.highestBidderSeatId === null);
-
-    if (!needStop) {
-      bidding.currentSeatId = this.nextSeatId(managed, seatId);
-      this.emitGameSnapshot(managed);
-      ack?.({ ok: true });
-      return;
-    }
-
-    this.finalizeBidding(managed);
-    ack?.({ ok: true });
+    this.douDizhuController.handleBid(managed, socket, { bid: payload.bid }, ack);
   }
 
   handleDouble(socket: AppServerSocket, payload: { tableId: string; double: boolean }, ack?: (result: { ok: boolean; message?: string }) => void) {
@@ -1105,41 +574,7 @@ export class TableManager {
       ack?.({ ok: false, message: '当前牌桌不支持加倍' });
       return;
     }
-    if (!managed.hasStarted || derivePhaseStatus(managed.phase) !== 'doubling') {
-      ack?.({ ok: false, message: '当前阶段不可加倍' });
-      return;
-    }
-    const seatId = socket.id;
-    if (!managed.state.seats.includes(seatId)) {
-      ack?.({ ok: false, message: '未在牌桌中' });
-      return;
-    }
-    const ddz = this.getDouDizhuState(managed);
-    const doubling = ddz.doubling;
-    if (!doubling || doubling.finished) {
-      ack?.({ ok: false, message: '加倍已结束' });
-      return;
-    }
-    const orderSeat = doubling.order[doubling.turnIndex];
-    if (orderSeat !== seatId) {
-      ack?.({ ok: false, message: '未轮到你加倍' });
-      return;
-    }
-    const landlordSeat = ddz.landlordSeatId;
-    if (landlordSeat && seatId === landlordSeat) {
-      doubling.landlordRedoubled = payload.double;
-    } else {
-      doubling.defenderDoubles[seatId] = payload.double;
-    }
-    doubling.turnIndex += 1;
-    if (doubling.turnIndex >= doubling.order.length) {
-      doubling.finished = true;
-      this.startPlayingPhase(managed);
-      ack?.({ ok: true });
-      return;
-    }
-    this.emitGameSnapshot(managed);
-    ack?.({ ok: true });
+    this.douDizhuController.handleDouble(managed, socket, { double: payload.double }, ack);
   }
 
   handlePlay(
@@ -1157,88 +592,7 @@ export class TableManager {
       ack?.({ ok: false, message: '当前牌桌不支持出牌' });
       return;
     }
-    if (!managed.hasStarted || derivePhaseStatus(managed.phase) !== 'playing') {
-      ack?.({ ok: false, message: '当前阶段不可出牌' });
-      return;
-    }
-    const seatId = socket.id;
-    if (!managed.state.seats.includes(seatId)) {
-      ack?.({ ok: false, message: '未在牌桌中' });
-      return;
-    }
-    const ddz = this.getDouDizhuState(managed);
-    const play = ddz.play;
-    if (!play || play.finished) {
-      ack?.({ ok: false, message: '本局已结束' });
-      return;
-    }
-    if (play.currentSeatId !== seatId) {
-      ack?.({ ok: false, message: '未轮到你出牌' });
-      return;
-    }
-    const player = managed.state.players[seatId];
-    if (!player) {
-      ack?.({ ok: false, message: '玩家不存在' });
-      return;
-    }
-    const { selectedCards, missing } = this.extractCardsById(player.hand, payload.cardIds ?? []);
-    if (missing.length > 0 || selectedCards.length !== payload.cardIds.length) {
-      ack?.({ ok: false, message: '手牌不足以出这些牌' });
-      return;
-    }
-
-    const hasPrev = play.lastCombo != null;
-    const validation = hasPrev
-      ? this.ddzValidator.validateFollow(selectedCards, play.lastCombo as Combo)
-      : this.ddzValidator.validateLead(selectedCards);
-
-    if (!validation.ok || !validation.combo) {
-      ack?.({ ok: false, message: validation.reason ?? '非法出牌' });
-      return;
-    }
-
-    const combo = validation.combo;
-    const trickAdvance = advanceTrick({
-      combo,
-      seatId,
-      state: {
-        lastCombo: play.lastCombo,
-        lastSeatId: play.lastSeatId,
-        passCountSinceLastPlay: play.passCount
-      },
-      getNextSeat: (id: string) => this.nextSeatId(managed, id)
-    });
-
-    if (!trickAdvance.ok) {
-      const reason = trickAdvance.reason === 'cannot-pass-when-leading' ? '首家不可过牌' : '非法出牌';
-      ack?.({ ok: false, message: reason });
-      return;
-    }
-
-    if (combo.type !== ComboType.PASS) {
-      player.hand = this.removeCards(player.hand, combo.cards);
-      play.trickCombos[seatId] = combo;
-    }
-
-    play.lastCombo = trickAdvance.state.lastCombo;
-    play.lastSeatId = trickAdvance.state.lastSeatId;
-    play.passCount = trickAdvance.state.passCountSinceLastPlay;
-    if (trickAdvance.trickEnded) {
-      play.trickCombos = {};
-    }
-
-    if (player.hand.length === 0 && combo.type !== ComboType.PASS) {
-      play.finished = true;
-      this.transitionPhase(managed, { type: 'complete', reason: 'stopped' });
-      this.emitGameSnapshot(managed);
-      ack?.({ ok: true });
-      return;
-    }
-
-    play.currentSeatId = trickAdvance.nextSeatId;
-
-    this.emitGameSnapshot(managed);
-    ack?.({ ok: true });
+    this.douDizhuController.handlePlay(managed, socket, { cardIds: payload.cardIds }, ack);
   }
 
   handleKick(socket: AppServerSocket, payload: { tableId?: string; userId?: number }) {
@@ -1255,17 +609,12 @@ export class TableManager {
       socket.emit('errorMessage', { message: 'Player not found at the table' });
       return;
     }
-    managed.state.seats = managed.state.seats.filter(id => id !== targetSeatId);
-    delete managed.state.players[targetSeatId];
     this.socketTable.delete(targetSeatId);
     this.socketUsers.delete(targetSeatId);
-    managed.prepared.delete(payload.userId);
+    this.seatManager.removePlayerSeat(managed, targetSeatId, payload.userId);
     const targetSocket = this.io.sockets.sockets.get(targetSeatId);
     targetSocket?.emit('kicked', { tableId });
     targetSocket?.disconnect(true);
-    this.resetTablePhaseIfNeeded(managed);
-    this.updateLobbyFromState(tableId);
-    this.emitState(tableId);
     this.emitGameSnapshot(managed);
   }
 
@@ -1297,7 +646,7 @@ export class TableManager {
       requestedCapacity: payload.capacity,
       appliedCapacity: requestedCapacity
     });
-    this.resetTablePhaseIfNeeded(managed);
+    this.seatManager.resetTablePhaseIfNeeded(managed);
     this.updateLobbyFromState(tableId);
     this.emitState(tableId);
     this.emitGameSnapshot(managed);
@@ -1353,15 +702,15 @@ export class TableManager {
     this.socketTable.delete(socket.id);
     this.socketUsers.delete(socket.id);
     if (managed.hasStarted) {
-      this.endGameAndReset(managed, 'player-left');
+      this.seatManager.endGameAndReset(managed, 'player-left');
     }
-    this.removePlayerSeat(managed, seatId, userId);
+    this.seatManager.removePlayerSeat(managed, seatId, userId);
     this.emitState(tableId);
     this.emitGameSnapshot(managed);
     if (ack) ack({ ok: true });
   }
 
   handleDisconnect(socketId: string) {
-    this.cleanupPlayerSocket(socketId);
+    this.seatManager.cleanupPlayerSocket(socketId);
   }
 }

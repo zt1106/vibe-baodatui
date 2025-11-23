@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import { io as createClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { ServerState } from '@shared/messages';
 import type { ClientToServerEvents, ServerToClientEvents } from '@shared/events';
+import { TableDealingCoordinator } from '../domain/tableDealing';
 import { TableManager } from '../domain/tableManager';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import { createUserRegistry } from '../infrastructure/userRegistry';
@@ -52,12 +53,10 @@ describe('table socket handlers', () => {
   });
 
   it('handles join, preparation, start, and leave flows over sockets', async () => {
-    const dealingStub = vi
-      .spyOn<any, any>(TableManager.prototype as any, 'startDouDizhuDealing')
-      .mockImplementation((table: any) => {
-        table.dealingState = null;
-        table.phase = { status: 'dealing' };
-      });
+    const dealingStub = vi.spyOn(TableDealingCoordinator.prototype as any, 'start').mockImplementation((table: any) => {
+      table.dealingState = null;
+      table.phase = { status: 'dealing' };
+    });
 
     const server = await startSocketServer();
     const { io, httpServer, users, tableManager, port, lobby } = server;

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AppServer, AppServerSocket } from '@shared/events';
 import { derivePhaseStatus } from '@shared/tablePhases';
+import { TableDealingCoordinator } from '../domain/tableDealing';
 import { TableManager } from '../domain/tableManager';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import { createUserRegistry } from '../infrastructure/userRegistry';
@@ -125,12 +126,10 @@ describe('TableManager lifecycle', () => {
       userId: playerThree.id
     });
 
-    const dealingStub = vi
-      .spyOn<any, any>(manager as any, 'startDouDizhuDealing')
-      .mockImplementation((tableState: any) => {
-        tableState.dealingState = null;
-        tableState.phase = { status: 'dealing' };
-      });
+    const dealingStub = vi.spyOn(TableDealingCoordinator.prototype as any, 'start').mockImplementation((tableState: any) => {
+      tableState.dealingState = null;
+      tableState.phase = { status: 'dealing' };
+    });
 
     manager.handleStart(p2Socket as unknown as AppServerSocket, { tableId: table.tableId });
     expect(p2Socket.emitted.errorMessage?.[0]?.message).toBe('Only the host can perform this action');
