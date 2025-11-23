@@ -4,6 +4,7 @@ import type { LobbyNotification } from '@shared/messages';
 import type { GameVariantDefinition, GameVariantId } from '@shared/variants';
 
 import type { AsyncStatus } from '../../lib/types';
+import styles from './LobbyTopBar.module.css';
 
 export type LobbyTopBarUser = {
   id: number;
@@ -61,85 +62,28 @@ export function LobbyTopBar({
   }, []);
 
   return (
-    <header
-      data-testid="lobby-user-summary"
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '1rem',
-        padding: '1rem 1.25rem',
-        background: 'rgba(15, 23, 42, 0.78)',
-        borderRadius: 24,
-        border: '1px solid rgba(148, 163, 184, 0.28)',
-        boxShadow: '0 32px 80px rgba(15, 23, 42, 0.55)'
-      }}
-    >
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
-        <button
-          type="button"
-          onClick={onBackHome}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: 999,
-            background: 'linear-gradient(135deg, #38bdf8, #6366f1)',
-            color: '#0f172a',
-            border: 'none',
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: '0 18px 40px rgba(99, 102, 241, 0.35)'
-          }}
-        >
+    <header data-testid="lobby-user-summary" className={styles.topBar}>
+      <div className={styles.controls}>
+        <button type="button" onClick={onBackHome} className={styles.backButton}>
           返回首页
         </button>
-        <div style={{ display: 'grid', gap: '0.25rem', position: 'relative' }} ref={variantMenuRef}>
-          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>玩法</span>
+        <div className={styles.variantGroup} ref={variantMenuRef}>
+          <span className={styles.variantLabel}>玩法</span>
           <button
             type="button"
             data-testid="variant-select"
             onClick={() => setIsVariantMenuOpen(open => !open)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: 12,
-              border: '1px solid rgba(148, 163, 184, 0.35)',
-              background: 'rgba(15, 23, 42, 0.85)',
-              color: '#e2e8f0',
-              minWidth: 150,
-              maxWidth: 200,
-              cursor: 'pointer',
-              boxShadow: '0 10px 28px rgba(15, 23, 42, 0.4)'
-            }}
+            className={styles.variantButton}
           >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span className={styles.variantValue}>
               {selectedVariant ? selectedVariant.name : '选择玩法'}
             </span>
-            <span aria-hidden="true" style={{ opacity: 0.6 }}>
+            <span aria-hidden="true" className={styles.caret}>
               ▼
             </span>
           </button>
           {isVariantMenuOpen && (
-            <div
-              role="listbox"
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '0.25rem',
-                background: 'rgba(15, 23, 42, 0.95)',
-                borderRadius: 12,
-                border: '1px solid rgba(148, 163, 184, 0.28)',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.35)',
-                minWidth: 220,
-                maxWidth: 260,
-                zIndex: 20,
-                overflow: 'hidden'
-              }}
-            >
+            <div role="listbox" className={styles.variantMenu}>
               {variants.map(variant => (
                 <button
                   key={variant.id}
@@ -149,37 +93,18 @@ export function LobbyTopBar({
                     onSelectVariant(variant.id);
                     setIsVariantMenuOpen(false);
                   }}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '0.75rem 0.85rem',
-                    background: variant.id === variantId ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                    color: '#e2e8f0',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'grid',
-                    gap: '0.2rem'
-                  }}
+                  className={`${styles.variantOption} ${
+                    variant.id === variantId ? styles.variantOptionActive : ''
+                  }`}
                 >
-                  <span style={{ fontWeight: 600 }}>{variant.name}</span>
-                  <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>{variant.description}</span>
+                  <span className={styles.variantName}>{variant.name}</span>
+                  <span className={styles.variantDescription}>{variant.description}</span>
                 </button>
               ))}
             </div>
           )}
           {selectedVariant && (
-            <span
-              data-testid="variant-description"
-              style={{
-                fontSize: '0.85rem',
-                opacity: 0.75,
-                paddingLeft: '0.25rem',
-                maxWidth: 240,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
+            <span data-testid="variant-description" className={styles.selectedVariantDescription}>
               {selectedVariant.description}
             </span>
           )}
@@ -192,109 +117,59 @@ export function LobbyTopBar({
             onCreateRoom(variantId);
           }}
           disabled={isCreateDisabled}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: 999,
-            border: 'none',
-            background: 'linear-gradient(135deg, #f59e0b, #f97316)',
-            color: '#0f172a',
-            fontWeight: 600,
-            cursor: isCreateDisabled ? 'not-allowed' : 'pointer',
-            opacity: isCreateDisabled ? 0.6 : 1,
-            boxShadow: '0 18px 40px rgba(249, 115, 22, 0.35)'
-          }}
+          className={styles.createButton}
         >
           {isCreatingRoom ? '创建中…' : '创建房间'}
         </button>
       </div>
-      <div style={{ display: 'grid', gap: '0.35rem', minWidth: 0 }}>
-        {authStatus === 'loading' && <span>正在登录…</span>}
+      <div className={styles.userArea}>
+        {authStatus === 'loading' && <span className={styles.statusText}>正在登录…</span>}
         {authStatus === 'ready' && user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button
-              type="button"
-              onClick={onOpenAvatarDialog}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
-                overflow: 'hidden',
-                border: '2px solid rgba(148, 163, 184, 0.4)',
-                boxShadow: '0 8px 20px rgba(15, 23, 42, 0.55)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                cursor: 'pointer',
-                background: 'transparent'
-              }}
-            >
+          <div className={styles.userWrapper}>
+            <button type="button" onClick={onOpenAvatarDialog} className={styles.avatarButton}>
               <img
                 src={`/avatars/${user.avatar}`}
                 alt={`${user.nickname} 头像`}
                 width={44}
                 height={44}
                 loading="lazy"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                className={styles.avatarImage}
               />
             </button>
-            <div style={{ display: 'grid', gap: '0.15rem' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                <span style={{ fontWeight: 600 }}>已登录：{user.nickname}</span>
+            <div className={styles.userMeta}>
+              <div className={styles.nicknameRow}>
+                <span className={styles.nicknameLabel}>已登录：{user.nickname}</span>
                 <button
                   type="button"
                   onClick={onOpenNameDialog}
                   aria-label="更改昵称"
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 6,
-                    border: '1px solid rgba(148, 163, 184, 0.5)',
-                    background: 'rgba(15, 23, 42, 0.6)',
-                    color: '#e2e8f0',
-                    fontSize: '0.85rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
-                  }}
+                  className={styles.nameEditButton}
                 >
-                  <span aria-hidden="true" style={{ lineHeight: 1 }}>
+                  <span aria-hidden="true" className={styles.icon}>
                     ✏️
                   </span>
                 </button>
               </div>
-              <span style={{ fontSize: '0.95rem', opacity: 0.7 }}>用户编号：{user.id}</span>
+              <span className={styles.userId}>用户编号：{user.id}</span>
             </div>
           </div>
         )}
-        {authStatus === 'error' && error && <span style={{ color: '#fca5a5' }}>{error}</span>}
+        {authStatus === 'error' && error && <span className={styles.errorText}>{error}</span>}
       </div>
-      <div style={{ display: 'grid', gap: '0.35rem', textAlign: 'right' }}>
-        <span style={{ fontWeight: 600 }}>房间总数：{roomsCount}</span>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
+      <div className={styles.summary}>
+        <span className={styles.roomsCount}>房间总数：{roomsCount}</span>
+        <div className={styles.notifications}>
           {notifications.map(notification => (
             <span
               key={notification.id}
-              style={{
-                padding: '0.35rem 0.75rem',
-                borderRadius: 999,
-                fontSize: '0.85rem',
-                background:
-                  notification.tone === 'warning'
-                    ? 'rgba(248, 113, 113, 0.18)'
-                    : 'rgba(96, 165, 250, 0.18)',
-                color: notification.tone === 'warning' ? '#fecaca' : '#bae6fd',
-                border:
-                  notification.tone === 'warning'
-                    ? '1px solid rgba(248, 113, 113, 0.35)'
-                    : '1px solid rgba(96, 165, 250, 0.45)'
-              }}
+              className={`${styles.notification} ${
+                notification.tone === 'warning' ? styles.notificationWarning : styles.notificationInfo
+              }`}
             >
               {notification.message}
             </span>
           ))}
-          {notifications.length === 0 && <span style={{ opacity: 0.7 }}>暂无通知</span>}
+          {notifications.length === 0 && <span className={styles.muted}>暂无通知</span>}
         </div>
       </div>
     </header>

@@ -1,0 +1,29 @@
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: rgba(15, 23, 42, 0.78);
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--indicator-color);
+  box-shadow: 0 0 16px var(--indicator-color);
+}
+
+.latency {
+  font-size: 0.9rem;
+  opacity: 0.75;
+}

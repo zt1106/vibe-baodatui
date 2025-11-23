@@ -1,0 +1,19 @@
+.page {
+  height: 100dvh;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 2rem;
+  gap: 2rem;
+  overflow: hidden;
+}
+
+.errorBanner {
+  padding: 0.85rem 1.25rem;
+  border-radius: 18px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+}
