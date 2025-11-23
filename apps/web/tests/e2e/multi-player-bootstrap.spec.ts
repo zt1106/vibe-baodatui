@@ -9,8 +9,10 @@ import {
 } from './helpers';
 
 const SESSION_CAPACITY = 3;
+const manualOptIn = process.env.E2E_INCLUDE_MANUAL === 'true';
 
 test('bootstrap multi-player session for manual gameplay debugging', async ({ browser }) => {
+  test.skip(!manualOptIn, 'Manual-only scenario; opt in with E2E_INCLUDE_MANUAL=true');
   test.setTimeout(600 * 60 * 1000);
   const blueprints: Array<Pick<PlayerSession, 'label' | 'nickname'>> = [
     { label: 'Host', nickname: 'Host Agent' },
