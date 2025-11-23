@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test } from './coverageTest';
 import {
   loginAndEnterLobby,
   createRoom,

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './coverageTest';
 
 import { createRoom, joinPrepareDirect, loginAndEnterLobby } from './helpers';
 

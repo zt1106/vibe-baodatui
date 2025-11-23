@@ -34,6 +34,7 @@ lerna-debug.log*
 coverage/
 coverage-final.json
 *.lcov
+**/.nyc_output/
 apps/web/test-results/
 **/test-results/
 apps/web/playwright-report/

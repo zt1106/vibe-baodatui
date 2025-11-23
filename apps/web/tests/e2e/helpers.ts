@@ -1,4 +1,5 @@
-import { expect, type BrowserContext, type Page } from '@playwright/test';
+import { expect } from './coverageTest';
+import type { BrowserContext, Page } from '@playwright/test';
 import type { GameVariantId } from '@shared/messages';
 import { DEFAULT_VARIANT_ID } from '@shared/variants';
 

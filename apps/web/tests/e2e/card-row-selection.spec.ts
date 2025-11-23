@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './coverageTest';
 
 test.describe('CardRow selection layout', () => {
   test('reverts to baseline position after deselect', async ({ page }) => {
