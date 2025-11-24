@@ -35,6 +35,10 @@ export type DouDizhuVariantState = {
     passCount: number;
     finished?: boolean;
     trickCombos: Record<string, Combo>;
+    bombCount: number;
+    rocketCount: number;
+    playedCombosBySeat: Record<string, number>;
+    firstComboSeatId?: string;
   };
 };
 

@@ -249,21 +249,123 @@ export class DouDizhuController implements VariantController {
     const state = this.getState(managed);
     const landlordSeatId = state.landlordSeatId;
     const landlordUserId = landlordSeatId ? managed.state.players[landlordSeatId]?.userId ?? null : null;
-    const winner = landlordSeatId && winnerSeatId === landlordSeatId ? 'LANDLORD' : 'FARMERS';
+    const breakdown = this.computeScoreBreakdown(managed, winnerSeatId);
+
+    return {
+      winner: breakdown.winner,
+      landlordUserId,
+      winningUserIds: breakdown.winningUserIds,
+      finishedAt: Date.now(),
+      callScore: breakdown.callScore,
+      bombCount: breakdown.bombCount,
+      rocketCount: breakdown.rocketCount,
+      spring: breakdown.spring,
+      landlordRedoubled: breakdown.landlordRedoubled,
+      usePerDefenderDoubling: breakdown.usePerDefenderDoubling,
+      scores: breakdown.scores
+    };
+  }
+
+  private computeScoreBreakdown(managed: ManagedTable, winnerSeatId: string) {
+    const state = this.getState(managed);
+    const landlordSeatId = state.landlordSeatId ?? '';
+    const winner: 'LANDLORD' | 'FARMERS' =
+      landlordSeatId && winnerSeatId === landlordSeatId ? 'LANDLORD' : 'FARMERS';
     const winningSeats =
       winner === 'LANDLORD'
-        ? [landlordSeatId ?? winnerSeatId]
+        ? [landlordSeatId || winnerSeatId]
         : managed.state.seats.filter(id => id !== landlordSeatId);
     const winningUserIds = winningSeats
       .map(id => managed.state.players[id]?.userId)
       .filter((userId): userId is number => typeof userId === 'number');
 
+    const bombCount = state.play?.bombCount ?? 0;
+    const rocketCount = state.play?.rocketCount ?? 0;
+    const callScore = state.callScore ?? 0;
+    const landlordRedoubled = state.doubling?.landlordRedoubled ?? false;
+    const usePerDefenderDoubling = true;
+    const spring = this.computeSpring(state);
+
+    const farmersWin = winner === 'FARMERS';
+    const winFactor = farmersWin ? 1 : -1;
+    const exponentCommon = bombCount + rocketCount + (spring ? 1 : 0);
+    const defenderSeats = managed.state.seats.filter(id => id !== landlordSeatId);
+    const farmerOutcomes = defenderSeats.map(seatId => {
+      const doubled = state.doubling?.defenderDoubles[seatId] ?? false;
+      const d_i = doubled ? 1 : 0;
+      const redoubleApplies = landlordRedoubled && (usePerDefenderDoubling ? doubled : true);
+      const d_L = redoubleApplies ? 1 : 0;
+      const exponent = exponentCommon + d_i + d_L;
+      const multiplier = 2 ** exponent;
+      const score = callScore * winFactor * multiplier;
+      const player = managed.state.players[seatId];
+      return {
+        userId: player?.userId ?? 0,
+        seatId,
+        role: 'FARMER' as const,
+        score,
+        doubled,
+        exponent,
+        multiplier,
+        factors: {
+          bombs: bombCount,
+          rockets: rocketCount,
+          spring,
+          defenderDouble: doubled,
+          landlordRedouble: redoubleApplies
+        }
+      };
+    });
+
+    const landlordScore = -farmerOutcomes.reduce((sum, entry) => sum + entry.score, 0);
+    const landlord = managed.state.players[landlordSeatId];
+    const landlordFactors = {
+      bombs: bombCount,
+      rockets: rocketCount,
+      spring,
+      defenderDouble: false,
+      landlordRedouble: landlordRedoubled
+    };
+    const scores = [
+      ...farmerOutcomes,
+      {
+        userId: landlord?.userId ?? 0,
+        seatId: landlordSeatId,
+        role: 'LANDLORD' as const,
+        score: landlordScore,
+        doubled: landlordRedoubled,
+        exponent: null,
+        multiplier: null,
+        factors: landlordFactors
+      }
+    ];
+
     return {
       winner,
-      landlordUserId,
       winningUserIds,
-      finishedAt: Date.now()
+      bombCount,
+      rocketCount,
+      callScore,
+      spring,
+      landlordRedoubled,
+      usePerDefenderDoubling,
+      scores
     };
+  }
+
+  private computeSpring(state: DouDizhuVariantState) {
+    const landlordSeatId = state.landlordSeatId;
+    const play = state.play;
+    if (!landlordSeatId || !play) return false;
+    const landlordPlays = play.playedCombosBySeat[landlordSeatId] ?? 0;
+    const farmerPlays = Object.entries(play.playedCombosBySeat)
+      .filter(([seatId]) => seatId !== landlordSeatId)
+      .map(([, count]) => count ?? 0);
+
+    const landlordSpring = (farmerPlays[0] ?? 0) === 0 && (farmerPlays[1] ?? 0) === 0;
+    const farmerSpring =
+      landlordPlays === 1 && play.firstComboSeatId === landlordSeatId;
+    return Boolean(landlordSpring || farmerSpring);
   }
 
   handlePlay(
@@ -333,6 +435,18 @@ export class DouDizhuController implements VariantController {
     if (combo.type !== ComboType.PASS) {
       player.hand = this.removeCards(player.hand, combo.cards);
       play.trickCombos[seatId] = combo;
+      if (!play.playedCombosBySeat[seatId]) {
+        play.playedCombosBySeat[seatId] = 0;
+      }
+      play.playedCombosBySeat[seatId] += 1;
+      if (!play.firstComboSeatId) {
+        play.firstComboSeatId = seatId;
+      }
+      if (combo.type === ComboType.BOMB) {
+        play.bombCount = (play.bombCount ?? 0) + 1;
+      } else if (combo.type === ComboType.ROCKET) {
+        play.rocketCount = (play.rocketCount ?? 0) + 1;
+      }
     }
 
     play.lastCombo = trickAdvance.state.lastCombo;
@@ -443,7 +557,10 @@ export class DouDizhuController implements VariantController {
       lastSeatId: null,
       passCount: 0,
       finished: false,
-      trickCombos: {}
+      trickCombos: {},
+      bombCount: 0,
+      rocketCount: 0,
+      playedCombosBySeat: {}
     };
     this.transitionPhase(table, { type: 'start-playing', reason: 'doubling-complete' });
     this.emitGameSnapshot(table);
