@@ -13,13 +13,20 @@ import type { AppServer, AppServerSocket } from '@shared/events';
 import { createTable, joinTable, resetDeck } from '@game-core/engine';
 import { DEFAULT_AVATAR, type AvatarFilename } from '@shared/avatars';
 import { GAME_VARIANTS_BY_ID, getVariantDefinition, getVariantSummary } from '@shared/variants';
-import { derivePhaseStatus, initialTablePhase, tablePhaseReducer } from '@shared/tablePhases';
+import {
+  derivePhaseStatus,
+  getActionTraceId,
+  getPhaseReason,
+  getPhaseTraceId,
+  initialTablePhase,
+  tablePhaseReducer
+} from '@shared/tablePhases';
 import type { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import type { createUserRegistry } from '../infrastructure/userRegistry';
 import { DuplicateNicknameError, UserNotFoundError } from '../infrastructure/userRegistry';
 import { ClassicController } from './variants/classicController';
 import { DouDizhuController } from './variants/douDizhuController';
-import { TableDealingCoordinator } from './tableDealing';
+import { TableDealingCoordinator, type TableDealingDeps } from './tableDealing';
 import { TableSeatManager } from './tableSeatManager';
 import type { VariantController, VariantSnapshot } from './variantController';
 import type { ManagedTable } from './tableTypes';
@@ -32,6 +39,7 @@ export type TableManagerDeps = {
   io: AppServer;
   lobby: ReturnType<typeof createLobbyRegistry>;
   users: ReturnType<typeof createUserRegistry>;
+  createDealingCoordinator?: (deps: TableDealingDeps) => TableDealingCoordinator;
 };
 
 export const normalizeTableId = (id: string) => id.trim();
@@ -56,7 +64,10 @@ export class TableManager {
     this.lobby = deps.lobby;
     this.users = deps.users;
 
-    this.dealing = new TableDealingCoordinator({
+    const createDealingCoordinator =
+      deps.createDealingCoordinator ?? ((dealingDeps: TableDealingDeps) => new TableDealingCoordinator(dealingDeps));
+
+    this.dealing = createDealingCoordinator({
       io: this.io,
       resolveRequestId: this.resolveRequestId.bind(this),
       transitionPhase: (table, action) => this.transitionPhase(table, action),
@@ -110,19 +121,16 @@ export class TableManager {
 
   private transitionPhase(table: ManagedTable, action: PhaseAction) {
     const previous = table.phase;
-    table.phase = tablePhaseReducer(table.phase, action as Parameters<typeof tablePhaseReducer>[1]);
-    if (
-      previous.status !== table.phase.status ||
-      ('reason' in previous && 'reason' in table.phase && previous.reason !== (table.phase as any).reason)
-    ) {
+    table.phase = tablePhaseReducer(table.phase, action);
+    const previousReason = getPhaseReason(previous);
+    const nextReason = getPhaseReason(table.phase);
+    if (previous.status !== table.phase.status || previousReason !== nextReason) {
       this.logStructured('phase:change', {
         tableId: table.id,
         from: previous.status,
         to: table.phase.status,
-        reason: 'reason' in table.phase ? (table.phase as any).reason : undefined,
-        traceId:
-          ('traceId' in table.phase ? (table.phase as any).traceId : undefined) ??
-          ('traceId' in action ? (action as any).traceId : undefined)
+        reason: nextReason,
+        traceId: getPhaseTraceId(table.phase) ?? getActionTraceId(action)
       });
     }
     return table.phase;

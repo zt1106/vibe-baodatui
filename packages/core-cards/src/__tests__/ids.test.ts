@@ -15,9 +15,9 @@ describe('ids', () => {
   });
 
   it('rejects invalid pack indexes and rank/suit combinations', () => {
-    expect(() => createCardId('A', 'S', -1 as unknown as number)).toThrow(RangeError);
+    expect(() => createCardId('A', 'S', -1)).toThrow(RangeError);
     expect(() => createCardId('A', 'S', MAX_PACK_COUNT + 1)).toThrow(RangeError);
-    expect(() => createCardId('Z' as any, 'S')).toThrow(RangeError);
+    expect(() => createCardId('Z' as never, 'S' as never)).toThrow(RangeError);
     expect(parseCardId(-5)).toBeNull();
     expect(parseCardId(0x1_0000)).toBeNull();
   });

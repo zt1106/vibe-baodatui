@@ -1,1 +1,3 @@
-export type PhaseAction = { type: string; [key: string]: unknown };
+import type { TablePhaseAction } from '@shared/tablePhases';
+
+export type PhaseAction = TablePhaseAction;

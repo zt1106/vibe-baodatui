@@ -1,18 +1,28 @@
-import type { AppServer, AppServerSocket } from '@shared/events';
+import type { AppServer } from '@shared/events';
 import type { Heartbeat } from '@shared/messages';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
 
 type Cleanup = () => void;
 
+export type HeartbeatServer = {
+  emit: (event: 'heartbeat', payload: Heartbeat) => unknown;
+  engine: Pick<AppServer['engine'], 'clientsCount'>;
+};
+
+export type HeartbeatSocket = {
+  emit: (event: 'heartbeat', payload: Heartbeat) => unknown;
+  on: (event: 'heartbeat:request', listener: () => void) => unknown;
+};
+
 /**
  * Periodically publishes a heartbeat payload to connected Socket.IO clients.
  * Also primes newly connected sockets with an immediate heartbeat so the UI
  * can reflect connection state without waiting for the next interval.
  */
-export function createHeartbeatPublisher(io: AppServer): {
+export function createHeartbeatPublisher(io: HeartbeatServer): {
   start: () => Cleanup;
-  handleConnection: (socket: AppServerSocket) => void;
+  handleConnection: (socket: HeartbeatSocket) => void;
   publish: () => void;
   snapshot: () => Heartbeat;
 } {
@@ -29,7 +39,7 @@ export function createHeartbeatPublisher(io: AppServer): {
     io.emit('heartbeat', snapshot());
   };
 
-  function handleConnection(socket: AppServerSocket) {
+  function handleConnection(socket: HeartbeatSocket) {
     socket.emit('heartbeat', snapshot());
     socket.on('heartbeat:request', () => socket.emit('heartbeat', snapshot()));
   }

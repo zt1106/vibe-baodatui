@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AppServer, AppServerSocket } from '@shared/events';
 import { derivePhaseStatus } from '@shared/tablePhases';
-import { TableDealingCoordinator } from '../domain/tableDealing';
+import { TableDealingCoordinator, type TableDealingDeps } from '../domain/tableDealing';
 import { TableManager } from '../domain/tableManager';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import { createUserRegistry } from '../infrastructure/userRegistry';
 
 class FakeSocket {
   id: string;
-  emitted: Record<string, any[]> = {};
+  emitted: Record<string, unknown[]> = {};
   rooms = new Set<string>();
 
   constructor(id: string, public nickname: string) {
@@ -23,35 +23,57 @@ class FakeSocket {
     this.rooms.delete(room);
   }
 
-  emit(event: string, payload: any) {
+  emit(event: string, payload: unknown) {
     (this.emitted[event] ||= []).push(payload);
   }
 }
 
 class FakeIo {
-  roomEmits: Record<string, Array<{ event: string; payload: any }>> = {};
-  broadcasts: Array<{ event: string; payload: any }> = [];
+  roomEmits: Record<string, Array<{ event: string; payload: unknown }>> = {};
+  broadcasts: Array<{ event: string; payload: unknown }> = [];
   sockets = { sockets: new Map<string, FakeSocket>() };
 
   to(room: string) {
     return {
-      emit: (event: string, payload: any) => {
+      emit: (event: string, payload: unknown) => {
         (this.roomEmits[room] ||= []).push({ event, payload });
       }
     };
   }
 
-  emit(event: string, payload: any) {
+  emit(event: string, payload: unknown) {
     this.broadcasts.push({ event, payload });
   }
 }
 
-const setupTableManager = () => {
+class StubTableDealingCoordinator extends TableDealingCoordinator {
+  override start = vi.fn<TableDealingCoordinator['start']>((table, _config) => {
+    table.dealingState = null;
+    table.phase = { status: 'dealing' };
+  });
+
+  override stop = vi.fn<TableDealingCoordinator['stop']>((table) => {
+    table.dealingState = null;
+  });
+}
+
+const setupTableManager = (options?: { createDealingCoordinator?: (deps: TableDealingDeps) => TableDealingCoordinator }) => {
   const io = new FakeIo();
   const lobby = createLobbyRegistry();
   const users = createUserRegistry();
-  const manager = new TableManager({ io: io as unknown as AppServer, lobby, users });
+  const manager = new TableManager({
+    io: io as unknown as AppServer,
+    lobby,
+    users,
+    createDealingCoordinator: options?.createDealingCoordinator
+  });
   return { io, lobby, users, manager };
+};
+
+const getErrorMessage = (socket: FakeSocket, index = -1) => {
+  const errors = socket.emitted.errorMessage as Array<{ message?: string }> | undefined;
+  if (!errors) return undefined;
+  return index === -1 ? errors.at(-1)?.message : errors[index]?.message;
 };
 
 describe('TableManager lifecycle', () => {
@@ -100,7 +122,13 @@ describe('TableManager lifecycle', () => {
   });
 
   it('requires the host and prepared players before starting a game', () => {
-    const { lobby, users, manager } = setupTableManager();
+    let dealingCoordinator: StubTableDealingCoordinator | null = null;
+    const { lobby, users, manager } = setupTableManager({
+      createDealingCoordinator: (deps: TableDealingDeps) => {
+        dealingCoordinator = new StubTableDealingCoordinator(deps);
+        return dealingCoordinator;
+      }
+    });
     const host = users.register('Host');
     const playerTwo = users.register('Player Two');
     const playerThree = users.register('Player Three');
@@ -126,16 +154,11 @@ describe('TableManager lifecycle', () => {
       userId: playerThree.id
     });
 
-    const dealingStub = vi.spyOn(TableDealingCoordinator.prototype as any, 'start').mockImplementation((tableState: any) => {
-      tableState.dealingState = null;
-      tableState.phase = { status: 'dealing' };
-    });
-
     manager.handleStart(p2Socket as unknown as AppServerSocket, { tableId: table.tableId });
-    expect(p2Socket.emitted.errorMessage?.[0]?.message).toBe('Only the host can perform this action');
+    expect(getErrorMessage(p2Socket, 0)).toBe('Only the host can perform this action');
 
     manager.handleStart(hostSocket as unknown as AppServerSocket, { tableId: table.tableId });
-    expect(hostSocket.emitted.errorMessage?.at(-1)?.message).toBe('仍有玩家未准备');
+    expect(getErrorMessage(hostSocket)).toBe('仍有玩家未准备');
 
     manager.handleSetPrepared(hostSocket as unknown as AppServerSocket, { tableId: table.tableId, prepared: true });
     manager.handleSetPrepared(p2Socket as unknown as AppServerSocket, { tableId: table.tableId, prepared: true });
@@ -143,13 +166,14 @@ describe('TableManager lifecycle', () => {
 
     manager.handleStart(hostSocket as unknown as AppServerSocket, { tableId: table.tableId });
 
-    const managed = (manager as any).tables.get(table.tableId);
+    const managed = manager.getManagedTable(table.tableId);
+    if (!managed || !dealingCoordinator) {
+      throw new Error('Table did not initialize correctly');
+    }
     expect(managed.hasStarted).toBe(true);
     expect(derivePhaseStatus(managed.phase)).toBe('dealing');
     expect(Array.from(managed.prepared.values()).every(flag => flag === false)).toBe(true);
     expect(lobby.snapshot().rooms[0].status).toBe('in-progress');
-
-    dealingStub.mockRestore();
   });
 
   it('waits for reconnect before removing a player from a started table', () => {
@@ -180,7 +204,10 @@ describe('TableManager lifecycle', () => {
       userId: playerThree.id
     });
 
-    const managed = (manager as any).tables.get(table.tableId);
+    const managed = manager.getManagedTable(table.tableId);
+    if (!managed) {
+      throw new Error('Table missing after setup');
+    }
     managed.hasStarted = true;
     managed.phase = { status: 'dealing' };
 

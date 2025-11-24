@@ -31,7 +31,7 @@ export async function createSocketServer(
 }
 
 export function waitForEvent<T = void>(
-  emitter: { once(event: string, cb: (...args: any[]) => void): void },
+  emitter: { once(event: string, cb: (...args: unknown[]) => void): void },
   event: string
 ): Promise<T> {
   return new Promise(resolve => emitter.once(event, (data: T) => resolve(data)));

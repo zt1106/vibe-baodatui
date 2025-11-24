@@ -4,14 +4,29 @@ import { Server } from 'socket.io';
 import { io as createClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { ServerState } from '@shared/messages';
 import type { ClientToServerEvents, ServerToClientEvents } from '@shared/events';
-import { TableDealingCoordinator } from '../domain/tableDealing';
+import { TableDealingCoordinator, type TableDealingDeps } from '../domain/tableDealing';
 import { TableManager } from '../domain/tableManager';
 import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
 import { createUserRegistry } from '../infrastructure/userRegistry';
 import { createHeartbeatPublisher } from '../infrastructure/heartbeat';
 import { registerTableSocketHandlers } from '../socket/tableHandlers';
 
-function waitFor<T>(emitter: any, event: string, predicate?: (payload: T) => boolean): Promise<T> {
+class StubTableDealingCoordinator extends TableDealingCoordinator {
+  override start = vi.fn<TableDealingCoordinator['start']>((table, _config) => {
+    table.dealingState = null;
+    table.phase = { status: 'dealing' };
+  });
+
+  override stop = vi.fn<TableDealingCoordinator['stop']>((table) => {
+    table.dealingState = null;
+  });
+}
+
+function waitFor<T>(
+  emitter: { on(event: string, handler: (payload: T) => void): void; off(event: string, handler: (payload: T) => void): void },
+  event: string,
+  predicate?: (payload: T) => boolean
+): Promise<T> {
   return new Promise(resolve => {
     const handler = (payload: T) => {
       if (predicate && !predicate(payload)) return;
@@ -22,12 +37,19 @@ function waitFor<T>(emitter: any, event: string, predicate?: (payload: T) => boo
   });
 }
 
-async function startSocketServer() {
+async function startSocketServer(
+  options?: { createDealingCoordinator?: (deps: TableDealingDeps) => TableDealingCoordinator }
+) {
   const httpServer = http.createServer();
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { cors: { origin: '*' } });
   const lobby = createLobbyRegistry();
   const users = createUserRegistry();
-  const tableManager = new TableManager({ io, lobby, users });
+  const tableManager = new TableManager({
+    io,
+    lobby,
+    users,
+    createDealingCoordinator: options?.createDealingCoordinator
+  });
   const heartbeat = createHeartbeatPublisher(io);
   registerTableSocketHandlers(io, tableManager, heartbeat);
   await new Promise<void>(resolve => httpServer.listen(0, resolve));
@@ -53,12 +75,9 @@ describe('table socket handlers', () => {
   });
 
   it('handles join, preparation, start, and leave flows over sockets', async () => {
-    const dealingStub = vi.spyOn(TableDealingCoordinator.prototype as any, 'start').mockImplementation((table: any) => {
-      table.dealingState = null;
-      table.phase = { status: 'dealing' };
+    const server = await startSocketServer({
+      createDealingCoordinator: (deps: TableDealingDeps) => new StubTableDealingCoordinator(deps)
     });
-
-    const server = await startSocketServer();
     const { io, httpServer, users, tableManager, port, lobby } = server;
 
     const host = users.register('Host');
@@ -122,7 +141,6 @@ describe('table socket handlers', () => {
     expect(leaveAck).toEqual({ ok: true });
     expect(lobby.snapshot().rooms[0].players).toBe(2);
 
-    dealingStub.mockRestore();
     await new Promise<void>(resolve => {
       io.close(() => {
         httpServer.close(() => resolve());

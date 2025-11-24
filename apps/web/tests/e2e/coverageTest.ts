@@ -10,6 +10,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nycOutputDir = path.join(__dirname, '..', '.nyc_output');
 const coverageBindingName = 'collectIstanbulCoverage';
 
+type CoverageWindow = Window & {
+  __coverage__?: unknown;
+  [coverageBindingName: string]: unknown;
+};
+
+const instrumentedContexts = new WeakSet<BrowserContext>();
+
 const ensureOutputDir = async () => {
   await fs.promises.mkdir(nycOutputDir, { recursive: true });
 };
@@ -29,9 +36,13 @@ const flushCoverage = async (context: BrowserContext) => {
         if (page.isClosed()) return;
         try {
           await page.evaluate((bindingName) => {
-            const coverage = (window as any).__coverage__;
+            const coverageWindow = window as unknown as CoverageWindow;
+            const coverage = coverageWindow.__coverage__;
             if (!coverage) return;
-            (window as any)[bindingName]?.(JSON.stringify(coverage));
+            const binding = coverageWindow[bindingName];
+            if (typeof binding === 'function') {
+              (binding as (payload: string) => void)(JSON.stringify(coverage));
+            }
           }, coverageBindingName);
         } catch {
           // Ignore pages that can no longer be evaluated (already torn down).
@@ -44,10 +55,10 @@ const flushCoverage = async (context: BrowserContext) => {
 };
 
 const instrumentContext = async (context: BrowserContext) => {
-  if ((context as any).__coverageInstrumented) {
+  if (instrumentedContexts.has(context)) {
     return;
   }
-  (context as any).__coverageInstrumented = true;
+  instrumentedContexts.add(context);
   await ensureOutputDir();
 
   await context.exposeBinding(
@@ -61,9 +72,13 @@ const instrumentContext = async (context: BrowserContext) => {
 
   await context.addInitScript((bindingName) => {
     const flush = () => {
-      const coverage = (window as any).__coverage__;
+      const coverageWindow = window as unknown as CoverageWindow;
+      const coverage = coverageWindow.__coverage__;
       if (!coverage) return;
-      (window as any)[bindingName]?.(JSON.stringify(coverage));
+      const binding = coverageWindow[bindingName];
+      if (typeof binding === 'function') {
+        (binding as (payload: string) => void)(JSON.stringify(coverage));
+      }
     };
     window.addEventListener('beforeunload', flush);
     window.addEventListener('pagehide', flush);

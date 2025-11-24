@@ -34,7 +34,7 @@ describe('loadServerEnv', () => {
       throw new Error(`exit ${code}`);
     }) as never);
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    (process.env as any).PORT = 123;
+    process.env.PORT = 123 as unknown as string;
 
     expect(() => loadServerEnv()).toThrow(/exit 1/);
     expect(exitSpy).toHaveBeenCalledWith(1);

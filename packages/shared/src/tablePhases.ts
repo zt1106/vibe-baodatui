@@ -75,3 +75,19 @@ export function tablePhaseReducer(state: TablePhase, action: TablePhaseAction): 
 export function derivePhaseStatus(phase: TablePhase): TablePhaseStatus {
   return phase.status;
 }
+
+type PhaseWithReason = Extract<TablePhase, { reason?: unknown }>;
+type PhaseWithTraceId = Extract<TablePhase, { traceId?: string }>;
+type PhaseActionWithTraceId = Extract<TablePhaseAction, { traceId?: string }>;
+
+export function getPhaseReason(phase: TablePhase): PhaseWithReason['reason'] | undefined {
+  return 'reason' in phase ? phase.reason : undefined;
+}
+
+export function getPhaseTraceId(phase: TablePhase): PhaseWithTraceId['traceId'] | undefined {
+  return 'traceId' in phase ? phase.traceId : undefined;
+}
+
+export function getActionTraceId(action: TablePhaseAction): PhaseActionWithTraceId['traceId'] | undefined {
+  return 'traceId' in action ? action.traceId : undefined;
+}

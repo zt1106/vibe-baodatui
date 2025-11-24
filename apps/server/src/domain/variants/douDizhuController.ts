@@ -3,7 +3,7 @@ import type { Combo } from '@game-core/doudizhu';
 import { advanceTrick, ComboType, createPlayValidator } from '@game-core/doudizhu';
 import type { AppServerSocket } from '@shared/events';
 import type { GameCard, GameResult } from '@shared/messages';
-import { derivePhaseStatus } from '@shared/tablePhases';
+import { derivePhaseStatus, getPhaseTraceId } from '@shared/tablePhases';
 import type { ManagedTable, DouDizhuVariantState, BidValue } from '../tableTypes';
 import type { VariantController, VariantSnapshot } from '../variantController';
 import type { TableDealingCoordinator } from '../tableDealing';
@@ -526,7 +526,7 @@ export class DouDizhuController implements VariantController {
       bidding.redealRequired = true;
       this.logStructured('bidding:redeal', {
         tableId: table.id,
-        traceId: 'traceId' in table.phase ? (table.phase as any).traceId : undefined,
+        traceId: getPhaseTraceId(table.phase),
         reason: 'all-pass'
       });
       this.start(table);

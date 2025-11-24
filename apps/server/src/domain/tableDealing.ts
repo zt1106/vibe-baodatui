@@ -21,6 +21,9 @@ type DealingDeps = {
 
 let DEAL_DELAY_MS = 600;
 
+export type TableDealConfig = DealConfig;
+export type TableDealingDeps = DealingDeps;
+
 export function setDealDelayMs(delay: number) {
   DEAL_DELAY_MS = Math.max(0, delay);
 }
