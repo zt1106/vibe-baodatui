@@ -70,11 +70,11 @@ registerTableSocketHandlers(io, tableManager, heartbeat);
 const stopHeartbeat = heartbeat.start();
 if (autoPlayBot) {
   autoPlayBot.start();
-  console.log('[server] auto-play mode enabled');
+  console.info('[server] auto-play mode enabled');
 }
 
 server.listen(Number(env.PORT), () => {
-  console.log(`[server] listening on http://localhost:${env.PORT}`);
+  console.info(`[server] listening on http://localhost:${env.PORT}`);
 });
 
 server.on('close', stopHeartbeat);

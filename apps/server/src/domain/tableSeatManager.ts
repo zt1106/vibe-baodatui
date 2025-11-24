@@ -168,7 +168,7 @@ export class TableSeatManager {
     }
     if (managed.lastResult && !managed.hasStarted) {
       // Keep seats intact after a completed round so the prepare room stays populated.
-       console.info('[seatManager] skip removal post-result', { tableId, socketId });
+      console.info('[seatManager] skip removal post-result', { tableId, socketId });
       return;
     }
     const seatIndex = managed.state.seats.indexOf(socketId);

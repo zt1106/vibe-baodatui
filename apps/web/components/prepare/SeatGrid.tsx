@@ -86,14 +86,14 @@ export function SeatGrid({
                       player.userId !== hostUserId &&
                       typeof player.userId === 'number' &&
                       onKickPlayer && (
-                        <button
-                          type="button"
-                          onClick={() => onKickPlayer(player.userId)}
-                          className={styles.kickButton}
-                        >
-                          移出
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => onKickPlayer(player.userId)}
+                        className={styles.kickButton}
+                      >
+                        移出
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (

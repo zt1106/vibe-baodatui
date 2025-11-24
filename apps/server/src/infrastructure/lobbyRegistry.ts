@@ -1,10 +1,5 @@
-import { LobbyRoomsResponse, deriveLobbyRoomStatus } from '@shared/messages';
-import type {
-  LobbyNotification,
-  LobbyRoom,
-  LobbyRoomsResponse as LobbyRoomsSnapshot,
-  LobbyRoomStatus
-} from '@shared/messages';
+import { LobbyRoomsResponse } from '@shared/messages';
+import type { LobbyNotification, LobbyRoom, LobbyRoomsResponse as LobbyRoomsSnapshot } from '@shared/messages';
 
 export type { LobbyRoom, LobbyNotification } from '@shared/messages';
 

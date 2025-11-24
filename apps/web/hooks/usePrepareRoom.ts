@@ -186,7 +186,7 @@ export function usePrepareRoom(tableId: string) {
         socketLeaseRef.current = null;
       }
     };
-  }, [apiBaseUrl, authStatus, tableId, user?.id, user?.nickname]);
+  }, [apiBaseUrl, authStatus, tableId, user]);
 
   const reloadPrepareState = useCallback(() => {
     setReloadToken(token => token + 1);

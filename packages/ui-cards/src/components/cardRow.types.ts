@@ -1,5 +1,5 @@
 import type { Card, CardId, CardSize } from '@poker/core-cards';
-import type { CSSProperties, HTMLAttributes } from 'react';
+import type { HTMLAttributes } from 'react';
 
 import type { CardAnimationOptions } from './cardAnimation.shared';
 

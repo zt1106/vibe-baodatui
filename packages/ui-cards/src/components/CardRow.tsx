@@ -2,16 +2,9 @@
 
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  type CSSProperties,
-  type HTMLAttributes,
-  type MouseEvent,
-  useCallback,
-  useMemo,
-  useState
-} from 'react';
+import { type CSSProperties, type KeyboardEvent, type MouseEvent, useCallback, useMemo, useState } from 'react';
 
-import type { Card, CardId, CardSize } from '@poker/core-cards';
+import type { Card, CardId } from '@poker/core-cards';
 import { getCardDimensions } from '@poker/core-cards';
 
 import { AnimatedCard } from './AnimatedCard';
@@ -106,8 +99,11 @@ export function CardRow({
   const isDisabled = useCallback((id: CardId) => disabledSet.has(id), [disabledSet]);
 
   const handleClick = useCallback(
-    (card: Card, event: MouseEvent<HTMLDivElement>) => {
+    (card: Card, event?: MouseEvent<HTMLDivElement>) => {
       if (isDisabled(card.id)) {
+        if (event) {
+          event.preventDefault();
+        }
         return;
       }
       onCardClick?.(card);
@@ -132,6 +128,17 @@ export function CardRow({
     [isDisabled, onCardClick, selection, selectionMode, setSelection]
   );
 
+  const handleKeyDown = useCallback(
+    (card: Card, event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+      event.preventDefault();
+      handleClick(card);
+    },
+    [handleClick]
+  );
+
   const spacing = Math.max(0, cardSize.width - resolvedOverlap);
   const totalWidth = cards.length === 0 ? cardSize.width : cardSize.width + (cards.length - 1) * spacing;
 
@@ -139,10 +146,10 @@ export function CardRow({
     selectionMode === 'none'
       ? { role: 'list', 'aria-label': 'Card row' }
       : {
-          role: 'listbox',
-          'aria-multiselectable': selectionMode === 'multiple' || undefined,
-          'aria-label': 'Card row'
-        };
+        role: 'listbox',
+        'aria-multiselectable': selectionMode === 'multiple' || undefined,
+        'aria-label': 'Card row'
+      };
 
   const containerClassName = clsx('v-card-row', className);
   const { getLayoutId, transition: contextTransition, layoutEnabled } = useCardAnimation();
@@ -178,23 +185,29 @@ export function CardRow({
             const cardTransition =
               directives.bounce
                 ? {
-                    ...baseTransition,
-                    bounce: Math.max(baseTransition.bounce ?? 0.32, 0.32),
-                    damping: baseTransition.damping ?? 20
-                  }
+                  ...baseTransition,
+                  bounce: Math.max(baseTransition.bounce ?? 0.32, 0.32),
+                  damping: baseTransition.damping ?? 20
+                }
                 : baseTransition;
+            const interactive = !isDisabled(card.id) && (selectionMode !== 'none' || Boolean(onCardClick));
+            const role = selectionMode === 'none' ? 'button' : 'option';
             return (
-              <motion.div
+              <motion.button
                 key={card.id}
+                type="button"
                 data-card-id={String(card.id)}
-                role={selectionMode === 'none' ? 'listitem' : 'option'}
+                role={role}
                 aria-selected={selectionMode === 'none' ? undefined : isSelected}
-                onClick={event => handleClick(card, event)}
-              initial={{
-                opacity: 0,
-                y: transform.y + (animationSettings.entryYOffset ?? 24),
-                scale: 0.92
-              }}
+                onClick={interactive ? () => handleClick(card) : undefined}
+                onKeyDown={interactive ? event => handleKeyDown(card, event) : undefined}
+                tabIndex={interactive ? 0 : undefined}
+                disabled={isDisabled(card.id)}
+                initial={{
+                  opacity: 0,
+                  y: transform.y + (animationSettings.entryYOffset ?? 24),
+                  scale: 0.92
+                }}
                 animate={{
                   opacity: 1,
                   x: transform.x,
@@ -209,22 +222,25 @@ export function CardRow({
                   left: 0,
                   bottom: 0,
                   zIndex: transform.zIndex,
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
                   cursor,
                   filter: disabledFilter,
                   transformOrigin: '50% 100%'
                 }}
               >
-                  <AnimatedCard
-                    card={card}
-                    size={typeof size === 'string' ? size : 'md'}
-                    selected={isSelected}
-                    disabled={isDisabled(card.id)}
-                    style={customSizeStyle}
-                    layoutId={getLayoutId(card.id)}
-                    transition={cardTransition}
-                    enableFlip={directives.flip}
-                  />
-              </motion.div>
+                <AnimatedCard
+                  card={card}
+                  size={typeof size === 'string' ? size : 'md'}
+                  selected={isSelected}
+                  disabled={isDisabled(card.id)}
+                  style={customSizeStyle}
+                  layoutId={getLayoutId(card.id)}
+                  transition={cardTransition}
+                  enableFlip={directives.flip}
+                />
+              </motion.button>
             );
           })}
         </AnimatePresence>
@@ -233,13 +249,19 @@ export function CardRow({
           const transform = layout[index] ?? { x: 0, y: 0, rotateDeg: 0, zIndex: index };
           const isSelected = selection.includes(card.id);
           const directives = resolveCardMetaAnimation(card);
+          const interactive = !isDisabled(card.id) && (selectionMode !== 'none' || Boolean(onCardClick));
+          const role = selectionMode === 'none' ? 'button' : 'option';
           return (
-            <div
+            <button
               key={card.id}
+              type="button"
               data-card-id={String(card.id)}
-              role={selectionMode === 'none' ? 'listitem' : 'option'}
+              role={role}
               aria-selected={selectionMode === 'none' ? undefined : isSelected}
-              onClick={event => handleClick(card, event)}
+              onClick={interactive ? () => handleClick(card) : undefined}
+              onKeyDown={interactive ? event => handleKeyDown(card, event) : undefined}
+              tabIndex={interactive ? 0 : undefined}
+              disabled={isDisabled(card.id)}
               style={{
                 position: 'absolute',
                 left: 0,
@@ -251,6 +273,9 @@ export function CardRow({
                 ].join(' '),
                 zIndex: transform.zIndex,
                 transition: 'transform 150ms ease, filter 150ms ease',
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
                 cursor:
                   isDisabled(card.id) || selectionMode === 'none'
                     ? isDisabled(card.id)
@@ -268,7 +293,7 @@ export function CardRow({
                 style={customSizeStyle}
                 enableFlip={directives.flip}
               />
-            </div>
+            </button>
           );
         })
       ))}

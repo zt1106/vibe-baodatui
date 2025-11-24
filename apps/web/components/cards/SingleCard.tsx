@@ -33,7 +33,7 @@ export function SingleCard({
       faceUp,
       meta
     };
-  }, [cardId, faceUp, meta?.ownerSeat, meta?.selectable, meta?.tags?.join('|')]);
+  }, [cardId, faceUp, meta]);
 
   return <PlayingCard {...rest} style={style} card={card} cornerRadius={cornerRadius} />;
 }

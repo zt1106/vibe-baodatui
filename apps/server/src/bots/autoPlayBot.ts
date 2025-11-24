@@ -1,6 +1,7 @@
 import type { AppServerSocket } from '@shared/events';
 import { derivePhaseStatus } from '@shared/tablePhases';
-import { beats, Combo, ComboType, rankValue, sortCardsByRank, type RankValue } from '@game-core/doudizhu';
+import type { Combo } from '@game-core/doudizhu';
+import { beats, ComboType, rankValue, sortCardsByRank, type RankValue } from '@game-core/doudizhu';
 import type { GameCard, GameCombo, GameSnapshot } from '@shared/messages';
 import type { ManagedTable, TableManager } from '../domain/tableManager';
 

@@ -219,6 +219,47 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+function DealingStory({ playerCount = 6, ...storyArgs }: Story['args']) {
+  const players = useMemo(() => playerStubsNoCards.slice(0, playerCount), [playerCount]);
+  const targetSeatIds = useMemo(() => players.map(player => player.id), [players]);
+  const maxDeals = targetSeatIds.length ? targetSeatIds.length * 2 : 0;
+  const [dealingIndex, setDealingIndex] = useState(0);
+  const [inFlight, setInFlight] = useState<DealingCardFlight[]>([]);
+
+  useEffect(() => {
+    setDealingIndex(0);
+    setInFlight([]);
+  }, [playerCount]);
+
+  useEffect(() => {
+    if (maxDeals === 0 || dealingIndex >= maxDeals) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      const seatId = targetSeatIds[dealingIndex % targetSeatIds.length];
+      const cardId = dealingCardIds[dealingIndex % dealingCardIds.length];
+      const id = `deal-${dealingIndex}-${seatId}`;
+      setInFlight(prev => [...prev, { id, seatId, cardId, faceUp: false }]);
+      setDealingIndex(index => index + 1);
+    }, 780);
+
+    return () => clearTimeout(timer);
+  }, [dealingIndex, maxDeals, targetSeatIds]);
+
+  const handleDealingComplete = useCallback((flightId: string) => {
+    setInFlight(prev => prev.filter(card => card.id !== flightId));
+  }, []);
+
+  return (
+    <GameTableStage
+      players={players}
+      dealingCards={inFlight}
+      onDealingCardComplete={handleDealingComplete}
+      {...storyArgs}
+    />
+  );
+}
+
 export const FullTable: Story = {
   args: {
     communityCards: flopToRiver,
@@ -279,47 +320,5 @@ export const Dealing: Story = {
     avatarRingScale: 1.08,
     cardRingScale: 0.62
   },
-  render: ({ playerCount, ...storyArgs }) => {
-    const players = useMemo(() => playerStubsNoCards.slice(0, playerCount), [playerCount]);
-    const targetSeatIds = useMemo(
-      () => players.map(player => player.id),
-      [players]
-    );
-    const maxDeals = targetSeatIds.length ? targetSeatIds.length * 2 : 0;
-    const [dealingIndex, setDealingIndex] = useState(0);
-    const [inFlight, setInFlight] = useState<DealingCardFlight[]>([]);
-
-    useEffect(() => {
-      setDealingIndex(0);
-      setInFlight([]);
-    }, [playerCount]);
-
-    useEffect(() => {
-      if (maxDeals === 0 || dealingIndex >= maxDeals) {
-        return;
-      }
-      const timer = setTimeout(() => {
-        const seatId = targetSeatIds[dealingIndex % targetSeatIds.length];
-        const cardId = dealingCardIds[dealingIndex % dealingCardIds.length];
-        const id = `deal-${dealingIndex}-${seatId}`;
-        setInFlight(prev => [...prev, { id, seatId, cardId, faceUp: false }]);
-        setDealingIndex(index => index + 1);
-      }, 780);
-
-      return () => clearTimeout(timer);
-    }, [dealingIndex, maxDeals, targetSeatIds]);
-
-    const handleDealingComplete = useCallback((flightId: string) => {
-      setInFlight(prev => prev.filter(card => card.id !== flightId));
-    }, []);
-
-    return (
-      <GameTableStage
-        players={players}
-        dealingCards={inFlight}
-        onDealingCardComplete={handleDealingComplete}
-        {...storyArgs}
-      />
-    );
-  }
+  render: storyArgs => <DealingStory {...storyArgs} />
 };

@@ -1,5 +1,5 @@
 import type express from 'express';
-import { createLobbyRegistry } from '../../infrastructure/lobbyRegistry';
+import type { createLobbyRegistry } from '../../infrastructure/lobbyRegistry';
 
 type Lobby = ReturnType<typeof createLobbyRegistry>;
 

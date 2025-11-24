@@ -1,5 +1,5 @@
 import type { AppServer, AppServerSocket } from '@shared/events';
-import { Heartbeat } from '@shared/messages';
+import type { Heartbeat } from '@shared/messages';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
 

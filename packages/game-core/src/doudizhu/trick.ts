@@ -1,4 +1,5 @@
-import { Combo, ComboType } from './types';
+import type { Combo } from './types';
+import { ComboType } from './types';
 
 export type TrickState<SeatId> = {
   lastCombo: Combo | null;

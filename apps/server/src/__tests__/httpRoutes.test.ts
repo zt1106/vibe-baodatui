@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import http from 'http';
+import type http from 'http';
 import type { AppServer, AppServerSocket } from '@shared/events';
 import { buildAllowedOrigins, createHttpApp } from '../http/app';
 import { registerLobbyRoutes } from '../http/routes/lobby';

@@ -47,9 +47,9 @@ export function CardStack({
   const offsetStep = Math.max(2, Math.round(width * 0.05));
   const displayedTopCard = topCard
     ? {
-        ...topCard,
-        faceUp: faceUpTop ?? topCard.faceUp
-      }
+      ...topCard,
+      faceUp: faceUpTop ?? topCard.faceUp
+    }
     : undefined;
   const { getLayoutId, transition: contextTransition, layoutEnabled } = useCardAnimation();
   const animationSettings = animation ?? {};
@@ -59,10 +59,10 @@ export function CardStack({
   const topCardTransition =
     topDirectives.bounce && animationsEnabled
       ? {
-          ...baseTransition,
-          bounce: Math.max(baseTransition.bounce ?? 0.32, 0.32),
-          damping: baseTransition.damping ?? 20
-        }
+        ...baseTransition,
+        bounce: Math.max(baseTransition.bounce ?? 0.32, 0.32),
+        damping: baseTransition.damping ?? 20
+      }
       : baseTransition;
 
   return (

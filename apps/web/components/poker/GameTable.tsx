@@ -106,7 +106,7 @@ export function GameTable({
   players,
   landlordSeatId,
   communityCards = [],
-  dealerSeatId,
+  dealerSeatId: _dealerSeatId,
   phaseLabel = '等待开始',
   callScoreLabel,
   deckCountLabel,
@@ -178,12 +178,9 @@ export function GameTable({
   const fallbackSize = 520;
   const effectiveWidth = dimensions.width || fallbackSize;
   const effectiveHeight = dimensions.height || fallbackSize;
-  const minDimension = Math.min(effectiveWidth, effectiveHeight);
-  const measurementBasis = minDimension > 0 ? minDimension : fallbackSize;
   const centerX = effectiveWidth / 2;
   const centerY = effectiveHeight / 2;
   const avatarSize = PLAYER_AVATAR_SIZE;
-  const communityCardWidth = Math.round(Math.min(Math.max(measurementBasis * 0.14, 96), 150));
   const avatarEdgeMargin = avatarSize / 2 + 18;
   const cardEdgeMargin = Math.max(avatarEdgeMargin - 8, 40);
 
@@ -242,8 +239,6 @@ export function GameTable({
     cardRadiusY,
     dealerRadiusX,
     dealerRadiusY,
-    effectiveHeight,
-    effectiveWidth,
     centerX,
     centerY,
     visiblePlayers
@@ -281,8 +276,8 @@ export function GameTable({
         sceneAlign === 'flex-start'
           ? 'flex-start'
           : sceneAlign === 'flex-end'
-          ? 'flex-end'
-          : 'center',
+            ? 'flex-end'
+            : 'center',
       alignItems: 'flex-start'
     }),
     [resolvedSceneHeight, sceneAlign, sceneWidth]
@@ -378,16 +373,16 @@ export function GameTable({
               ))}
             </AnimatePresence>
             <div className={styles.communityRow}>
-            {communityCards.length > 0 ? (
-              <CardRow
-                cards={communityCards}
-                size={communityCardSize}
-                overlap="65%"
-                angle={0}
-                curveVerticalOffset={18}
-                selectionMode="none"
-              />
-            ) : null}
+              {communityCards.length > 0 ? (
+                <CardRow
+                  cards={communityCards}
+                  size={communityCardSize}
+                  overlap="65%"
+                  angle={0}
+                  curveVerticalOffset={18}
+                  selectionMode="none"
+                />
+              ) : null}
             </div>
             {seatPositions.length === 0 && (
               <div className={styles.emptyState}>等待玩家坐下…</div>

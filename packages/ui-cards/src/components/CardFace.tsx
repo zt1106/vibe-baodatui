@@ -105,22 +105,22 @@ export function CardFace({ card, variant = 'classic', className, style, ...rest 
     <div
       {...rest}
       className={clsx('v-card-face', className)}
-    style={{
-      width: '100%',
-      height: '100%',
-      borderRadius: 'inherit',
-      border: `2px solid ${palette.border}`,
-      background: palette.background,
-      color: accent,
-      userSelect: 'none',
-      display: 'grid',
-      gridTemplateRows: 'auto 1fr auto',
-      padding: 'var(--v-card-face-padding, 0.65rem)',
-      boxSizing: 'border-box',
-      position: 'relative',
-      overflow: 'hidden',
-      ...style
-    }}
+      style={{
+        width: '100%',
+        height: '100%',
+        borderRadius: 'inherit',
+        border: `2px solid ${palette.border}`,
+        background: palette.background,
+        color: accent,
+        userSelect: 'none',
+        display: 'grid',
+        gridTemplateRows: 'auto 1fr auto',
+        padding: 'var(--v-card-face-padding, 0.65rem)',
+        boxSizing: 'border-box',
+        position: 'relative',
+        overflow: 'hidden',
+        ...style
+      }}
     >
       <div style={topCornerStyle}>{renderTopCornerContent()}</div>
       <div style={centerSymbolStyle} aria-hidden>

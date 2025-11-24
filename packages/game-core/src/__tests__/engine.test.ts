@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeDeck } from '../cards';
 import { shuffle } from '../shuffle';
-import { createTable, joinTable, deal, resetDeck, clearHands, drawCard, reduceTable } from '../engine';
+import { createTable, joinTable, deal, clearHands, drawCard, reduceTable } from '../engine';
 
 describe('deck + shuffle', () => {
   it('builds one pack (54 cards with jokers)', () => {

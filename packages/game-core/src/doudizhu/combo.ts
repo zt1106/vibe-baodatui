@@ -1,6 +1,7 @@
 import type { GameCard } from '@shared/messages';
 
-import { Combo, ComboType, RankValue, isBigJoker, isSmallJoker, rankValue, sortCardsByRank } from './types';
+import type { Combo, RankValue } from './types';
+import { ComboType, isBigJoker, isSmallJoker, rankValue, sortCardsByRank } from './types';
 
 type RankCounts = Map<RankValue, number>;
 

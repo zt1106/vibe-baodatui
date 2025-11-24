@@ -11,14 +11,14 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: 'pnpm -C .. dev',
-        url: 'http://localhost:3000',
-        reuseExistingServer: !process.env.CI,
-        env: {
-          ...process.env,
-          ISTANBUL_COVERAGE: process.env.ISTANBUL_COVERAGE ?? '0',
-        },
+      command: 'pnpm -C .. dev',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+      env: {
+        ...process.env,
+        ISTANBUL_COVERAGE: process.env.ISTANBUL_COVERAGE ?? '0',
       },
+    },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],

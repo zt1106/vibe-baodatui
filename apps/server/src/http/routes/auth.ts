@@ -7,10 +7,12 @@ import {
   UpdateAvatarRequest,
   UpdateNicknameRequest
 } from '@shared/messages';
+import type {
+  createUserRegistry
+} from '../../infrastructure/userRegistry';
 import {
   DuplicateNicknameError,
-  UserNotFoundError,
-  createUserRegistry
+  UserNotFoundError
 } from '../../infrastructure/userRegistry';
 
 type Users = ReturnType<typeof createUserRegistry>;

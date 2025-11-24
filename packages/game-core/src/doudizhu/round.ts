@@ -3,7 +3,8 @@ import type { GameCard } from '@shared/messages';
 import { makeDeck } from '../cards';
 import { shuffle } from '../shuffle';
 import { beats, classifyCombo } from './combo';
-import { Combo, ComboType, DdzConfig, Role, Seat, SEATS, normalizeConfig, nextSeat } from './types';
+import type { Combo, DdzConfig, Role, Seat } from './types';
+import { ComboType, SEATS, normalizeConfig, nextSeat } from './types';
 import { advanceTrick } from './trick';
 
 export type BidValue = 0 | 1 | 2 | 3;

@@ -28,14 +28,14 @@ export function CardBack({
   const palette = VARIANT_PALETTES[variant] ?? VARIANT_PALETTES.red;
   const patternStyle: CSSProperties = customPatternUrl
     ? {
-        backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.55)), url(${customPatternUrl})`,
-        backgroundSize: 'cover'
-      }
+      backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.55)), url(${customPatternUrl})`,
+      backgroundSize: 'cover'
+    }
     : {
-        backgroundImage: buildPattern(palette.accent),
-        backgroundSize: '180% 180%',
-        backgroundPosition: 'center'
-      };
+      backgroundImage: buildPattern(palette.accent),
+      backgroundSize: '180% 180%',
+      backgroundPosition: 'center'
+    };
 
   return (
     <div

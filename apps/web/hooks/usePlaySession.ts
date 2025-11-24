@@ -64,7 +64,7 @@ export function usePlaySession(tableId: string, options: UsePlaySessionOptions =
     if (!snapshot || !user) return null;
     const seat = snapshot.seats.find(entry => entry.userId === user.id);
     return seat?.seatId ?? null;
-  }, [snapshot, user?.id]);
+  }, [snapshot, user]);
 
   const { dealingFlights, handleDealingComplete } = useDealingFlights({
     resetKey: tableId,
@@ -551,8 +551,7 @@ function useTableSocketLifecycle({
     syncPhaseFromSnapshot,
     tableId,
     resetPhase,
-    user?.id,
-    user?.nickname
+    user
   ]);
 
   return { socketRef, releaseSocket };

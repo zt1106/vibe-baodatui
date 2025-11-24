@@ -132,8 +132,8 @@ export function GameResultDialog({ result, players, currentUserId, onClose }: Ga
                         ? '农民加倍'
                         : '未加倍'
                       : entry.doubled
-                      ? '地主再加倍'
-                      : '未再加倍'}
+                        ? '地主再加倍'
+                        : '未再加倍'}
                   </span>
                   {entry.factors.landlordRedouble && entry.role === 'FARMER' && (
                     <span className={styles.factorChip}>再加倍生效</span>

@@ -4,7 +4,8 @@ import clsx from 'clsx';
 import {
   type CSSProperties,
   type DragEvent,
-  type HTMLAttributes,
+  type ButtonHTMLAttributes,
+  type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
@@ -23,7 +24,7 @@ type CardStyleProperties = CSSProperties & {
   [customVar: `--${string}`]: string | undefined;
 };
 
-export interface PlayingCardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
+export interface PlayingCardProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   card: Card;
   size?: CardSize;
   faceVariant?: CardFaceVariant;
@@ -52,7 +53,7 @@ const ELEVATION_SHADOW: Record<NonNullable<PlayingCardProps['elevation']>, strin
   3: '0 28px 70px rgba(15, 23, 42, 0.45)'
 };
 
-export const PlayingCard = forwardRef<HTMLDivElement, PlayingCardProps>(function PlayingCard(
+export const PlayingCard = forwardRef<HTMLButtonElement, PlayingCardProps>(function PlayingCard(
   {
     card,
     size = 'md',
@@ -124,10 +125,16 @@ export const PlayingCard = forwardRef<HTMLDivElement, PlayingCardProps>(function
     opacity: disabled ? 0.6 : 1,
     cursor,
     filter: filterValue,
+    background: 'transparent',
+    border: 'none',
+    padding: 0,
+    appearance: 'none',
     transition: 'filter 0.15s ease, box-shadow 0.2s ease, transform 0.15s ease',
     ...(styleRest as CSSProperties),
     transformOrigin: 'center center'
   };
+
+  const interactive = Boolean(onClick || onLongPress || draggable || onPointerDown || onPointerUp);
 
   const cancelLongPress = () => {
     if (longPressTimer.current != null) {
@@ -174,6 +181,14 @@ export const PlayingCard = forwardRef<HTMLDivElement, PlayingCardProps>(function
       return;
     }
     onClick?.(event);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!onClick || disabled) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick(event as unknown as MouseEvent<HTMLDivElement>);
+    }
   };
 
   const staticContent = (
@@ -227,24 +242,27 @@ export const PlayingCard = forwardRef<HTMLDivElement, PlayingCardProps>(function
   );
 
   return (
-    <div
+    <button
       {...rest}
       ref={ref}
       data-card-id={String(card.id)}
       data-selected={selected ? 'true' : undefined}
       data-highlighted={highlighted ? 'true' : undefined}
       data-disabled={disabled ? 'true' : undefined}
+      type="button"
       draggable={draggable}
       className={clsx('v-playing-card', className)}
       style={combinedStyle}
-      role={onClick ? 'button' : undefined}
+      role={interactive ? 'button' : undefined}
       aria-pressed={selected ?? undefined}
       aria-disabled={disabled ?? undefined}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={cancelLongPress}
-      onClick={handleClick}
-      onDragStartCapture={handleDragStart}
+      tabIndex={interactive ? (disabled ? -1 : 0) : undefined}
+      onPointerDown={interactive ? handlePointerDown : undefined}
+      onPointerUp={interactive ? handlePointerUp : undefined}
+      onPointerLeave={interactive ? cancelLongPress : undefined}
+      onClick={onClick ? handleClick : undefined}
+      onKeyDown={onClick ? handleKeyDown : undefined}
+      onDragStartCapture={draggable ? handleDragStart : undefined}
     >
       {flipEnabled ? flipContent : staticContent}
       {highlightFrame}
@@ -259,7 +277,7 @@ export const PlayingCard = forwardRef<HTMLDivElement, PlayingCardProps>(function
           {renderOverlay}
         </div>
       )}
-    </div>
+    </button>
   );
 });
 

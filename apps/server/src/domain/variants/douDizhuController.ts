@@ -1,5 +1,6 @@
 import { clearHands, resetDeck } from '@game-core/engine';
-import { advanceTrick, Combo, ComboType, createPlayValidator } from '@game-core/doudizhu';
+import type { Combo } from '@game-core/doudizhu';
+import { advanceTrick, ComboType, createPlayValidator } from '@game-core/doudizhu';
 import type { AppServerSocket } from '@shared/events';
 import type { GameCard, GameResult } from '@shared/messages';
 import { derivePhaseStatus } from '@shared/tablePhases';
@@ -66,38 +67,38 @@ export class DouDizhuController implements VariantController {
     const doublingSnapshot =
       state?.doubling && state.landlordSeatId
         ? {
-            currentSeatId: state.doubling.finished
-              ? state.landlordSeatId
-              : state.doubling.order[state.doubling.turnIndex] ?? state.landlordSeatId,
-            defenderDoubles: state.doubling.defenderDoubles,
-            landlordRedoubled: state.doubling.landlordRedoubled,
-            finished: state.doubling.finished
-          }
+          currentSeatId: state.doubling.finished
+            ? state.landlordSeatId
+            : state.doubling.order[state.doubling.turnIndex] ?? state.landlordSeatId,
+          defenderDoubles: state.doubling.defenderDoubles,
+          landlordRedoubled: state.doubling.landlordRedoubled,
+          finished: state.doubling.finished
+        }
         : undefined;
     const lastComboSnapshot =
       state?.play?.lastCombo && state.play.lastSeatId
         ? {
-            seatId: state.play.lastSeatId,
-            type: state.play.lastCombo.type,
-            cards: state.play.lastCombo.cards.map(card => ({ ...card })),
-            mainRank: state.play.lastCombo.mainRank,
-            length: state.play.lastCombo.length
-          }
+          seatId: state.play.lastSeatId,
+          type: state.play.lastCombo.type,
+          cards: state.play.lastCombo.cards.map(card => ({ ...card })),
+          mainRank: state.play.lastCombo.mainRank,
+          length: state.play.lastCombo.length
+        }
         : undefined;
     const trickCombos =
       state?.play?.trickCombos && Object.keys(state.play.trickCombos).length > 0
         ? Object.fromEntries(
-            Object.entries(state.play.trickCombos).map(([seatId, combo]) => [
+          Object.entries(state.play.trickCombos).map(([seatId, combo]) => [
+            seatId,
+            {
               seatId,
-              {
-                seatId,
-                type: combo.type,
-                cards: combo.cards.map(card => ({ ...card, faceUp: true })),
-                mainRank: combo.mainRank,
-                length: combo.length
-              }
-            ])
-          )
+              type: combo.type,
+              cards: combo.cards.map(card => ({ ...card, faceUp: true })),
+              mainRank: combo.mainRank,
+              length: combo.length
+            }
+          ])
+        )
         : undefined;
     return {
       deckCount,

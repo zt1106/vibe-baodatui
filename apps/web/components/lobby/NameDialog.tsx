@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 import styles from './NameDialog.module.css';
 
 type NameDialogProps = {
@@ -21,6 +23,13 @@ export function NameDialog({
   onConfirm,
   onChangeName
 }: NameDialogProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    inputRef.current?.focus();
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -40,10 +49,10 @@ export function NameDialog({
         <label className={styles.field}>
           <span className={styles.label}>昵称</span>
           <input
+            ref={inputRef}
             value={nameDraft}
             onChange={event => onChangeName(event.target.value)}
             maxLength={32}
-            autoFocus
             className={styles.input}
           />
         </label>

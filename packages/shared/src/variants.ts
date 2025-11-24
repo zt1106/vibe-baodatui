@@ -1,4 +1,4 @@
-import {
+import type {
   GameVariantId,
   GameVariantSummary,
   GameVariantCapacity

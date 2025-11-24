@@ -4,8 +4,9 @@ import {
   TablePlayStateResponse,
   TablePrepareResponse
 } from '@shared/messages';
-import { createUserRegistry } from '../../infrastructure/userRegistry';
-import { TableManager, normalizeTableId } from '../../domain/tableManager';
+import type { createUserRegistry } from '../../infrastructure/userRegistry';
+import type { TableManager } from '../../domain/tableManager';
+import { normalizeTableId } from '../../domain/tableManager';
 
 type Users = ReturnType<typeof createUserRegistry>;
 

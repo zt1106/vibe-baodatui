@@ -73,7 +73,7 @@ export default function PreparePage({ params }: PreparePageProps) {
     });
     lastResultSeenRef.current = prepareState.lastResult.finishedAt;
     setVisibleResult(prepareState.lastResult);
-  }, [prepareState?.lastResult, prepareState?.players, user?.id]);
+  }, [prepareState?.lastResult, prepareState?.players, tableId, user]);
 
   useEffect(() => {
     if (!prepareState) {
@@ -107,7 +107,7 @@ export default function PreparePage({ params }: PreparePageProps) {
     navigatedToPlayRef.current = true;
     resetSharedHand();
     router.push(`/game/${encodeURIComponent(tableId)}/play`);
-  }, [prepareState, router, tableId, user?.id]);
+  }, [prepareState, router, tableId, user]);
 
   useEffect(() => {
     if (prepareStatus !== 'error' || prepareError !== '你已被房主移出房间。') {
@@ -155,12 +155,12 @@ export default function PreparePage({ params }: PreparePageProps) {
     if (configDraft === null) return;
     if (prepareState?.config.variant.capacity.locked) return;
     sendTableEvent('table:updateConfig', { tableId, capacity: configDraft });
-  }, [configDraft, sendTableEvent, tableId]);
+  }, [configDraft, prepareState?.config.variant.capacity.locked, sendTableEvent, tableId]);
   const handleCloseResultDialog = useCallback(() => setVisibleResult(null), []);
   const selfPlayer = useMemo(() => {
     if (!prepareState || !user) return null;
     return prepareState.players.find(player => player.userId === user.id) ?? null;
-  }, [prepareState, user?.id]);
+  }, [prepareState, user]);
   const isSelfSeated = Boolean(selfPlayer);
   const selfPrepared = Boolean(selfPlayer?.prepared);
   const everyonePrepared = prepareState?.players.every(player => player.prepared) ?? false;
@@ -180,7 +180,7 @@ export default function PreparePage({ params }: PreparePageProps) {
       return;
     }
     sendTableEvent('table:setPrepared', { tableId, prepared: !selfPrepared });
-  }, [isSelfSeated, selfPrepared, sendTableEvent, tableId]);
+  }, [isSelfSeated, selfPrepared, sendTableEvent, setPrepareError, tableId]);
   const seats = useMemo<PrepareSeat[]>(() => {
     if (!prepareState) return [];
     const total = prepareState.config.capacity;

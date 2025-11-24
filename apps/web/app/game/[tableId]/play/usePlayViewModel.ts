@@ -113,16 +113,18 @@ export function usePlayViewModel({
     if (!snapshot) return [];
     return rotateSeats(
       snapshot.seats.map(seat => {
-        const status =
-          tablePhaseStatus === 'complete'
-            ? '等待下一局'
-            : snapshot.lastDealtSeatId === seat.seatId
-            ? '发牌中…'
-            : seat.handCount > 0
-            ? `持有 ${seat.handCount} 张`
-            : tablePhaseStatus === 'dealing'
-            ? '等待发牌'
-            : '等待开局';
+        let status: string;
+        if (tablePhaseStatus === 'complete') {
+          status = '等待下一局';
+        } else if (snapshot.lastDealtSeatId === seat.seatId) {
+          status = '发牌中…';
+        } else if (seat.handCount > 0) {
+          status = `持有 ${seat.handCount} 张`;
+        } else if (tablePhaseStatus === 'dealing') {
+          status = '等待发牌';
+        } else {
+          status = '等待开局';
+        }
         const isCurrentTurn = currentTurnSeatId === seat.seatId;
         const isLandlord = snapshot.landlordSeatId === seat.seatId;
         return {
@@ -225,15 +227,18 @@ export function usePlayViewModel({
       const disabled = !isMyTurn;
       const landlordSeatId = snapshot?.landlordSeatId;
       const isSelfLandlord = Boolean(landlordSeatId && landlordSeatId === selfSeatId);
-      const options: DoubleOption[] = isSelfLandlord
-        ? [
-            { label: disabled ? '等待地主决定…' : '不再加倍', value: false, variant: 'ghost' },
-            { label: '再加倍', value: true, variant: 'secondary' }
-          ]
-        : [
-            { label: disabled ? '等待轮到你…' : '不加倍', value: false, variant: 'ghost' },
-            { label: '加倍', value: true, variant: 'secondary' }
-          ];
+      let options: DoubleOption[];
+      if (isSelfLandlord) {
+        options = [
+          { label: disabled ? '等待地主决定…' : '不再加倍', value: false, variant: 'ghost' },
+          { label: '再加倍', value: true, variant: 'secondary' }
+        ];
+      } else {
+        options = [
+          { label: disabled ? '等待轮到你…' : '不加倍', value: false, variant: 'ghost' },
+          { label: '加倍', value: true, variant: 'secondary' }
+        ];
+      }
       return { stage: 'doubling', options, disabled, onSelect: sendDouble };
     }
     if (tablePhaseStatus === 'playing') {

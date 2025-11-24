@@ -1,10 +1,11 @@
 import { randomUUID } from 'crypto';
-import {
-  deriveLobbyRoomStatus,
+import type {
   GameSnapshot,
   GameVariantId,
   GameResult,
-  ServerState,
+  ServerState } from '@shared/messages';
+import {
+  deriveLobbyRoomStatus,
   TablePlayStateResponse,
   TablePrepareResponse
 } from '@shared/messages';
@@ -13,8 +14,9 @@ import { createTable, joinTable, resetDeck } from '@game-core/engine';
 import { DEFAULT_AVATAR, type AvatarFilename } from '@shared/avatars';
 import { GAME_VARIANTS_BY_ID, getVariantDefinition, getVariantSummary } from '@shared/variants';
 import { derivePhaseStatus, initialTablePhase, tablePhaseReducer } from '@shared/tablePhases';
-import { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
-import { DuplicateNicknameError, UserNotFoundError, createUserRegistry } from '../infrastructure/userRegistry';
+import type { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
+import type { createUserRegistry } from '../infrastructure/userRegistry';
+import { DuplicateNicknameError, UserNotFoundError } from '../infrastructure/userRegistry';
 import { ClassicController } from './variants/classicController';
 import { DouDizhuController } from './variants/douDizhuController';
 import { TableDealingCoordinator } from './tableDealing';

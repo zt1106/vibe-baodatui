@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { GameTableStage } from '../../../../components/poker/GameTableStage';
 import { usePlaySession } from '../../../../hooks/usePlaySession';
 import { createPlayValidator } from '@game-core/doudizhu';
-import type { Card } from '@poker/core-cards';
 import { ActionControls } from './ActionControls';
 import { usePlayViewModel } from './usePlayViewModel';
 

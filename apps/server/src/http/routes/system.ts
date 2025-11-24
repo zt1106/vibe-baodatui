@@ -1,5 +1,5 @@
 import type express from 'express';
-import { createHeartbeatPublisher } from '../../infrastructure/heartbeat';
+import type { createHeartbeatPublisher } from '../../infrastructure/heartbeat';
 
 type Heartbeat = ReturnType<typeof createHeartbeatPublisher>;
 

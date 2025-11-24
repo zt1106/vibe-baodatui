@@ -9,8 +9,8 @@ import {
   GameDoubleRequest,
   GamePlayRequest
 } from '@shared/messages';
-import { TableManager } from '../domain/tableManager';
-import { createHeartbeatPublisher } from '../infrastructure/heartbeat';
+import type { TableManager } from '../domain/tableManager';
+import type { createHeartbeatPublisher } from '../infrastructure/heartbeat';
 
 type Heartbeat = ReturnType<typeof createHeartbeatPublisher>;
 

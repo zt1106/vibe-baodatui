@@ -1,4 +1,5 @@
-import { Card, CardId, JokerSuit, Rank, RANKS, Suit, SUITS } from './types';
+import type { Card, CardId, JokerSuit, Rank, Suit } from './types';
+import { RANKS, SUITS } from './types';
 
 function normalizeRank(rank: Rank) {
   return rank;

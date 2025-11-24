@@ -19,10 +19,10 @@ export function LobbyFooter({ status, latencyMs }: LobbyFooterProps) {
     status === 'online'
       ? '连接正常'
       : status === 'degraded'
-      ? '连接不稳定'
-      : status === 'connecting'
-      ? '正在连接…'
-      : '连接已断开';
+        ? '连接不稳定'
+        : status === 'connecting'
+          ? '正在连接…'
+          : '连接已断开';
 
   return (
     <footer className={styles.footer}>

@@ -1,7 +1,8 @@
 import type { GameCard } from '@shared/messages';
 
 import { beats, classifyCombo } from './combo';
-import { Combo, ComboType } from './types';
+import type { Combo } from './types';
+import { ComboType } from './types';
 
 export interface ComboMatcher {
   type: ComboType;
