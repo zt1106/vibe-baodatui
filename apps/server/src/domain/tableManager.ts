@@ -534,16 +534,22 @@ export class TableManager {
       return;
     }
 
-    if (table.state.seats.length >= table.config.capacity) {
+    const reconnecting = Boolean(seatForUser);
+    if (!reconnecting && table.state.seats.length >= table.config.capacity) {
       socket.emit('errorMessage', { message: 'Table is full' });
       return;
     }
 
-    joinTable(table.state, socket.id, user.nickname, user.id);
+    if (!reconnecting) {
+      joinTable(table.state, socket.id, user.nickname, user.id);
+    }
+
     socket.join(tableId);
     this.socketTable.set(socket.id, tableId);
     this.socketUsers.set(socket.id, user.id);
-    table.prepared.set(user.id, false);
+    if (!reconnecting) {
+      table.prepared.set(user.id, false);
+    }
     this.updateLobbyFromState(tableId);
     this.emitState(tableId);
     this.emitGameSnapshot(table);

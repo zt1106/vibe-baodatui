@@ -691,25 +691,6 @@ landlordScore = -(defenderScore[farmer0] + defenderScore[farmer1]);
 
 This ensures zero-sum property per round.
 
-### 10.4 Alternative simple scoring (optional)
-
-Many casual/English descriptions (Pagat, Wikipedia) use a simpler scheme: initial stake equal to bid; each bomb/rocket doubles the whole stake; spring doubles again. ([pagat.com][2])
-
-If you want simpler logic (e.g. local testing), use:
-
-```ts
-exponent = B + R + S;
-multiplier = 2 ** exponent;
-stake = callScore * multiplier; // base per landlord vs each farmer pair
-
-if (landlordWin) {
-  landlordScore = +2 * stake;   // gets stake from both farmers
-  farmerScoreEach = -stake;
-} else {
-  landlordScore = -2 * stake;
-  farmerScoreEach = +stake;
-}
-```
 
 ---
 
