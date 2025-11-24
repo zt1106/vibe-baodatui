@@ -76,6 +76,12 @@ export class TableSeatManager {
   }
 
   endGameAndReset(table: ManagedTable, reason: GameEndReason | undefined, result?: GameResult) {
+    console.info('[seatManager] endGameAndReset', {
+      tableId: table.id,
+      reason,
+      hasStarted: table.hasStarted,
+      result: result ? { winner: result.winner, finishedAt: result.finishedAt } : null
+    });
     table.hasStarted = false;
     this.transitionPhase(table, { type: 'reset' });
     this.dealing.stop(table);
@@ -107,6 +113,13 @@ export class TableSeatManager {
   }
 
   removePlayerSeat(table: ManagedTable, seatId: string, departingUserId?: number) {
+    console.info('[seatManager] removePlayerSeat', {
+      tableId: table.id,
+      seatId,
+      departingUserId,
+      hasStarted: table.hasStarted,
+      lastResult: Boolean(table.lastResult)
+    });
     const index = table.state.seats.indexOf(seatId);
     if (index === -1) {
       return;
@@ -138,6 +151,12 @@ export class TableSeatManager {
   cleanupPlayerSocket(socketId: string) {
     const tableId = this.socketTable.get(socketId);
     const userId = this.socketUsers.get(socketId);
+    console.info('[seatManager] cleanupPlayerSocket', {
+      socketId,
+      tableId,
+      userId,
+      hasMapping: Boolean(tableId)
+    });
     this.socketTable.delete(socketId);
     this.socketUsers.delete(socketId);
     if (!tableId) {
@@ -149,6 +168,7 @@ export class TableSeatManager {
     }
     if (managed.lastResult && !managed.hasStarted) {
       // Keep seats intact after a completed round so the prepare room stays populated.
+       console.info('[seatManager] skip removal post-result', { tableId, socketId });
       return;
     }
     const seatIndex = managed.state.seats.indexOf(socketId);

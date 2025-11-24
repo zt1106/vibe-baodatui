@@ -148,6 +148,11 @@ export function usePrepareRoom(tableId: string) {
     );
 
     const handleState = (payload: ServerState) => {
+      console.info('[prepare] state', {
+        tableId: payload.tableId,
+        status: payload.status,
+        players: payload.seats.map(seat => seat.userId)
+      });
       if (payload.tableId !== tableId) {
         return;
       }

@@ -201,6 +201,10 @@ export class TableManager {
   }
 
   private completeGame(table: ManagedTable, result?: GameResult) {
+    console.info('[tableManager] completeGame', {
+      tableId: table.id,
+      result: result ? { winner: result.winner, finishedAt: result.finishedAt } : null
+    });
     table.lastResult = result ?? null;
     this.seatManager.endGameAndReset(table, 'completed', result);
     this.updateLobbyFromState(table.id);
@@ -549,6 +553,7 @@ export class TableManager {
     const tableId = normalizeTableId(payload.tableId ?? '');
     const managed = this.ensureHostAction(socket, tableId);
     if (!managed) return;
+    console.info('[tableManager] handleStart', { tableId, hasStarted: managed.hasStarted });
     if (managed.hasStarted) {
       socket.emit('errorMessage', { message: '牌局已经开始' });
       return;
@@ -576,6 +581,7 @@ export class TableManager {
       ack?.({ ok: false, message: '当前牌桌不支持叫分' });
       return;
     }
+    console.info('[tableManager] handleBid', { tableId, seatId: socket.id, bid: payload.bid });
     this.douDizhuController.handleBid(managed, socket, { bid: payload.bid }, ack);
   }
 
@@ -590,6 +596,7 @@ export class TableManager {
       ack?.({ ok: false, message: '当前牌桌不支持加倍' });
       return;
     }
+    console.info('[tableManager] handleDouble', { tableId, seatId: socket.id, double: payload.double });
     this.douDizhuController.handleDouble(managed, socket, { double: payload.double }, ack);
   }
 
@@ -608,6 +615,7 @@ export class TableManager {
       ack?.({ ok: false, message: '当前牌桌不支持出牌' });
       return;
     }
+    console.info('[tableManager] handlePlay', { tableId, seatId: socket.id, cardCount: payload.cardIds.length });
     this.douDizhuController.handlePlay(managed, socket, { cardIds: payload.cardIds }, ack);
   }
 
@@ -710,6 +718,7 @@ export class TableManager {
     if (!tableId) return;
     const managed = this.tables.get(tableId);
     if (!managed) return;
+    console.info('[tableManager] handleLeave', { tableId, socketId: socket.id });
     const userId = payload?.userId ?? this.socketUsers.get(socket.id);
     if (!userId) return;
     const seatId =

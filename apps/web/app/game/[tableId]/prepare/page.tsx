@@ -66,6 +66,11 @@ export default function PreparePage({ params }: PreparePageProps) {
     const participated = prepareState.players.some(player => player.userId === user.id);
     if (!participated) return;
     if (lastResultSeenRef.current === prepareState.lastResult.finishedAt) return;
+    console.info('[prepare] show result dialog', {
+      tableId,
+      finishedAt: prepareState.lastResult.finishedAt,
+      winner: prepareState.lastResult.winner
+    });
     lastResultSeenRef.current = prepareState.lastResult.finishedAt;
     setVisibleResult(prepareState.lastResult);
   }, [prepareState?.lastResult, prepareState?.players, user?.id]);

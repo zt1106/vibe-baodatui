@@ -185,29 +185,35 @@ export function attachTableSocketLifecycle(
   const joinPayload = { ...payload, tableId };
 
   const requestJoin = () => {
+    console.info('[tableSocket] requestJoin', joinPayload);
     socket.emit('joinTable', joinPayload);
   };
 
   const handleConnect = () => {
+    console.info('[tableSocket] connect', { tableId });
     requestJoin();
     callbacks.onConnect?.();
   };
 
   const handleReconnect = () => {
+    console.info('[tableSocket] reconnect', { tableId });
     clearTableSocketJoin(tableId);
     requestJoin();
     callbacks.onReconnect?.();
   };
 
   const handleConnectError = (error: Error) => {
+    console.warn('[tableSocket] connect_error', { tableId, error: error.message });
     callbacks.onConnectError?.(error);
   };
 
   const handleServerError = (serverPayload: { message?: string }) => {
+    console.warn('[tableSocket] server_error', { tableId, message: serverPayload?.message });
     callbacks.onServerError?.(serverPayload);
   };
 
   const handleKicked = (serverPayload: { tableId?: string }) => {
+    console.warn('[tableSocket] kicked', serverPayload);
     callbacks.onKicked?.(serverPayload);
   };
 
