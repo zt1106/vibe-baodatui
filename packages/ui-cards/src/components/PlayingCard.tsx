@@ -143,7 +143,7 @@ export const PlayingCard = forwardRef<HTMLButtonElement, PlayingCardProps>(funct
     }
   };
 
-  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
     if (disabled) {
       event.preventDefault();
       return;
@@ -158,12 +158,12 @@ export const PlayingCard = forwardRef<HTMLButtonElement, PlayingCardProps>(funct
     onPointerDown?.(event);
   };
 
-  const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
+  const handlePointerUp = (event: PointerEvent<HTMLButtonElement>) => {
     cancelLongPress();
     onPointerUp?.(event);
   };
 
-  const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
+  const handleDragStart = (event: DragEvent<HTMLButtonElement>) => {
     if (!draggable) return;
     if (dragData !== undefined) {
       try {
@@ -175,7 +175,7 @@ export const PlayingCard = forwardRef<HTMLButtonElement, PlayingCardProps>(funct
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (disabled) {
       event.preventDefault();
       return;
@@ -183,11 +183,11 @@ export const PlayingCard = forwardRef<HTMLButtonElement, PlayingCardProps>(funct
     onClick?.(event);
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!onClick || disabled) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      onClick(event as unknown as MouseEvent<HTMLDivElement>);
+      onClick(event as unknown as MouseEvent<HTMLButtonElement>);
     }
   };
 

@@ -12,7 +12,7 @@ const DEFAULT_INITIAL = { opacity: 0, scale: 0.95 };
 const DEFAULT_ANIMATE = { opacity: 1, scale: 1 };
 const DEFAULT_EXIT = { opacity: 0, scale: 0.85 };
 
-export type AnimatedCardProps = PlayingCardProps & HTMLMotionProps<'div'>;
+export type AnimatedCardProps = PlayingCardProps & HTMLMotionProps<'button'>;
 
 export function AnimatedCard({
   layout,

@@ -159,7 +159,8 @@ describe('round flow', () => {
     state.play.rocketCount = 0;
 
     expect(applyPlay(state, 2, [landlordCards[0]]).ok).toBe(true);
-    expect(state.play.lastNonPassCombo?.type).toBe(ComboType.SINGLE);
+    const lastCombo = state.play.lastNonPassCombo!;
+    expect(lastCombo.type).toBe(ComboType.SINGLE);
     expect(applyPlay(state, 0, farmer0Cards.slice(0, 4)).ok).toBe(true); // bomb
     expect(state.play.bombCount).toBe(1);
     expect(applyPlay(state, 1, []).ok).toBe(true); // pass

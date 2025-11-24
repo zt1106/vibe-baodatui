@@ -11,7 +11,7 @@ export type BidValue = 0 | 1 | 2 | 3;
 
 export type RoundPhase = 'BIDDING' | 'DOUBLING' | 'PLAY' | 'COMPLETE';
 
-export interface PlayerState {
+export interface DdzPlayerState {
   seat: Seat;
   role: Role | null;
   hand: GameCard[];
@@ -72,7 +72,7 @@ export interface RoundState {
   config: Required<DdzConfig>;
   deck: GameCard[];
   bottomCards: GameCard[];
-  players: Record<Seat, PlayerState>;
+  players: Record<Seat, DdzPlayerState>;
   landlordSeat: Seat | null;
   callScore: BidValue;
   bidding: BiddingState;
@@ -108,7 +108,7 @@ export function createRoundState(seed: string, options: CreateRoundOptions = {})
     }
   }
   const bottomCards = shuffled.slice(deckIndex).map(card => ({ ...card }));
-  const players: Record<Seat, PlayerState> = {
+  const players: Record<Seat, DdzPlayerState> = {
     0: { seat: 0, role: null, hand: hands[0] },
     1: { seat: 1, role: null, hand: hands[1] },
     2: { seat: 2, role: null, hand: hands[2] }

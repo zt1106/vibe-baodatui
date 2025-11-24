@@ -99,7 +99,7 @@ export function CardRow({
   const isDisabled = useCallback((id: CardId) => disabledSet.has(id), [disabledSet]);
 
   const handleClick = useCallback(
-    (card: Card, event?: MouseEvent<HTMLDivElement>) => {
+    (card: Card, event?: MouseEvent<HTMLButtonElement>) => {
       if (isDisabled(card.id)) {
         if (event) {
           event.preventDefault();
@@ -129,7 +129,7 @@ export function CardRow({
   );
 
   const handleKeyDown = useCallback(
-    (card: Card, event: KeyboardEvent<HTMLDivElement>) => {
+    (card: Card, event: KeyboardEvent<HTMLButtonElement>) => {
       if (event.key !== 'Enter' && event.key !== ' ') {
         return;
       }
