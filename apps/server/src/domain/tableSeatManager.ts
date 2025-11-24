@@ -156,7 +156,7 @@ export class TableSeatManager {
       return;
     }
     const departingUserId = managed.state.players[socketId]?.userId ?? userId;
-    if ((managed.hasStarted || managed.lastResult) && typeof departingUserId === 'number') {
+    if (managed.hasStarted && typeof departingUserId === 'number') {
       const existingTimer = managed.pendingDisconnects.get(departingUserId);
       if (existingTimer) {
         clearTimeout(existingTimer);
