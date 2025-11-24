@@ -83,6 +83,8 @@ export class TableSeatManager {
     resetDeck(table.state, { packs: table.variant.deck.packs });
     this.setAllPrepared(table, false);
     table.variantState = {};
+    this.updateLobbyFromState(table.id);
+    this.emitState(table.id);
     this.emitGameSnapshot(table);
     if (reason) {
       this.io.to(table.id).emit('game:ended', { tableId: table.id, reason, result });
