@@ -302,6 +302,7 @@ export class DouDizhuController implements VariantController {
       return {
         userId: player?.userId ?? 0,
         seatId,
+        nickname: player?.nickname ?? '未知玩家',
         role: 'FARMER' as const,
         score,
         doubled,
@@ -331,6 +332,7 @@ export class DouDizhuController implements VariantController {
       {
         userId: landlord?.userId ?? 0,
         seatId: landlordSeatId,
+        nickname: landlord?.nickname ?? '未知玩家',
         role: 'LANDLORD' as const,
         score: landlordScore,
         doubled: landlordRedoubled,

@@ -20,11 +20,16 @@ export function GameResultDialog({ result, players, currentUserId, onClose }: Ga
   const landlordName = players.find(player => player.userId === result.landlordUserId)?.nickname ?? '未知地主';
   const winners = result.winningUserIds.map(id => ({
     id,
-    name: players.find(player => player.userId === id)?.nickname ?? `玩家 ${id}`
+    name:
+      result.scores.find(entry => entry.userId === id)?.nickname ??
+      players.find(player => player.userId === id)?.nickname ??
+      `玩家 ${id}`
   }));
 
   const getPlayerName = (userId: number) =>
-    players.find(player => player.userId === userId)?.nickname ?? `玩家 ${userId}`;
+    result.scores.find(entry => entry.userId === userId)?.nickname ??
+    players.find(player => player.userId === userId)?.nickname ??
+    `玩家 ${userId}`;
 
   return (
     <div role="presentation" className={styles.overlay}>

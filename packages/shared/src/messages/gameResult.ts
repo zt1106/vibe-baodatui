@@ -14,6 +14,7 @@ const PlayerScore = z.object({
   userId: UserId,
   seatId: SeatId,
   role: z.enum(['LANDLORD', 'FARMER']),
+  nickname: z.string(),
   score: z.number(),
   doubled: z.boolean().optional(),
   exponent: z.number().int().nullable().optional(),
