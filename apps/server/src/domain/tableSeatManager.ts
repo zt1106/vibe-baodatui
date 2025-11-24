@@ -145,6 +145,10 @@ export class TableSeatManager {
     if (!managed) {
       return;
     }
+    if (managed.lastResult && !managed.hasStarted) {
+      // Keep seats intact after a completed round so the prepare room stays populated.
+      return;
+    }
     const seatIndex = managed.state.seats.indexOf(socketId);
     if (seatIndex === -1) {
       return;
