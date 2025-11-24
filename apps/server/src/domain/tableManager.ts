@@ -486,24 +486,32 @@ export class TableManager {
 
     const seatForUser = table.state.seats.find(id => table.state.players[id]?.userId === user.id);
 
+    const allowSeatSwap = table.hasStarted || table.lastResult;
     if (table.hasStarted) {
       if (!seatForUser) {
         socket.emit('errorMessage', { message: '牌局已开始，暂无法加入' });
         return;
       }
-      if (seatForUser !== socket.id) {
-        const seatIndex = table.state.seats.indexOf(seatForUser);
-        if (seatIndex !== -1) {
-          table.state.seats[seatIndex] = socket.id;
-        }
-        const playerState = table.state.players[seatForUser];
-        if (playerState) {
-          delete table.state.players[seatForUser];
-          playerState.id = socket.id;
-          playerState.seatId = socket.id;
-          table.state.players[socket.id] = playerState;
-        }
+    }
+
+    if (seatForUser && seatForUser !== socket.id && allowSeatSwap) {
+      const seatIndex = table.state.seats.indexOf(seatForUser);
+      if (seatIndex !== -1) {
+        table.state.seats[seatIndex] = socket.id;
       }
+      const playerState = table.state.players[seatForUser];
+      if (playerState) {
+        delete table.state.players[seatForUser];
+        playerState.id = socket.id;
+        playerState.seatId = socket.id;
+        table.state.players[socket.id] = playerState;
+      }
+    } else if (seatForUser) {
+      socket.emit('errorMessage', { message: 'User already seated at the table' });
+      return;
+    }
+
+    if (table.hasStarted) {
       const pendingTimer = table.pendingDisconnects.get(user.id);
       if (pendingTimer) {
         clearTimeout(pendingTimer);
@@ -519,11 +527,6 @@ export class TableManager {
         hand: (table.state.players[socket.id]?.hand ?? []).map(card => ({ ...card }))
       });
       socket.emit('game:hydrate', hydratePayload);
-      return;
-    }
-
-    if (seatForUser) {
-      socket.emit('errorMessage', { message: 'User already seated at the table' });
       return;
     }
 
