@@ -1,5 +1,6 @@
 import type express from 'express';
 import type { createLobbyRegistry } from '../../infrastructure/lobbyRegistry';
+import { logError } from '../../logger';
 
 type Lobby = ReturnType<typeof createLobbyRegistry>;
 
@@ -8,7 +9,7 @@ export function registerLobbyRoutes(app: express.Express, lobby: Lobby) {
     try {
       res.json(lobby.snapshot());
     } catch (error) {
-      console.error('[server] failed to build lobby snapshot', error);
+      logError('route:lobby.rooms', error);
       res.status(500).json({ error: 'Failed to load lobby rooms' });
     }
   });

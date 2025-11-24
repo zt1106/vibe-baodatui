@@ -5,6 +5,7 @@ import type { ManagedTable } from './tableTypes';
 import type { TableDealingCoordinator } from './tableDealing';
 import type { PhaseAction } from './types';
 import type { createLobbyRegistry } from '../infrastructure/lobbyRegistry';
+import { logInfo } from '../logger';
 
 type SeatManagerDeps = {
   io: AppServer;
@@ -76,7 +77,7 @@ export class TableSeatManager {
   }
 
   endGameAndReset(table: ManagedTable, reason: GameEndReason | undefined, result?: GameResult) {
-    console.info('[seatManager] endGameAndReset', {
+    logInfo('seatManager:endGameAndReset', {
       tableId: table.id,
       reason,
       hasStarted: table.hasStarted,
@@ -113,7 +114,7 @@ export class TableSeatManager {
   }
 
   removePlayerSeat(table: ManagedTable, seatId: string, departingUserId?: number) {
-    console.info('[seatManager] removePlayerSeat', {
+    logInfo('seatManager:removePlayerSeat', {
       tableId: table.id,
       seatId,
       departingUserId,
@@ -151,7 +152,7 @@ export class TableSeatManager {
   cleanupPlayerSocket(socketId: string) {
     const tableId = this.socketTable.get(socketId);
     const userId = this.socketUsers.get(socketId);
-    console.info('[seatManager] cleanupPlayerSocket', {
+    logInfo('seatManager:cleanupPlayerSocket', {
       socketId,
       tableId,
       userId,
@@ -168,7 +169,7 @@ export class TableSeatManager {
     }
     if (managed.lastResult && !managed.hasStarted) {
       // Keep seats intact after a completed round so the prepare room stays populated.
-      console.info('[seatManager] skip removal post-result', { tableId, socketId });
+      logInfo('seatManager:skipRemovalPostResult', { tableId, socketId });
       return;
     }
     const seatIndex = managed.state.seats.indexOf(socketId);

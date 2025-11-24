@@ -7,6 +7,7 @@ import {
 import type { createUserRegistry } from '../../infrastructure/userRegistry';
 import type { TableManager } from '../../domain/tableManager';
 import { normalizeTableId } from '../../domain/tableManager';
+import { logError } from '../../logger';
 
 type Users = ReturnType<typeof createUserRegistry>;
 
@@ -28,7 +29,7 @@ export function registerTableRoutes(
     try {
       res.json(TablePrepareResponse.parse(payload));
     } catch (error) {
-      console.error('[server] failed to build prepare snapshot', error);
+      logError('route:tables.prepare', error, { tableId: requestedId });
       res.status(500).json({ error: 'Failed to load table' });
     }
   });
@@ -52,7 +53,7 @@ export function registerTableRoutes(
     try {
       res.json(TablePlayStateResponse.parse(payload));
     } catch (error) {
-      console.error('[server] failed to build play snapshot', error);
+      logError('route:tables.play', error, { tableId: requestedId, userId });
       res.status(500).json({ error: 'Failed to load play state' });
     }
   });
@@ -75,7 +76,10 @@ export function registerTableRoutes(
       const table = tableManager.createTable(hostRecord, parsed.data.variantId);
       res.status(201).json(table);
     } catch (error) {
-      console.error('[server] failed to create table', error);
+      logError('route:tables.create', error, {
+        hostId: parsed.data.host.userId,
+        variantId: parsed.data.variantId
+      });
       res.status(500).json({ error: 'Failed to create table' });
     }
   });

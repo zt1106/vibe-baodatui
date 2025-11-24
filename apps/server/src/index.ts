@@ -15,6 +15,7 @@ import { TableManager } from './domain/tableManager';
 import { registerTableSocketHandlers } from './socket/tableHandlers';
 import { AutoPlayBot } from './bots/autoPlayBot';
 import { setDealDelayMs } from './domain/tableManager';
+import { logInfo } from './logger';
 
 type ServerCliFlags = {
   autoPlay: boolean;
@@ -70,11 +71,11 @@ registerTableSocketHandlers(io, tableManager, heartbeat);
 const stopHeartbeat = heartbeat.start();
 if (autoPlayBot) {
   autoPlayBot.start();
-  console.info('[server] auto-play mode enabled');
+  logInfo('server:autoPlayEnabled', { dealDelayMs: 100 });
 }
 
 server.listen(Number(env.PORT), () => {
-  console.info(`[server] listening on http://localhost:${env.PORT}`);
+  logInfo('server:listening', { port: env.PORT, origins: Array.from(allowedOrigins) });
 });
 
 server.on('close', stopHeartbeat);

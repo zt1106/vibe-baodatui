@@ -31,6 +31,7 @@ import { TableSeatManager } from './tableSeatManager';
 import type { VariantController, VariantSnapshot } from './variantController';
 import type { ManagedTable } from './tableTypes';
 import type { PhaseAction } from './types';
+import { logError, logInfo } from '../logger';
 
 export { setDealDelayMs } from './tableDealing';
 export type { ManagedTable } from './tableTypes';
@@ -144,7 +145,7 @@ export class TableManager {
   }
 
   private logStructured(event: string, context: Record<string, unknown>) {
-    console.info('[table]', { event, ...context });
+    logInfo(event, { scope: 'table', ...context });
   }
 
   getActiveTableIds() {
@@ -211,7 +212,7 @@ export class TableManager {
   }
 
   private completeGame(table: ManagedTable, result?: GameResult) {
-    console.info('[tableManager] completeGame', {
+    logInfo('tableManager:completeGame', {
       tableId: table.id,
       result: result ? { winner: result.winner, finishedAt: result.finishedAt } : null
     });
@@ -278,7 +279,7 @@ export class TableManager {
       try {
         listener(table, snapshot);
       } catch (error) {
-        console.error('[table] snapshot listener failed', error);
+        logError('table:snapshotListenerFailed', error, { tableId: table.id });
       }
     }
     return snapshot;
@@ -492,7 +493,11 @@ export class TableManager {
       } else if (error instanceof UserNotFoundError) {
         socket.emit('errorMessage', { message: 'Nickname not registered' });
       } else {
-        console.error('[server] failed to process joinTable', error);
+        logError('tableManager:handleJoinFailed', error, {
+          tableId,
+          socketId: socket.id,
+          requestedUserId
+        });
         socket.emit('errorMessage', { message: 'Failed to join table' });
       }
       return;
@@ -569,7 +574,7 @@ export class TableManager {
     const tableId = normalizeTableId(payload.tableId ?? '');
     const managed = this.ensureHostAction(socket, tableId);
     if (!managed) return;
-    console.info('[tableManager] handleStart', { tableId, hasStarted: managed.hasStarted });
+    logInfo('tableManager:handleStart', { tableId, hasStarted: managed.hasStarted });
     if (managed.hasStarted) {
       socket.emit('errorMessage', { message: '牌局已经开始' });
       return;
@@ -597,7 +602,7 @@ export class TableManager {
       ack?.({ ok: false, message: '当前牌桌不支持叫分' });
       return;
     }
-    console.info('[tableManager] handleBid', { tableId, seatId: socket.id, bid: payload.bid });
+    logInfo('tableManager:handleBid', { tableId, seatId: socket.id, bid: payload.bid });
     this.douDizhuController.handleBid(managed, socket, { bid: payload.bid }, ack);
   }
 
@@ -612,7 +617,7 @@ export class TableManager {
       ack?.({ ok: false, message: '当前牌桌不支持加倍' });
       return;
     }
-    console.info('[tableManager] handleDouble', { tableId, seatId: socket.id, double: payload.double });
+    logInfo('tableManager:handleDouble', { tableId, seatId: socket.id, double: payload.double });
     this.douDizhuController.handleDouble(managed, socket, { double: payload.double }, ack);
   }
 
@@ -631,7 +636,7 @@ export class TableManager {
       ack?.({ ok: false, message: '当前牌桌不支持出牌' });
       return;
     }
-    console.info('[tableManager] handlePlay', { tableId, seatId: socket.id, cardCount: payload.cardIds.length });
+    logInfo('tableManager:handlePlay', { tableId, seatId: socket.id, cardCount: payload.cardIds.length });
     this.douDizhuController.handlePlay(managed, socket, { cardIds: payload.cardIds }, ack);
   }
 
@@ -734,7 +739,7 @@ export class TableManager {
     if (!tableId) return;
     const managed = this.tables.get(tableId);
     if (!managed) return;
-    console.info('[tableManager] handleLeave', { tableId, socketId: socket.id });
+    logInfo('tableManager:handleLeave', { tableId, socketId: socket.id });
     const userId = payload?.userId ?? this.socketUsers.get(socket.id);
     if (!userId) return;
     const seatId =

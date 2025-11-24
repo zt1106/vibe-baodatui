@@ -17,7 +17,8 @@
     "@poker/shared": "workspace:*",
     "@poker/game-core": "workspace:*",
     "dotenv": "^16.4.5",
-    "@prisma/client": "^5.19.1"
+    "@prisma/client": "^5.19.1",
+    "pino": "^9.4.0"
   },
   "devDependencies": {
     "tsx": "^4.15.6",

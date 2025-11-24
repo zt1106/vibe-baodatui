@@ -14,6 +14,7 @@ import {
   DuplicateNicknameError,
   UserNotFoundError
 } from '../../infrastructure/userRegistry';
+import { logError } from '../../logger';
 
 type Users = ReturnType<typeof createUserRegistry>;
 
@@ -32,7 +33,7 @@ export function registerAuthRoutes(app: express.Express, users: Users) {
         res.status(409).json({ error: 'Nickname already registered' });
         return;
       }
-      console.error('[server] failed to register user', error);
+      logError('route:auth.register', error, { nickname: parsed.data.nickname });
       res.status(500).json({ error: 'Failed to register user' });
     }
   });
@@ -51,7 +52,7 @@ export function registerAuthRoutes(app: express.Express, users: Users) {
         res.status(404).json({ error: 'Nickname not found' });
         return;
       }
-      console.error('[server] failed to login user', error);
+      logError('route:auth.login', error, { nickname: parsed.data.nickname });
       res.status(500).json({ error: 'Failed to login user' });
     }
   });
@@ -88,7 +89,10 @@ export function registerAuthRoutes(app: express.Express, users: Users) {
         res.status(409).json({ error: 'Nickname already registered' });
         return;
       }
-      console.error('[server] failed to update nickname', error);
+      logError('route:auth.updateNickname', error, {
+        userId: parsed.data.userId,
+        nickname: parsed.data.nickname
+      });
       res.status(500).json({ error: 'Failed to update nickname' });
     }
   });
