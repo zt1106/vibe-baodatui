@@ -3,6 +3,7 @@ import {
   deriveLobbyRoomStatus,
   GameSnapshot,
   GameVariantId,
+  GameResult,
   ServerState,
   TablePlayStateResponse,
   TablePrepareResponse
@@ -92,6 +93,7 @@ export class TableManager {
       updateLobbyFromState: tableId => this.updateLobbyFromState(tableId),
       setAllPrepared: (table, prepared) => this.seatManager.setAllPrepared(table, prepared),
       nextSeatId: (table, seatId) => this.nextSeatId(table, seatId),
+      completeGame: (table, result) => this.completeGame(table, result),
       logStructured: (event, context) => this.logStructured(event, context)
     });
 
@@ -196,6 +198,13 @@ export class TableManager {
   private getVariantSnapshot(table: ManagedTable): VariantSnapshot {
     const controller = this.getVariantController(table);
     return controller.buildSnapshot ? controller.buildSnapshot(table) : { deckCount: table.state.deck.length };
+  }
+
+  private completeGame(table: ManagedTable, result?: GameResult) {
+    table.lastResult = result ?? null;
+    this.seatManager.endGameAndReset(table, 'completed', result);
+    this.updateLobbyFromState(table.id);
+    this.emitState(table.id);
   }
 
   private resolveCurrentTurnSeatId(table: ManagedTable, lastDealtSeatId?: string) {
@@ -313,7 +322,8 @@ export class TableManager {
       config: {
         capacity: table.config.capacity,
         variant: table.config.variant
-      }
+      },
+      lastResult: table.lastResult ?? undefined
     });
   }
 
@@ -351,7 +361,8 @@ export class TableManager {
       phase: initialTablePhase,
       dealingState: null,
       pendingDisconnects: new Map(),
-      variantState: {}
+      variantState: {},
+      lastResult: null
     };
     this.tables.set(normalizedId, managed);
     this.updateLobbyFromState(normalizedId);
@@ -421,7 +432,8 @@ export class TableManager {
           avatar: this.resolveUserAvatar(player.userId),
           prepared: table.prepared.get(player.userId) ?? false,
           handCount: player.hand.length
-        }))
+        })),
+      lastResult: table.lastResult ?? undefined
     };
     this.io.emit('state', snapshot);
   }
@@ -546,6 +558,7 @@ export class TableManager {
       socket.emit('errorMessage', { message: '仍有玩家未准备' });
       return;
     }
+    managed.lastResult = null;
     this.getVariantController(managed).start(managed);
   }
 

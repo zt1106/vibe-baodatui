@@ -1,4 +1,4 @@
-import type { GameVariantSummary } from '@shared/messages';
+import type { GameResult, GameVariantSummary } from '@shared/messages';
 import type { GameVariantDefinition } from '@shared/variants';
 import type { TablePhase } from '@shared/tablePhases';
 import type { createTable } from '@game-core/engine';
@@ -60,6 +60,7 @@ export type ManagedTable = {
   } | null;
   pendingDisconnects: Map<number, NodeJS.Timeout>;
   variantState: Record<string, unknown>;
+  lastResult?: GameResult | null;
 };
 
 // These imports rely on shared types, so keep them at the bottom to avoid circular ordering pitfalls.

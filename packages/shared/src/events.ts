@@ -19,6 +19,7 @@ import {
   TableId,
   UserId
 } from './messages';
+import { GameResult } from './messages/gameResult';
 
 type SocketEventSchema<Payload extends z.ZodTypeAny, Ack extends z.ZodTypeAny | undefined = undefined> =
   { payload: Payload; ack?: Ack };
@@ -33,7 +34,8 @@ const LeaveTableAck = z.object({ ok: z.boolean(), message: z.string().optional()
 
 const GameEndedPayload = z.object({
   tableId: TableId,
-  reason: z.enum(['player-left', 'manual-reset']).optional()
+  reason: z.enum(['player-left', 'manual-reset', 'completed']).optional(),
+  result: GameResult.optional()
 });
 
 const ErrorMessagePayload = z.object({

@@ -1,5 +1,6 @@
 import { clearHands, resetDeck } from '@game-core/engine';
 import type { AppServer } from '@shared/events';
+import type { GameResult } from '@shared/messages';
 import type { ManagedTable } from './tableTypes';
 import type { TableDealingCoordinator } from './tableDealing';
 import type { PhaseAction } from './types';
@@ -17,6 +18,8 @@ type SeatManagerDeps = {
   emitGameSnapshot: (table: ManagedTable) => void;
   updateLobbyFromState: (tableId: string) => void;
 };
+
+type GameEndReason = 'player-left' | 'manual-reset' | 'completed';
 
 const RECONNECT_GRACE_MS = 5_000;
 
@@ -72,7 +75,7 @@ export class TableSeatManager {
     }
   }
 
-  endGameAndReset(table: ManagedTable, reason: 'player-left' | 'manual-reset' | undefined) {
+  endGameAndReset(table: ManagedTable, reason: GameEndReason | undefined, result?: GameResult) {
     table.hasStarted = false;
     this.transitionPhase(table, { type: 'reset' });
     this.dealing.stop(table);
@@ -82,7 +85,7 @@ export class TableSeatManager {
     table.variantState = {};
     this.emitGameSnapshot(table);
     if (reason) {
-      this.io.to(table.id).emit('game:ended', { tableId: table.id, reason });
+      this.io.to(table.id).emit('game:ended', { tableId: table.id, reason, result });
     }
   }
 
@@ -147,7 +150,7 @@ export class TableSeatManager {
       return;
     }
     const departingUserId = managed.state.players[socketId]?.userId ?? userId;
-    if (managed.hasStarted && typeof departingUserId === 'number') {
+    if ((managed.hasStarted || managed.lastResult) && typeof departingUserId === 'number') {
       const existingTimer = managed.pendingDisconnects.get(departingUserId);
       if (existingTimer) {
         clearTimeout(existingTimer);

@@ -11,6 +11,7 @@ import {
   nonNegativeIntSchema,
   positiveIntSchema
 } from './common';
+import { GameResult } from './gameResult';
 import { LobbyRoomStatus } from './lobby';
 
 export const PlayerIdentity = z.object({
@@ -46,7 +47,8 @@ export const TablePrepareResponse = z.object({
   status: LobbyRoomStatus,
   host: TableHost,
   players: z.array(TablePlayer),
-  config: TableConfig
+  config: TableConfig,
+  lastResult: GameResult.optional()
 });
 export type TablePrepareResponse = z.infer<typeof TablePrepareResponse>;
 
@@ -86,7 +88,8 @@ export const ServerState = z.object({
   status: LobbyRoomStatus,
   host: TableHost,
   config: TableConfig,
-  seats: z.array(TableSeatState)
+  seats: z.array(TableSeatState),
+  lastResult: GameResult.optional()
 });
 export type ServerState = z.infer<typeof ServerState>;
 

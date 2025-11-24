@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { TablePrepareResponse } from '@shared/messages';
+import type { GameResult, TablePrepareResponse } from '@shared/messages';
 
 import { HostControls } from '../../../../components/prepare/HostControls';
 import { ReadyPanel } from '../../../../components/prepare/ReadyPanel';
+import { GameResultDialog } from '../../../../components/prepare/GameResultDialog';
 import { SeatGrid, type PrepareSeat } from '../../../../components/prepare/SeatGrid';
 import { StatusBanner } from '../../../../components/prepare/StatusBanner';
 import { resetSharedHand } from '../../../../lib/tableSocket';
@@ -51,10 +52,23 @@ export default function PreparePage({ params }: PreparePageProps) {
   } = usePrepareRoom(tableId);
   const [configDraft, setConfigDraft] = useState<number | null>(null);
   const navigatedToPlayRef = useRef(false);
+  const lastResultSeenRef = useRef<number | null>(null);
+  const [visibleResult, setVisibleResult] = useState<GameResult | null>(null);
 
   useEffect(() => {
     navigatedToPlayRef.current = false;
+    setVisibleResult(null);
+    lastResultSeenRef.current = null;
   }, [tableId]);
+
+  useEffect(() => {
+    if (!prepareState?.lastResult || !user) return;
+    const participated = prepareState.players.some(player => player.userId === user.id);
+    if (!participated) return;
+    if (lastResultSeenRef.current === prepareState.lastResult.finishedAt) return;
+    lastResultSeenRef.current = prepareState.lastResult.finishedAt;
+    setVisibleResult(prepareState.lastResult);
+  }, [prepareState?.lastResult, prepareState?.players, user?.id]);
 
   useEffect(() => {
     if (!prepareState) {
@@ -137,6 +151,7 @@ export default function PreparePage({ params }: PreparePageProps) {
     if (prepareState?.config.variant.capacity.locked) return;
     sendTableEvent('table:updateConfig', { tableId, capacity: configDraft });
   }, [configDraft, sendTableEvent, tableId]);
+  const handleCloseResultDialog = useCallback(() => setVisibleResult(null), []);
   const selfPlayer = useMemo(() => {
     if (!prepareState || !user) return null;
     return prepareState.players.find(player => player.userId === user.id) ?? null;
@@ -173,74 +188,85 @@ export default function PreparePage({ params }: PreparePageProps) {
   const statusTone = prepareState ? seatStatusTone(prepareState.status) : null;
 
   return (
-    <main className={styles.page}>
-      <StatusBanner
-        tableId={tableId}
-        tone={statusTone}
-        variantName={variantConfig?.name ?? null}
-        variantDescription={variantConfig?.description ?? null}
-        user={user}
-        host={prepareState?.host ?? null}
-        authStatus={authStatus}
-        authError={authError}
-        onLeave={handleLeaveRoom}
-      />
-
-      {!tableId && (
-        <section className={styles.warning}>无效的房间地址，请返回大厅重新选择。</section>
+    <>
+      {visibleResult && (
+        <GameResultDialog
+          result={visibleResult}
+          players={prepareState?.players ?? []}
+          currentUserId={user?.id ?? null}
+          onClose={handleCloseResultDialog}
+        />
       )}
 
-      <section className={styles.content}>
-        <SeatGrid
-          seats={seats}
-          playerCount={playerCount}
-          capacity={resolvedCapacity || null}
-          status={prepareStatus}
-          error={prepareError}
-          isHost={isHost}
-          hostUserId={prepareState?.host.userId ?? null}
-          currentUserId={user?.id ?? null}
-          onKickPlayer={handleKickPlayer}
+      <main className={styles.page}>
+        <StatusBanner
+          tableId={tableId}
+          tone={statusTone}
+          variantName={variantConfig?.name ?? null}
+          variantDescription={variantConfig?.description ?? null}
+          user={user}
+          host={prepareState?.host ?? null}
+          authStatus={authStatus}
+          authError={authError}
+          onLeave={handleLeaveRoom}
         />
 
-        <div className={styles.sidebar}>
-          {isHost && (
-            <HostControls
-              playerCount={playerCount}
-              capacity={resolvedCapacity || null}
-              canStart={canHostStart}
-              canAdjustCapacity={canAdjustCapacity}
-              configDraft={configDraft}
-              capacityDisplay={resolvedCapacity || null}
-              capacityLockedValue={capacityLockedValue}
-              configIsDirty={configIsDirty}
-              onStart={handleStartGame}
-              onAdjustCapacity={handleAdjustCapacity}
-              onSaveCapacity={handleSaveConfig}
-            />
-          )}
+        {!tableId && (
+          <section className={styles.warning}>无效的房间地址，请返回大厅重新选择。</section>
+        )}
 
-          <ReadyPanel
-            capacity={resolvedCapacity || null}
+        <section className={styles.content}>
+          <SeatGrid
+            seats={seats}
             playerCount={playerCount}
-            isSelfSeated={isSelfSeated}
-            selfPrepared={selfPrepared}
-            canTogglePrepared={canTogglePrepared}
-            preparedButtonLabel={preparedButtonLabel}
-            onTogglePrepared={handleTogglePrepared}
+            capacity={resolvedCapacity || null}
+            status={prepareStatus}
+            error={prepareError}
+            isHost={isHost}
+            hostUserId={prepareState?.host.userId ?? null}
+            currentUserId={user?.id ?? null}
+            onKickPlayer={handleKickPlayer}
           />
 
-          <section className={styles.placeholder}>
-            <h3 className={styles.placeholderTitle}>上一局战报</h3>
-            <p className={styles.placeholderText}>战报整理中，敬请期待。</p>
-          </section>
+          <div className={styles.sidebar}>
+            {isHost && (
+              <HostControls
+                playerCount={playerCount}
+                capacity={resolvedCapacity || null}
+                canStart={canHostStart}
+                canAdjustCapacity={canAdjustCapacity}
+                configDraft={configDraft}
+                capacityDisplay={resolvedCapacity || null}
+                capacityLockedValue={capacityLockedValue}
+                configIsDirty={configIsDirty}
+                onStart={handleStartGame}
+                onAdjustCapacity={handleAdjustCapacity}
+                onSaveCapacity={handleSaveConfig}
+              />
+            )}
 
-          <section className={`${styles.placeholder} ${styles.placeholderTall}`}>
-            <h3 className={styles.placeholderTitle}>聊天室</h3>
-            <p className={styles.placeholderText}>聊天面板开发中，稍后开放。</p>
-          </section>
-        </div>
-      </section>
-    </main>
+            <ReadyPanel
+              capacity={resolvedCapacity || null}
+              playerCount={playerCount}
+              isSelfSeated={isSelfSeated}
+              selfPrepared={selfPrepared}
+              canTogglePrepared={canTogglePrepared}
+              preparedButtonLabel={preparedButtonLabel}
+              onTogglePrepared={handleTogglePrepared}
+            />
+
+            <section className={styles.placeholder}>
+              <h3 className={styles.placeholderTitle}>上一局战报</h3>
+              <p className={styles.placeholderText}>战报整理中，敬请期待。</p>
+            </section>
+
+            <section className={`${styles.placeholder} ${styles.placeholderTall}`}>
+              <h3 className={styles.placeholderTitle}>聊天室</h3>
+              <p className={styles.placeholderText}>聊天面板开发中，稍后开放。</p>
+            </section>
+          </div>
+        </section>
+      </main>
+    </>
   );
 }

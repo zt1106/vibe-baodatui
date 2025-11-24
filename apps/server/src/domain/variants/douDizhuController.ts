@@ -1,7 +1,7 @@
 import { clearHands, resetDeck } from '@game-core/engine';
 import { advanceTrick, Combo, ComboType, createPlayValidator } from '@game-core/doudizhu';
 import type { AppServerSocket } from '@shared/events';
-import type { GameCard } from '@shared/messages';
+import type { GameCard, GameResult } from '@shared/messages';
 import { derivePhaseStatus } from '@shared/tablePhases';
 import type { ManagedTable, DouDizhuVariantState, BidValue } from '../tableTypes';
 import type { VariantController, VariantSnapshot } from '../variantController';
@@ -16,6 +16,7 @@ type DouDizhuControllerDeps = {
   updateLobbyFromState: (tableId: string) => void;
   setAllPrepared: (table: ManagedTable, prepared: boolean) => void;
   nextSeatId: (table: ManagedTable, seatId: string) => string;
+  completeGame: (table: ManagedTable, result?: GameResult) => void;
   logStructured: (event: string, context: Record<string, unknown>) => void;
 };
 
@@ -27,6 +28,7 @@ export class DouDizhuController implements VariantController {
   private readonly updateLobbyFromState: DouDizhuControllerDeps['updateLobbyFromState'];
   private readonly setAllPrepared: DouDizhuControllerDeps['setAllPrepared'];
   private readonly nextSeatId: DouDizhuControllerDeps['nextSeatId'];
+  private readonly completeGame: DouDizhuControllerDeps['completeGame'];
   private readonly logStructured: DouDizhuControllerDeps['logStructured'];
   private readonly validator = createPlayValidator();
 
@@ -38,6 +40,7 @@ export class DouDizhuController implements VariantController {
     this.updateLobbyFromState = deps.updateLobbyFromState;
     this.setAllPrepared = deps.setAllPrepared;
     this.nextSeatId = deps.nextSeatId;
+    this.completeGame = deps.completeGame;
     this.logStructured = deps.logStructured;
   }
 
@@ -242,6 +245,27 @@ export class DouDizhuController implements VariantController {
     ack?.({ ok: true });
   }
 
+  private buildGameResult(managed: ManagedTable, winnerSeatId: string): GameResult {
+    const state = this.getState(managed);
+    const landlordSeatId = state.landlordSeatId;
+    const landlordUserId = landlordSeatId ? managed.state.players[landlordSeatId]?.userId ?? null : null;
+    const winner = landlordSeatId && winnerSeatId === landlordSeatId ? 'LANDLORD' : 'FARMERS';
+    const winningSeats =
+      winner === 'LANDLORD'
+        ? [landlordSeatId ?? winnerSeatId]
+        : managed.state.seats.filter(id => id !== landlordSeatId);
+    const winningUserIds = winningSeats
+      .map(id => managed.state.players[id]?.userId)
+      .filter((userId): userId is number => typeof userId === 'number');
+
+    return {
+      winner,
+      landlordUserId,
+      winningUserIds,
+      finishedAt: Date.now()
+    };
+  }
+
   handlePlay(
     managed: ManagedTable,
     socket: AppServerSocket,
@@ -321,7 +345,9 @@ export class DouDizhuController implements VariantController {
     if (player.hand.length === 0 && combo.type !== ComboType.PASS) {
       play.finished = true;
       this.transitionPhase(managed, { type: 'complete', reason: 'stopped' });
+      const result = this.buildGameResult(managed, seatId);
       this.emitGameSnapshot(managed);
+      this.completeGame(managed, result);
       ack?.({ ok: true });
       return;
     }

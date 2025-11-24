@@ -3,6 +3,7 @@ export * from './auth';
 export * from './lobby';
 export * from './table';
 export * from './game';
+export * from './gameResult';
 
 import {
   DomainContractVersion,
@@ -57,6 +58,7 @@ import {
   GameSnapshot,
   TablePlayStateResponse
 } from './game';
+import { GameResult } from './gameResult';
 
 export const DomainContracts = {
   version: DomainContractVersion,
@@ -114,7 +116,8 @@ export const DomainContracts = {
     GameSeatState,
     GameSnapshot,
     GameDealCardEvent,
-    TablePlayStateResponse
+    TablePlayStateResponse,
+    GameResult
   }
 } as const;
 export type DomainContracts = typeof DomainContracts;

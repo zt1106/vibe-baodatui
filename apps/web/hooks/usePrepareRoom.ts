@@ -151,7 +151,7 @@ export function usePrepareRoom(tableId: string) {
       if (payload.tableId !== tableId) {
         return;
       }
-      setPrepareState({
+      setPrepareState(prevState => ({
         tableId: payload.tableId,
         status: payload.status,
         host: payload.host,
@@ -161,8 +161,9 @@ export function usePrepareRoom(tableId: string) {
           avatar: player.avatar,
           prepared: player.prepared
         })),
-        config: payload.config
-      });
+        config: payload.config,
+        lastResult: payload.lastResult ?? prevState?.lastResult
+      }));
       if (payload.seats.some(player => player.userId === user.id)) {
         markTableSocketJoined(tableId);
       }

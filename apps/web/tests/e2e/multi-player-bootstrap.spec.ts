@@ -84,7 +84,21 @@ test('bootstrap multi-player session for auto-play', async ({ browser }) => {
     log('entered play view; waiting for auto-play progression');
     await autoAdvanceToPlayPhase(players);
     await expect(host.page.getByText(/阶段：出牌阶段/)).toBeVisible({ timeout: 30_000 });
-    await expect(host.page.getByText(/阶段：本局结束/)).toBeVisible({ timeout: 90_000 });
+    const prepareUrl = `**/game/${encodeURIComponent(createdRoom.tableId)}/prepare`;
+    await Promise.race([
+      host.page.waitForURL(prepareUrl, { timeout: 120_000 }),
+      host.page.getByText(/阶段：本局结束/).waitFor({ timeout: 90_000 }).catch(() => undefined)
+    ]);
+
+    log('round complete; waiting for result dialog');
+    await host.page.waitForURL(prepareUrl, { timeout: 120_000 });
+
+    const resultDialog = host.page.getByRole('dialog', { name: '本局结果' });
+    await expect(resultDialog).toBeVisible({ timeout: 20_000 });
+    await expect(resultDialog.getByText(/你(赢|输)了/)).toBeVisible({ timeout: 5_000 });
+
+    log('result dialog visible; holding for 2s before ending');
+    await host.page.waitForTimeout(2_000);
 
   } finally {
     await Promise.all(

@@ -490,10 +490,16 @@ function useTableSocketLifecycle({
       console.error('[web] play socket connect error', error);
     };
 
-    const handleGameEnded = (payload: { tableId?: string }) => {
+    const handleGameEnded = (payload: { tableId?: string; reason?: string }) => {
       if (!active) return;
       if (payload?.tableId && payload.tableId !== tableId) return;
-      setGameError('有玩家离开，牌局已结束，返回准备房间。');
+      if (payload.reason === 'completed') {
+        setGameError(null);
+      } else if (payload.reason === 'manual-reset') {
+        setGameError('房主已重置牌局，返回准备房间。');
+      } else {
+        setGameError('有玩家离开，牌局已结束，返回准备房间。');
+      }
       resetPhase();
       onGameEnded?.(tableId);
     };
