@@ -185,9 +185,7 @@ export function attachTableSocketLifecycle(
   const joinPayload = { ...payload, tableId };
 
   const requestJoin = () => {
-    if (!isTableSocketJoined(tableId)) {
-      socket.emit('joinTable', joinPayload);
-    }
+    socket.emit('joinTable', joinPayload);
   };
 
   const handleConnect = () => {
