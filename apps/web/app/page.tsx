@@ -198,6 +198,6 @@ export default function Page() {
           {lastBeatSeconds != null ? `Last beat ${lastBeatSeconds}s ago` : 'Awaiting heartbeat…'}
         </span>
       </div>
-      </>
+    </>
   );
 }
